@@ -1,6 +1,6 @@
 {
   "name": "wallpaper-app",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "A Windows background application that automatically syncs wallpapers.",
   "main": "main.js",
   "scripts": {
