@@ -9,16 +9,21 @@
     "dist": "electron-builder"
   },
   "build": {
-    "appId": "com.wallpaper.syncapp",
-    "productName": "Wallpaper Sync App",
-    "win": {
-      "target": "nsis",
-      "icon": "icon.png"
-    },
-    "extraResources": [
-      "wall_img/**/*"
-    ]
+  "appId": "com.wallpaper.syncapp",
+  "productName": "Wallpaper Sync App",
+  "win": {
+    "target": "nsis",
+    "icon": "icon.png"
   },
+  "extraResources": [
+    "wall_img/**/*"
+  ],
+  "publish": [
+    {
+      "provider": "github"
+    }
+  ]
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
