@@ -6,7 +6,12 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "publish": "electron-builder --win --publish always"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Debanjan110d/wallpaper-sync-app.git"
   },
   "build": {
   "appId": "com.wallpaper.syncapp",
