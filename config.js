@@ -2,7 +2,10 @@ const path = require("path");
 const { app } = require("electron");
 
 module.exports = {
-  get API_URL() { return process.env.WALLPAPER_SYNC_API_URL || "http://localhost:3000/api/wallpapers"; },
+  get API_URL() {
+    return process.env.WALLPAPER_SYNC_API_URL
+      || "https://wallpaper-sync-app.vercel.app/api/wallpapers";
+  },
   get SYNC_TOKEN() { return process.env.WALLPAPER_SYNC_TOKEN || ""; },
   get WALLPAPER_DIR() { return path.join(app.getPath("userData"), "wallpapers"); },
   get SOURCE_DIR() { return app.isPackaged ? path.join(process.resourcesPath, "wall_img") : path.join(__dirname, "wall_img"); },
