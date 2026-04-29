@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("api", {
   getWallpapers: () => ipcRenderer.invoke("get-wallpapers"),
   setWallpaper: (absolutePath) => ipcRenderer.invoke("set-wallpaper", absolutePath),
   syncNow: () => ipcRenderer.invoke("sync-now"),
+  fetchFromServer: () => ipcRenderer.invoke("fetch-server"),
   updateInterval: (ms) => ipcRenderer.invoke("update-interval", ms),
   uploadWallpapers: (fileDataArray) => ipcRenderer.invoke("upload-wallpapers", fileDataArray),
   deleteWallpaper: (absolutePath) => ipcRenderer.invoke("delete-wallpaper", absolutePath),

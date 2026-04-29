@@ -17,13 +17,15 @@ function loadSettings() {
       console.error("Error reading settings:", err);
     }
   }
-  
+
   return {
     autoSync: false,
     slideshow: false,
     slideshowInterval: 10000,
     lastSyncDate: Date.now(),
     selectedImages: [],
+    apiUrl: "",
+    syncToken: "",
     ...savedSettings
   };
 }

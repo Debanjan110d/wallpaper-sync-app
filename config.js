@@ -2,7 +2,8 @@ const path = require("path");
 const { app } = require("electron");
 
 module.exports = {
-  JSON_URL: "https://yourdomain.com/wallpapers.json",
+  get API_URL() { return process.env.WALLPAPER_SYNC_API_URL || "http://localhost:3000/api/wallpapers"; },
+  get SYNC_TOKEN() { return process.env.WALLPAPER_SYNC_TOKEN || ""; },
   get WALLPAPER_DIR() { return path.join(app.getPath("userData"), "wallpapers"); },
   get SOURCE_DIR() { return app.isPackaged ? path.join(process.resourcesPath, "wall_img") : path.join(__dirname, "wall_img"); },
   NOTIFICATION_INTERVAL: 1000 * 60 * 60 * 24 * 30 // 30 days

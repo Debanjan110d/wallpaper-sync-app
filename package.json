@@ -1,6 +1,6 @@
 {
   "name": "wallpaper-app",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A Windows background application that automatically syncs wallpapers.",
   "main": "main.js",
   "scripts": {
@@ -14,21 +14,31 @@
     "url": "https://github.com/Debanjan110d/wallpaper-sync-app.git"
   },
   "build": {
-  "appId": "com.wallpaper.syncapp",
-  "productName": "Wallpaper Sync App",
-  "win": {
-    "target": "nsis",
-    "icon": "icon.png"
+    "appId": "com.wallpaper.syncapp",
+    "productName": "Wallpaper Sync App",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "asar": false,
+    "extraResources": [
+      {
+        "from": "wall_img",
+        "to": "wall_img",
+        "filter": ["**/*"]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
+    ]
   },
-  "extraResources": [
-    "wall_img/**/*"
-  ],
-  "publish": [
-    {
-      "provider": "github"
-    }
-  ]
-},
   "keywords": [],
   "author": "",
   "license": "ISC",

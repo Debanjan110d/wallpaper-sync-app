@@ -47,7 +47,18 @@ Thumbs.db
 *.swp
 *.swo
 
-# Project specific
-wall_img/
-# (If you want to track your default wall_img folder, remove the line above, 
-# but usually it's best not to track large image assets in git)
+# Next.js / React
+**/.next/
+**/out/
+
+# Misc build artifacts
+coverage/
+*.tsbuildinfo
+
+# Project-specific
+# Note: `wall_img/` is intentionally tracked (packaged into releases).
+settings.json
+
+# Local scratch / debug artifacts
+build_output.txt
+scratch/

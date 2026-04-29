@@ -1,34 +1,51 @@
-name: Build and Release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build_release:
+    name: Build and publish
     runs-on: windows-latest
-    
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Check out Git repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build and Publish Release
+      - name: Generate release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          node scripts/extract-release-notes.mjs "${{ github.ref_name }}" | Out-File -FilePath release-notes.md -Encoding utf8
+
+      - name: Build Windows artifacts
+        run: npx electron-builder --win --publish never
+
+      - name: Create GitHub Release (non-draft) and upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body_path: release-notes.md
+          files: |
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
+            dist/*.zip
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run publish
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
