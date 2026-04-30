@@ -11,7 +11,6 @@ let tray = null;
 let mainWindow = null;
 let settings = null;
 let slideshowTimer = null;
-let autoSyncTimer = null;
 let currentImageIndex = 0;
 let isQuitting = false;
 
@@ -102,8 +101,6 @@ function startSlideshow() {
   }
 }
 
-const { dialog } = require("electron");
-
 function getSyncConfig() {
   const apiUrl =
     (settings && typeof settings.apiUrl === "string" && settings.apiUrl.trim()) ||
@@ -125,7 +122,11 @@ function getSyncConfig() {
 async function runAutoSync(promptUser = false, notifyOnError = false) {
   try {
     const syncConfig = getSyncConfig();
-    const { latestFile, downloadCount, serverFiles, error } = await syncWallpapers(syncConfig);
+    if (mainWindow) mainWindow.webContents.send("download-progress", 0);
+    const { latestFile, downloadCount, serverFiles, error } = await syncWallpapers(syncConfig, (percent) => {
+      if (mainWindow) mainWindow.webContents.send("download-progress", percent);
+    });
+    if (mainWindow) mainWindow.webContents.send("download-progress", 100);
 
     if (error) {
       if (notifyOnError && mainWindow) {
@@ -134,55 +135,33 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
       return { downloadCount: 0, orphanedCount: 0, error };
     }
 
-    let orphanedCount = 0;
+    let serverDeletedCount = 0;
     if (serverFiles && serverFiles.length > 0) {
       const localFiles = fs
         .readdirSync(config.WALLPAPER_DIR)
         .filter((f) => f.match(/\.(jpg|jpeg|png|webp)$/i));
       for (const local of localFiles) {
         if (!serverFiles.includes(local)) {
-          if (promptUser && mainWindow) {
-            const result = await dialog.showMessageBox(mainWindow, {
-              type: 'question',
-              buttons: ['Keep', 'Delete'],
-              defaultId: 1,
-              title: 'Server Deletion Detected',
-              message: `The image '${local}' was deleted from the server. Do you want to keep your local copy or delete it?`
-            });
-            if (result.response === 1) { // Delete
-              try {
-                fs.unlinkSync(path.join(config.WALLPAPER_DIR, local));
-                orphanedCount++;
-              } catch (e) {
-                console.error("Error unlinking", e);
-              }
-            }
-          }
+          // Non-blocking UX: keep local copies; just report count.
+          serverDeletedCount++;
         }
       }
     }
 
-    if (latestFile || orphanedCount > 0) {
+    if (latestFile) {
       settings.lastSyncDate = Date.now();
       saveSettings(settings);
       if (mainWindow) mainWindow.webContents.send("sync-complete");
     }
 
-    return { downloadCount, orphanedCount, error: null };
+    return { downloadCount, orphanedCount: 0, serverDeletedCount, error: null };
   } catch (err) {
     console.error("Auto Sync Error:", err.message);
     const message = err && err.message ? err.message : String(err);
     if (notifyOnError && mainWindow) {
       mainWindow.webContents.send("app-error", `Sync failed: ${message}`);
     }
-    return { downloadCount: 0, orphanedCount: 0, error: message };
-  }
-}
-
-function startAutoSync() {
-  if (autoSyncTimer) clearInterval(autoSyncTimer);
-  if (settings.autoSync) {
-    autoSyncTimer = setInterval(runAutoSync, 1000 * 60 * 60);
+    return { downloadCount: 0, orphanedCount: 0, serverDeletedCount: 0, error: message };
   }
 }
 
@@ -213,7 +192,6 @@ app.whenReady().then(() => {
   setupTray();
 
   startSlideshow();
-  startAutoSync();
 });
 
 app.on("window-all-closed", () => {
@@ -228,12 +206,6 @@ app.on("activate", () => {
 
 ipcMain.handle("get-settings", () => {
   return settings;
-});
-
-ipcMain.handle("toggle-auto-sync", (event, state) => {
-  settings.autoSync = state;
-  saveSettings(settings);
-  startAutoSync();
 });
 
 ipcMain.handle("toggle-slideshow", (event, state) => {
@@ -260,6 +232,10 @@ ipcMain.handle("fetch-server", async () => {
 
 ipcMain.handle("get-wallpapers", () => {
   return getImages();
+});
+
+ipcMain.handle("get-wallpaper-count", () => {
+  return { count: getImages().length };
 });
 
 ipcMain.handle("upload-wallpapers", async (event, fileDataArray) => {

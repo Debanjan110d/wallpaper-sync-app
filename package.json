@@ -1,13 +1,13 @@
 {
   "name": "wallpaper-app",
-  "version": "1.0.5",
-  "description": "A Windows background application that automatically syncs wallpapers.",
+  "version": "2.0.1",
+  "description": "A Windows background application that syncs wallpapers and manages a local collection.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "publish": "electron-builder --win --publish always"
+    "pack": "npx electron-builder --dir",
+    "dist": "npx electron-builder",
+    "publish": "npx electron-builder --win --publish always"
   },
   "repository": {
     "type": "git",

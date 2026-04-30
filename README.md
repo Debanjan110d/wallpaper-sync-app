@@ -15,6 +15,7 @@
 </p>
 
 Wallpaper Sync is an Electron tray app that can:
+
 - rotate wallpapers from your local collection
 - let you drag & drop new wallpapers into the app
 - optionally sync a wallpaper collection from a server API
@@ -48,12 +49,13 @@ npm start
 The desktop app syncs from an API URL (defaults to `http://localhost:3000/api/wallpapers`).
 
 You can override it either by:
+
 - setting `apiUrl` in the desktop app settings file (stored in Electron's `userData` directory as `settings.json`), or
 - setting the env var `WALLPAPER_SYNC_API_URL`.
 
 If your web API is protected, you can also set `syncToken` in that same settings file (or `WALLPAPER_SYNC_TOKEN` as an env var).
 
-1) Install and run the Next.js app:
+1. Install and run the Next.js app:
 
 ```bash
 cd web
@@ -61,7 +63,7 @@ npm ci
 npm run dev
 ```
 
-2) Create `web/.env.local` with:
+1. Create `web/.env.local` with:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -98,11 +100,29 @@ The Windows installer will be generated in `dist/`.
 
 Releases are fully automated from tags and use `CHANGELOG.md` as release notes.
 
-1) Bump the version in `package.json` (root)
-2) Add/update the matching section in `CHANGELOG.md` (e.g. `## 1.0.5`)
-3) Create and push a git tag like `v1.0.5`
+The release workflow triggers on `push` of tags matching `v*` (example: `v2.0.1`).
+
+1. Bump the version in root `package.json` (example: `2.0.1`)
+1. Add/update the matching section heading in `CHANGELOG.md` (example: `## 2.0.1`)
+1. Commit those changes
+1. Create and push a git tag like `v2.0.1`
+
+Example commands:
+
+```bash
+git status
+git add -A
+git commit -m "release: v2.0.1"
+
+# annotated tag is recommended
+git tag -a v2.0.1 -m "v2.0.1"
+
+git push origin main
+git push origin v2.0.1
+```
 
 When you push the tag, GitHub Actions will:
+
 - build the Windows artifacts
 - create a GitHub Release (non-draft)
 - attach the generated installer files
@@ -115,5 +135,3 @@ See `CONTRIBUTING.md` for setup, workflow, and release/changelog rules.
 ## License
 
 MIT
-
-

@@ -70,13 +70,6 @@
 
             <div class="sidebar-section">
                 <h3>Network</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Auto Sync</span>
-                    <label class="switch">
-                        <input type="checkbox" id="autoSyncToggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
                 <button id="fetchWallpapersBtn" class="primary-btn" style="margin-top: 1rem; background: #8b5cf6;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -85,6 +78,15 @@
                     </svg>
                     Fetch from Server
                 </button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Wallpaper Info</h3>
+                <p>Total Wallpapers: <span id="wallpaperCount">0</span></p>
+                <p>Sync Progress: <span id="syncProgress">0%</span></p>
+                <div class="progress-track" aria-label="Sync progress">
+                    <div id="syncProgressBarFill" class="progress-fill" style="width: 0%"></div>
+                </div>
             </div>
 
             <div class="drag-hint">

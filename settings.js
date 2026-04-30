@@ -19,7 +19,6 @@ function loadSettings() {
   }
 
   return {
-    autoSync: false,
     slideshow: false,
     slideshowInterval: 10000,
     lastSyncDate: Date.now(),

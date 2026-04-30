@@ -82,7 +82,18 @@ Releases are automated.
 3. Create and push a tag `vX.Y.Z`.
 
 Pushing the tag triggers the release workflow, which:
+
 - builds the Windows artifacts
 - creates a non-draft GitHub Release
 - uploads the `dist/` artifacts
 - uses the `CHANGELOG.md` entry for that version as the release description
+
+Example:
+
+```bash
+git add -A
+git commit -m "release: v2.0.1"
+git tag -a v2.0.1 -m "v2.0.1"
+git push origin main
+git push origin v2.0.1
+```

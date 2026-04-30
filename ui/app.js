@@ -1,20 +1,18 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const gallery = document.getElementById("gallery");
-    const autoSyncToggle = document.getElementById("autoSyncToggle");
     const slideshowToggle = document.getElementById("slideshowToggle");
     const syncNowBtn = document.getElementById("syncNowBtn");
     const intervalDropdown = document.getElementById("intervalDropdown");
+    const wallpaperCountElement = document.getElementById("wallpaperCount");
+    const syncProgressElement = document.getElementById("syncProgress");
+    const syncProgressBarFill = document.getElementById("syncProgressBarFill");
 
     // Load initial settings
     const settings = await window.api.getSettings();
-    autoSyncToggle.checked = settings.autoSync;
     slideshowToggle.checked = settings.slideshow;
     intervalDropdown.value = settings.slideshowInterval || 10000;
 
     // Toggle listeners
-    autoSyncToggle.addEventListener("change", async (e) => {
-        await window.api.toggleAutoSync(e.target.checked);
-    });
     slideshowToggle.addEventListener("change", async (e) => {
         await window.api.toggleSlideshow(e.target.checked);
     });
@@ -50,47 +48,42 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Sync Now listener
-    syncNowBtn.addEventListener("click", async () => {
-        syncNowBtn.disabled = true;
-        const originalContent = syncNowBtn.innerHTML;
-        syncNowBtn.innerHTML = "Loading...";
-        try {
-            const result = await window.api.syncNow();
-            if (result && result.error) {
-                showToast("Failed to sync: " + result.error, "error");
-            } else
-                if (result && result.downloadCount > 0) {
-                    showToast(`Successfully downloaded ${result.downloadCount} image(s)!`, "success");
-                } else if (result && result.orphanedCount > 0) {
-                    showToast(`Cleaned up ${result.orphanedCount} orphaned image(s).`, "success");
-                } else {
-                    showToast("Already up to date.", "success");
-                }
-        } catch (e) {
-            showToast("Failed to sync: " + e.message, "error");
+    function setSyncProgress(percent) {
+        const safe = Math.max(0, Math.min(100, Number(percent) || 0));
+        syncProgressElement.textContent = `${safe}%`;
+        if (syncProgressBarFill) {
+            syncProgressBarFill.style.width = `${safe}%`;
         }
-        syncNowBtn.innerHTML = originalContent;
-        syncNowBtn.disabled = false;
-    });
+    }
+
+    setSyncProgress(0);
+
+    if (window.api.onDownloadProgress) {
+        window.api.onDownloadProgress((percent) => {
+            setSyncProgress(percent);
+        });
+    }
 
     const fetchWallpapersBtn = document.getElementById("fetchWallpapersBtn");
     fetchWallpapersBtn.addEventListener("click", async () => {
         fetchWallpapersBtn.disabled = true;
         const originalContent = fetchWallpapersBtn.innerHTML;
         fetchWallpapersBtn.innerHTML = "Fetching...";
+        setSyncProgress(0);
 
         try {
             const result = await window.api.fetchFromServer();
-            loadWallpapers();
+            setSyncProgress(100);
+            await updateWallpaperInfo();
+            await loadWallpapers();
 
             if (result && result.error) {
                 showToast("Failed to fetch: " + result.error, "error");
             } else
                 if (result && result.downloadCount > 0) {
                     showToast(`Successfully downloaded ${result.downloadCount} image(s)!`, "success");
-                } else if (result && result.orphanedCount > 0) {
-                    showToast(`Cleaned up ${result.orphanedCount} orphaned image(s).`, "success");
+                } else if (result && result.serverDeletedCount > 0) {
+                    showToast(`Server removed ${result.serverDeletedCount} wallpaper(s) (kept locally).`, "success");
                 } else {
                     showToast("Already up to date.", "success");
                 }
@@ -100,6 +93,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         fetchWallpapersBtn.innerHTML = originalContent;
         fetchWallpapersBtn.disabled = false;
+    });
+
+    // Sync Now listener
+    syncNowBtn.addEventListener("click", async () => {
+        syncNowBtn.disabled = true;
+        const originalContent = syncNowBtn.innerHTML;
+        syncNowBtn.innerHTML = "Loading...";
+        setSyncProgress(0);
+
+        try {
+            const result = await window.api.syncNow();
+            setSyncProgress(100);
+            await updateWallpaperInfo();
+            await loadWallpapers();
+
+            if (result && result.error) {
+                showToast("Failed to sync: " + result.error, "error");
+            } else if (result && result.downloadCount > 0) {
+                showToast(`Successfully downloaded ${result.downloadCount} image(s)!`, "success");
+            } else if (result && result.serverDeletedCount > 0) {
+                showToast(`Server removed ${result.serverDeletedCount} wallpaper(s) (kept locally).`, "success");
+            } else {
+                showToast("Already up to date.", "success");
+            }
+        } catch (e) {
+            showToast("Failed to sync: " + e.message, "error");
+        }
+
+        syncNowBtn.innerHTML = originalContent;
+        syncNowBtn.disabled = false;
     });
 
     // Load Wallpapers
@@ -150,6 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 e.stopPropagation();
                 if (confirm("Are you sure you want to delete this wallpaper?")) {
                     await window.api.deleteWallpaper(imgData.path);
+                    await updateWallpaperInfo();
                     loadWallpapers();
                 }
             });
@@ -209,9 +233,22 @@ document.addEventListener("DOMContentLoaded", async () => {
                 fileDataArray.push({ name: file.name, data: buffer });
             }
             await window.api.uploadWallpapers(fileDataArray);
+            await updateWallpaperInfo();
             loadWallpapers();
         }
     });
+
+    async function updateWallpaperInfo() {
+        try {
+            const { count } = await window.api.getWallpaperCount();
+            wallpaperCountElement.textContent = count;
+        } catch (error) {
+            console.error("Failed to fetch wallpaper count:", error);
+        }
+    }
+
+    // Initial update
+    updateWallpaperInfo();
 
     loadWallpapers();
 });
