@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
 import { cookies } from "next/headers";
+import crypto from "crypto";
+
+type DbError = {
+  message: string;
+  code?: string;
+};
+
+function getHash(buffer: Buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,10 +28,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Use the Service Role Key to bypass Row Level Security (RLS) 
-    // because we already authenticated the user with our ADMIN_PASSWORD.
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is missing in .env.local" }, { status: 500 });
+      return NextResponse.json(
+        { error: "SUPABASE_SERVICE_ROLE_KEY is missing in .env.local" },
+        { status: 500 }
+      );
     }
 
     const supabaseAdmin = createClient(
@@ -30,10 +40,35 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const buffer = await file.arrayBuffer();
-    const ext = file.name.substring(file.name.lastIndexOf('.'));
-    // Generate a very short unique name like "0123-4567.jpg"
-    const randomStr = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const hash = getHash(buffer);
+
+    const { error: insertError } = await supabaseAdmin
+      .from("wallpapers")
+      .insert([{ file_name: file.name, hash }]);
+
+    const dbError = insertError as DbError | null;
+
+    if (dbError) {
+      if (dbError.code === "23505") {
+        return NextResponse.json(
+          { error: "Duplicate image already exists" },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: dbError.message },
+        { status: 500 }
+      );
+    }
+
+    const ext = file.name.substring(file.name.lastIndexOf("."));
+    const randomStr = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, "0");
     const timeStr = Date.now().toString().slice(-4);
     const filename = `${randomStr}-${timeStr}${ext}`;
 
@@ -48,6 +83,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, data });
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
