@@ -10,7 +10,9 @@ function extractSection(markdown, version) {
     // ## 1.0.4
     // ## [1.0.4]
     // ## 1.0.4 - 2026-04-29
-    const headingRe = /^##\s+(?:\[)?(?<ver>[^\]\s]+)(?:\])?(?:\s+-.*)?\s*$/gm;
+    // ## 1.0.4 (v1.0.4)
+    // ## [1.0.4] (v1.0.4)
+    const headingRe = /^##\s+(?:\[)?(?<ver>[^\]\s]+)(?:\])?(?:\s+.*)?\s*$/gm;
 
     const matches = [];
     for (const match of markdown.matchAll(headingRe)) {
@@ -36,7 +38,14 @@ function extractSection(markdown, version) {
 
 const tag = process.argv[2];
 if (!tag) {
-    console.error("Usage: node scripts/extract-release-notes.mjs <tag>");
+    console.error("Usage: node scripts/extract-release-notes.mjs <tag> [--out <path>]");
+    process.exit(2);
+}
+
+const outFlagIndex = process.argv.findIndex((arg) => arg === "--out" || arg === "--output");
+const outPath = outFlagIndex >= 0 ? process.argv[outFlagIndex + 1] : null;
+if (outFlagIndex >= 0 && (!outPath || outPath.startsWith("--"))) {
+    console.error("Missing value for --out. Usage: node scripts/extract-release-notes.mjs <tag> [--out <path>]");
     process.exit(2);
 }
 
@@ -51,4 +60,8 @@ if (!section) {
 }
 
 // Print section as-is; GitHub release body supports Markdown.
-process.stdout.write(section + "\n");
+if (outPath) {
+    fs.writeFileSync(outPath, section + "\n", "utf8");
+} else {
+    process.stdout.write(section + "\n");
+}

@@ -29,7 +29,7 @@ jobs:
       - name: Generate release notes from CHANGELOG.md
         shell: pwsh
         run: |
-          node scripts/extract-release-notes.mjs "${{ github.ref_name }}" | Out-File -FilePath release-notes.md -Encoding utf8
+          node scripts/extract-release-notes.mjs "${{ github.ref_name }}" --out release-notes.md
 
       - name: Build Windows artifacts
         run: npx electron-builder --win --publish never
