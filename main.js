@@ -14,6 +14,26 @@ let slideshowTimer = null;
 let currentImageIndex = 0;
 let isQuitting = false;
 
+function registerWindowsStartupOnce() {
+  if (process.platform !== "win32") return;
+  if (!settings) return;
+
+  // Register on first run so the entry shows up in Windows "Startup apps".
+  // We only do this once to avoid re-enabling startup after the user disables it in Windows.
+  if (settings.startupRegistered) return;
+
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: process.execPath
+    });
+    settings.startupRegistered = true;
+    saveSettings(settings);
+  } catch (err) {
+    console.error("Failed to register startup:", err);
+  }
+}
+
 function createMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -188,8 +208,16 @@ function setupTray() {
 
 app.whenReady().then(() => {
   settings = loadSettings();
-  createMainWindow();
   setupTray();
+
+  registerWindowsStartupOnce();
+
+  const isStartupLaunch =
+    process.platform === "win32" && app.getLoginItemSettings().wasOpenedAtLogin;
+
+  if (!isStartupLaunch) {
+    createMainWindow();
+  }
 
   startSlideshow();
 });

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 (v2.0.2)
+
+### 🪟 Windows Startup
+
+- Adds native Windows "Startup apps" integration (users can enable/disable from Windows)
+- On startup launches, app starts tray-only (does not open the dashboard)
+
 ## 2.0.1 (v2.0.1)
 
 ### ✨ Improvements
