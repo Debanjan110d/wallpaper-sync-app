@@ -30,7 +30,7 @@ This repo also contains an optional Next.js + Supabase web app under `web/` that
 - Simple image management (delete & organize)
 - Runs silently in the system tray
 - Optional Windows Startup Apps support (enable/disable from Task Manager → Startup apps)
-- Update notifications (tray tooltip + small Windows notification) with one-click download/install
+- App updates (installed builds): checks once on startup, auto-downloads when available, then prompts to install/restart
 
 ## Project structure
 
