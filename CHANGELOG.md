@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.0.0 (v3.0.0) — 2026-05-23
+
+### 🌑 Major UI Refresh (Dark)
+
+- Dark, clean dashboard styling and a more responsive layout (not locked to a single rigid grid)
+- Better preview/selection UX across the app
+
+### 🎞️ Slideshow Management
+
+- Added slideshow management mode with a selected-preview strip
+- Selected wallpapers can be removed directly from the preview strip (fixes “first items not deletable” behavior)
+- Added random slideshow toggle
+
+### 📥 Wallpaper Sync (Database-First / Supabase)
+
+- Wallpaper listing now comes from the database as the source of truth (DB-first), not storage listing
+- Incremental sync with `since` cursor (reduced bandwidth and faster syncs)
+- Local ignore list prevents re-downloading wallpapers that the user deleted locally
+- Preserves server ordering locally
+- Startup-only “new wallpapers available?” check (no polling; minimal resources)
+- Added “Clear Local Wallpapers” action to wipe local downloads and reset local sync state
+
+### ⬆️ App Updates
+
+- Update check happens once on app startup (no background polling)
+- Automatically downloads updates when found
+- Prompts the user to install/restart or defer after download completes
+
+### 🛠️ Windows Stability
+
+- Fixed Chromium/Electron disk cache “Access is denied (0x5)” issues by moving cache to a safe temp directory (per-launch)
+
 ## 2.0.2 (v2.0.2)
 
 ### 🪟 Windows Startup

@@ -6,11 +6,136 @@ document.addEventListener("DOMContentLoaded", async () => {
     const wallpaperCountElement = document.getElementById("wallpaperCount");
     const syncProgressElement = document.getElementById("syncProgress");
     const syncProgressBarFill = document.getElementById("syncProgressBarFill");
+    const clearLocalBtn = document.getElementById("clearLocalBtn");
+
+    const manageSlideshowBtn = document.getElementById("manageSlideshowBtn");
+    const slideshowSelectedCount = document.getElementById("slideshowSelectedCount");
+    const gallerySubheader = document.getElementById("gallerySubheader");
+    const manageDoneBtn = document.getElementById("manageDoneBtn");
+    const selectedPreview = document.getElementById("selectedPreview");
+
+    const randomToggle = document.getElementById("randomToggle");
+
+    const updateStatusText = document.getElementById("updateStatusText");
+    const updateNotesText = document.getElementById("updateNotesText");
+    const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
+    const downloadUpdateBtn = document.getElementById("downloadUpdateBtn");
+    const installUpdateBtn = document.getElementById("installUpdateBtn");
+
+    const topUpdateBanner = document.getElementById("topUpdateBanner");
+    const topUpdateText = document.getElementById("topUpdateText");
+    const topUpdateActionBtn = document.getElementById("topUpdateActionBtn");
 
     // Load initial settings
     const settings = await window.api.getSettings();
     slideshowToggle.checked = settings.slideshow;
+    if (randomToggle) randomToggle.checked = !!settings.slideshowRandom;
     intervalDropdown.value = settings.slideshowInterval || 10000;
+
+    let isManageSlideshowMode = false;
+
+    function toFileUrl(absolutePath) {
+        if (!absolutePath) return "";
+        // Windows paths may contain backslashes; file URLs require forward slashes and 3 slashes after scheme.
+        // Example: C:\Users\Me\a b.jpg -> file:///C:/Users/Me/a%20b.jpg
+        const normalized = String(absolutePath).replace(/\\/g, "/");
+        const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`;
+        return encodeURI(`file://${withLeadingSlash}`);
+    }
+
+    // Manage slideshow flow:
+    // step 0: select/deselect
+    // step 1: preview selected thumbnails, confirm to exit
+    let manageStep = 0;
+    let selectedSet = new Set((settings.selectedImages || []).map(String));
+
+    function setManageMode(enabled) {
+        isManageSlideshowMode = !!enabled;
+        manageStep = 0;
+        if (gallerySubheader) {
+            gallerySubheader.style.display = isManageSlideshowMode ? "" : "none";
+        }
+        if (manageSlideshowBtn) {
+            manageSlideshowBtn.textContent = isManageSlideshowMode ? "Managing…" : "Manage Slideshow";
+        }
+
+        if (selectedPreview) {
+            selectedPreview.style.display = "none";
+            selectedPreview.innerHTML = "";
+        }
+
+        if (manageDoneBtn) {
+            manageDoneBtn.textContent = "Done";
+        }
+    }
+
+    if (manageSlideshowBtn) {
+        manageSlideshowBtn.addEventListener("click", async () => {
+            setManageMode(true);
+            await loadWallpapers();
+        });
+    }
+
+    if (manageDoneBtn) {
+        manageDoneBtn.addEventListener("click", async () => {
+            if (!isManageSlideshowMode) return;
+
+            if (manageStep === 0) {
+                // Preview step
+                manageStep = 1;
+                if (selectedPreview) {
+                    selectedPreview.style.display = "flex";
+                    selectedPreview.innerHTML = "";
+                    const selected = Array.from(selectedSet);
+                    for (const absolutePath of selected) {
+                        if (!absolutePath) continue;
+
+                        const item = document.createElement("div");
+                        item.className = "selected-item";
+                        item.title = absolutePath;
+
+                        const thumb = document.createElement("img");
+                        thumb.className = "selected-thumb";
+                        thumb.alt = "Selected wallpaper";
+                        thumb.src = toFileUrl(absolutePath);
+
+                        const removeBtn = document.createElement("button");
+                        removeBtn.type = "button";
+                        removeBtn.className = "selected-remove";
+                        removeBtn.title = "Remove from slideshow";
+                        removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+                        removeBtn.addEventListener("click", async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const key = String(absolutePath);
+                            if (!selectedSet.has(key)) return;
+                            selectedSet.delete(key);
+                            await window.api.toggleSelection(key, false);
+                            if (slideshowSelectedCount) slideshowSelectedCount.textContent = String(selectedSet.size);
+                            item.remove();
+                        });
+
+                        item.appendChild(thumb);
+                        item.appendChild(removeBtn);
+                        selectedPreview.appendChild(item);
+                    }
+                }
+                if (manageDoneBtn) manageDoneBtn.textContent = "Done (Confirm)";
+                showToast("Review selected wallpapers above, then confirm.", "success");
+                return;
+            }
+
+            // Finalize
+            setManageMode(false);
+            await loadWallpapers();
+        });
+    }
+
+    if (randomToggle) {
+        randomToggle.addEventListener("change", async (e) => {
+            await window.api.toggleRandom(!!e.target.checked);
+        });
+    }
 
     // Toggle listeners
     slideshowToggle.addEventListener("change", async (e) => {
@@ -42,6 +167,167 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 5000);
     }
 
+    function setButtonVisible(button, isVisible) {
+        if (!button) return;
+        button.style.display = isVisible ? "" : "none";
+    }
+
+    function renderUpdateState(state) {
+        if (!updateStatusText) return;
+
+        const supported = state && state.supported;
+        const checking = !!(state && state.checking);
+        const available = !!(state && state.available);
+        const downloaded = !!(state && state.downloaded);
+        const downloading = !!(state && state.downloading);
+        const version = state && state.version ? state.version : null;
+        const notes = state && state.notes ? state.notes : "";
+
+        const shouldShowTopBanner = supported && (available || downloading || downloaded || checking);
+        if (topUpdateBanner) {
+            topUpdateBanner.style.display = shouldShowTopBanner ? "" : "none";
+        }
+
+        if (topUpdateText) {
+            if (!supported) {
+                topUpdateText.textContent = "Updates are available after install";
+            } else if (checking) {
+                topUpdateText.textContent = "Checking for updates…";
+            } else if (available) {
+                const v = version ? `v${version}` : "";
+                topUpdateText.textContent = notes ? `Update available ${v} — ${notes}` : `Update available ${v}`.trim();
+            } else {
+                topUpdateText.textContent = "Up to date";
+            }
+        }
+
+        if (topUpdateActionBtn) {
+            if (!supported) {
+                topUpdateActionBtn.disabled = true;
+                topUpdateActionBtn.textContent = "Install required";
+            } else if (downloaded) {
+                topUpdateActionBtn.disabled = false;
+                topUpdateActionBtn.textContent = "Install";
+            } else if (available) {
+                topUpdateActionBtn.disabled = downloading;
+                topUpdateActionBtn.textContent = downloading ? "Downloading…" : "Download";
+            } else {
+                topUpdateActionBtn.disabled = checking;
+                topUpdateActionBtn.textContent = checking ? "Checking…" : "Check";
+            }
+        }
+
+        if (!supported) {
+            updateStatusText.textContent = "Updates: available after install";
+            if (updateNotesText) {
+                updateNotesText.textContent = "Packaged/installed builds only.";
+                updateNotesText.title = updateNotesText.textContent;
+            }
+            if (checkUpdatesBtn) checkUpdatesBtn.disabled = true;
+            setButtonVisible(downloadUpdateBtn, false);
+            setButtonVisible(installUpdateBtn, false);
+            return;
+        }
+
+        if (checking) {
+            updateStatusText.textContent = "Checking for updates…";
+        } else if (available) {
+            updateStatusText.textContent = version ? `Update available (v${version})` : "Update available";
+        } else {
+            updateStatusText.textContent = "Up to date";
+        }
+
+        if (updateNotesText) {
+            updateNotesText.textContent = notes || "";
+            updateNotesText.title = notes || "";
+        }
+
+        if (checkUpdatesBtn) checkUpdatesBtn.disabled = checking || downloading;
+
+        setButtonVisible(downloadUpdateBtn, available && !downloaded);
+        if (downloadUpdateBtn) {
+            downloadUpdateBtn.disabled = downloading;
+            downloadUpdateBtn.textContent = downloading ? "Downloading…" : "Download";
+        }
+
+        setButtonVisible(installUpdateBtn, available && downloaded);
+        if (installUpdateBtn) {
+            installUpdateBtn.disabled = false;
+            installUpdateBtn.textContent = "Install";
+        }
+    }
+
+    async function refreshUpdateState() {
+        if (!window.api.getUpdateState) return;
+        try {
+            const state = await window.api.getUpdateState();
+            renderUpdateState(state);
+        } catch (err) {
+            console.error("Failed to fetch update state:", err);
+        }
+    }
+
+    if (checkUpdatesBtn && window.api.checkForUpdates) {
+        checkUpdatesBtn.addEventListener("click", async () => {
+            try {
+                const state = await window.api.checkForUpdates();
+                renderUpdateState(state);
+                showToast("Checking for updates…", "success");
+            } catch (err) {
+                showToast("Update check failed: " + (err && err.message ? err.message : String(err)), "error");
+            }
+        });
+    }
+
+    if (downloadUpdateBtn && window.api.downloadUpdate) {
+        downloadUpdateBtn.addEventListener("click", async () => {
+            try {
+                const state = await window.api.downloadUpdate();
+                renderUpdateState(state);
+                showToast("Downloading update…", "success");
+            } catch (err) {
+                showToast("Download failed: " + (err && err.message ? err.message : String(err)), "error");
+            }
+        });
+    }
+
+    if (installUpdateBtn && window.api.installUpdate) {
+        installUpdateBtn.addEventListener("click", async () => {
+            try {
+                await window.api.installUpdate();
+            } catch (err) {
+                showToast("Install failed: " + (err && err.message ? err.message : String(err)), "error");
+            }
+        });
+    }
+
+    if (topUpdateActionBtn) {
+        topUpdateActionBtn.addEventListener("click", async () => {
+            try {
+                const state = await window.api.getUpdateState();
+                if (state && state.downloaded) {
+                    await window.api.installUpdate();
+                    return;
+                }
+                if (state && state.available) {
+                    const nextState = await window.api.downloadUpdate();
+                    renderUpdateState(nextState);
+                    return;
+                }
+                const nextState = await window.api.checkForUpdates();
+                renderUpdateState(nextState);
+            } catch (err) {
+                showToast("Update action failed: " + (err && err.message ? err.message : String(err)), "error");
+            }
+        });
+    }
+
+    if (window.api.onUpdateState) {
+        window.api.onUpdateState((state) => {
+            renderUpdateState(state);
+        });
+    }
+
     if (window.api.onAppError) {
         window.api.onAppError((message) => {
             showToast(message, "error");
@@ -50,13 +336,69 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function setSyncProgress(percent) {
         const safe = Math.max(0, Math.min(100, Number(percent) || 0));
-        syncProgressElement.textContent = `${safe}%`;
-        if (syncProgressBarFill) {
-            syncProgressBarFill.style.width = `${safe}%`;
-        }
+        animateSyncProgressTo(safe);
     }
 
-    setSyncProgress(0);
+    const syncProgressAnim = {
+        current: 0,
+        raf: 0,
+        startTime: 0,
+        startValue: 0,
+        targetValue: 0,
+        durationMs: 0,
+    };
+
+    function renderSyncProgress(value) {
+        const safe = Math.max(0, Math.min(100, Number(value) || 0));
+        syncProgressAnim.current = safe;
+        if (syncProgressElement) syncProgressElement.textContent = `${Math.round(safe)}%`;
+        if (syncProgressBarFill) syncProgressBarFill.style.width = `${safe}%`;
+    }
+
+    function animateSyncProgressTo(target) {
+        const safeTarget = Math.max(0, Math.min(100, Number(target) || 0));
+        const start = syncProgressAnim.current;
+        const delta = Math.abs(safeTarget - start);
+
+        // If the delta is tiny, update immediately to avoid UI lag.
+        if (delta < 0.5) {
+            if (syncProgressAnim.raf) cancelAnimationFrame(syncProgressAnim.raf);
+            syncProgressAnim.raf = 0;
+            renderSyncProgress(safeTarget);
+            return;
+        }
+
+        if (syncProgressAnim.raf) cancelAnimationFrame(syncProgressAnim.raf);
+
+        // Duration scales with delta so 0->100 doesn't snap.
+        const durationMs = Math.max(240, Math.min(2200, delta * 18));
+
+        syncProgressAnim.startTime = performance.now();
+        syncProgressAnim.startValue = start;
+        syncProgressAnim.targetValue = safeTarget;
+        syncProgressAnim.durationMs = durationMs;
+
+        const tick = (now) => {
+            const elapsed = now - syncProgressAnim.startTime;
+            const t = Math.max(0, Math.min(1, elapsed / syncProgressAnim.durationMs));
+
+            // Ease-out quad for a natural finish.
+            const eased = 1 - Math.pow(1 - t, 2);
+            const value = syncProgressAnim.startValue + (syncProgressAnim.targetValue - syncProgressAnim.startValue) * eased;
+            renderSyncProgress(value);
+
+            if (t < 1) {
+                syncProgressAnim.raf = requestAnimationFrame(tick);
+            } else {
+                syncProgressAnim.raf = 0;
+                renderSyncProgress(syncProgressAnim.targetValue);
+            }
+        };
+
+        syncProgressAnim.raf = requestAnimationFrame(tick);
+    }
+
+    renderSyncProgress(0);
 
     if (window.api.onDownloadProgress) {
         window.api.onDownloadProgress((percent) => {
@@ -95,6 +437,36 @@ document.addEventListener("DOMContentLoaded", async () => {
         fetchWallpapersBtn.disabled = false;
     });
 
+    if (clearLocalBtn) {
+        clearLocalBtn.addEventListener("click", async () => {
+            const ok = confirm(
+                "This will delete ALL locally downloaded wallpapers on this device and reset your slideshow selection. Continue?"
+            );
+            if (!ok) return;
+
+            clearLocalBtn.disabled = true;
+            const original = clearLocalBtn.textContent;
+            clearLocalBtn.textContent = "Clearing…";
+
+            try {
+                const result = await window.api.clearLocalWallpapers();
+                await updateWallpaperInfo();
+                await loadWallpapers();
+
+                if (result && result.success) {
+                    showToast(`Cleared ${result.deletedCount || 0} local wallpaper(s).`, "success");
+                } else {
+                    showToast(`Clear failed: ${(result && result.error) || "Unknown error"}`, "error");
+                }
+            } catch (err) {
+                showToast("Clear failed: " + (err && err.message ? err.message : String(err)), "error");
+            }
+
+            clearLocalBtn.textContent = original;
+            clearLocalBtn.disabled = false;
+        });
+    }
+
     // Sync Now listener
     syncNowBtn.addEventListener("click", async () => {
         syncNowBtn.disabled = true;
@@ -129,26 +501,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     async function loadWallpapers() {
         const images = await window.api.getWallpapers();
         const settings = await window.api.getSettings();
-        const selectedImages = settings.selectedImages || [];
+        const selectedImages = (settings.selectedImages || []).map(String);
+        selectedSet = new Set(selectedImages);
+
+        if (slideshowSelectedCount) {
+            slideshowSelectedCount.textContent = String(selectedImages.length);
+        }
 
         gallery.innerHTML = "";
 
         images.forEach(imgData => {
             const card = document.createElement("div");
             card.className = "wallpaper-card";
-            if (selectedImages.includes(imgData.path)) {
+            if (selectedSet.has(String(imgData.path))) {
                 card.classList.add("selected");
             }
 
             const img = document.createElement("img");
-            img.src = `file://${imgData.path}`;
+            img.src = toFileUrl(imgData.path);
 
             const overlay = document.createElement("div");
             overlay.className = "overlay";
 
             const overlayText = document.createElement("div");
             overlayText.className = "overlay-text";
-            overlayText.innerText = "Set Wallpaper";
+            overlayText.innerText = isManageSlideshowMode
+                ? (selectedSet.has(String(imgData.path)) ? "Selected" : "Select")
+                : "Set Wallpaper";
 
             overlay.appendChild(overlayText);
 
@@ -163,7 +542,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const isSelected = !card.classList.contains("selected");
                 if (isSelected) card.classList.add("selected");
                 else card.classList.remove("selected");
-                await window.api.toggleSelection(imgData.path, isSelected);
+                const key = String(imgData.path);
+                if (isSelected) selectedSet.add(key);
+                else selectedSet.delete(key);
+
+                await window.api.toggleSelection(key, isSelected);
+
+                if (slideshowSelectedCount) slideshowSelectedCount.textContent = String(selectedSet.size);
+                if (isManageSlideshowMode) overlayText.innerText = isSelected ? "Selected" : "Select";
             });
 
             const deleteBtn = document.createElement("div");
@@ -186,6 +572,20 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.appendChild(cardActions);
 
             card.addEventListener("click", async () => {
+                if (isManageSlideshowMode) {
+                    const isSelected = !card.classList.contains("selected");
+                    if (isSelected) card.classList.add("selected");
+                    else card.classList.remove("selected");
+                    const key = String(imgData.path);
+                    if (isSelected) selectedSet.add(key);
+                    else selectedSet.delete(key);
+                    await window.api.toggleSelection(key, isSelected);
+                    if (slideshowSelectedCount) slideshowSelectedCount.textContent = String(selectedSet.size);
+                    overlayText.innerText = isSelected ? "Selected" : "Select";
+                    showToast(isSelected ? "Added to slideshow" : "Removed from slideshow", "success");
+                    return;
+                }
+
                 overlayText.innerText = "Applying...";
                 await window.api.setWallpaper(imgData.path);
                 overlayText.innerText = "Applied!";
@@ -251,4 +651,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateWallpaperInfo();
 
     loadWallpapers();
+
+    setManageMode(false);
+
+    // Initial updater state
+    refreshUpdateState();
 });

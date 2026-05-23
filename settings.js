@@ -20,8 +20,13 @@ function loadSettings() {
 
   return {
     slideshow: false,
+    slideshowRandom: false,
     slideshowInterval: 10000,
     lastSyncDate: Date.now(),
+    // ISO timestamp of the newest wallpaper we've seen from the server (db created_at).
+    lastSyncCursor: "",
+    // Storage file keys (e.g. '<hash>.jpg') that this device should never re-download.
+    ignoredServerFiles: [],
     selectedImages: [],
     apiUrl: "",
     syncToken: "",

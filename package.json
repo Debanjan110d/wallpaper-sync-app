@@ -1,6 +1,6 @@
 {
   "name": "wallpaper-app",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "description": "A Windows background application that syncs wallpapers and manages a local collection.",
   "main": "main.js",
   "scripts": {
@@ -44,6 +44,7 @@
   "license": "ISC",
   "dependencies": {
     "axios": "latest",
+    "electron-updater": "^6.6.2",
     "wallpaper": "latest"
   },
   "devDependencies": {

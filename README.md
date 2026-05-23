@@ -30,6 +30,7 @@ This repo also contains an optional Next.js + Supabase web app under `web/` that
 - Simple image management (delete & organize)
 - Runs silently in the system tray
 - Optional Windows Startup Apps support (enable/disable from Task Manager → Startup apps)
+- Update notifications (tray tooltip + small Windows notification) with one-click download/install
 
 ## Project structure
 
@@ -98,6 +99,8 @@ npm run dist
 The Windows installer will be generated in `dist/`.
 
 Note: Windows Startup Apps integration works properly after installing the packaged build (NSIS). It will not reliably show up when running via `npm start`.
+
+Note: In-app update checks/notifications also only work for installed packaged builds (they rely on GitHub Releases artifacts).
 
 ## Automated releases (GitHub Actions)
 
