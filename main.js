@@ -175,17 +175,48 @@ function registerWindowsStartupOnce() {
   if (process.platform !== "win32") return;
   if (!settings) return;
 
+  // Windows Startup Apps integration is only reliable for installed/packaged builds.
+  // Avoid registering from dev runs (`npm start`) because it can:
+  // - create an unusable login item pointing at Electron
+  // - set a "registered" flag that prevents the installed app from registering later
+  if (!app.isPackaged) return;
+
+  const currentExecPath = process.execPath;
+  const previouslyRegisteredExecPath = settings.startupRegisteredExecPath;
+  const loginSettings = app.getLoginItemSettings();
+
+  // If Windows already has this enabled, just persist our bookkeeping.
+  if (loginSettings && loginSettings.openAtLogin) {
+    if (!settings.startupRegistered || previouslyRegisteredExecPath !== currentExecPath) {
+      settings.startupRegistered = true;
+      settings.startupRegisteredExecPath = currentExecPath;
+      saveSettings(settings);
+    }
+    return;
+  }
+
   // Register on first run so the entry shows up in Windows "Startup apps".
   // We only do this once to avoid re-enabling startup after the user disables it in Windows.
-  if (settings.startupRegistered) return;
+  // If we've already registered for *this* installed build, assume the user may have disabled it.
+  if (settings.startupRegistered && previouslyRegisteredExecPath === currentExecPath) return;
 
   try {
     app.setLoginItemSettings({
       openAtLogin: true,
-      path: process.execPath
+      path: currentExecPath
     });
-    settings.startupRegistered = true;
-    saveSettings(settings);
+
+    const after = app.getLoginItemSettings();
+    if (after && after.openAtLogin) {
+      settings.startupRegistered = true;
+      settings.startupRegisteredExecPath = currentExecPath;
+      saveSettings(settings);
+    } else {
+      console.warn(
+        "Startup registration did not stick (openAtLogin still false)." +
+          " This can happen if the app isn't installed, lacks permissions, or is blocked by policy."
+      );
+    }
   } catch (err) {
     console.error("Failed to register startup:", err);
   }

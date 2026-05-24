@@ -34,6 +34,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let isManageSlideshowMode = false;
 
+    // Lightbox gallery viewer (double click + arrow navigation)
+    const lightbox = document.getElementById("lightbox");
+    const lightboxBackdrop = document.getElementById("lightboxBackdrop");
+    const lightboxClose = document.getElementById("lightboxClose");
+    const lightboxImage = document.getElementById("lightboxImage");
+    let lightboxOpen = false;
+    let currentImages = [];
+    let lightboxIndex = -1;
+
     function toFileUrl(absolutePath) {
         if (!absolutePath) return "";
         // Windows paths may contain backslashes; file URLs require forward slashes and 3 slashes after scheme.
@@ -68,6 +77,78 @@ document.addEventListener("DOMContentLoaded", async () => {
             manageDoneBtn.textContent = "Done";
         }
     }
+
+    function setLightboxOpen(open) {
+        lightboxOpen = !!open;
+        if (!lightbox) return;
+        if (lightboxOpen) {
+            lightbox.classList.remove("hidden");
+            // Prevent the background from scrolling while viewing.
+            document.body.style.overflow = "hidden";
+        } else {
+            lightbox.classList.add("hidden");
+            document.body.style.overflow = "hidden";
+            lightboxIndex = -1;
+        }
+    }
+
+    function showLightboxAt(index) {
+        if (!lightboxImage) return;
+        if (!Array.isArray(currentImages) || currentImages.length === 0) return;
+
+        const safeIndex = Math.max(0, Math.min(currentImages.length - 1, Number(index) || 0));
+        lightboxIndex = safeIndex;
+        const imgData = currentImages[safeIndex];
+        if (!imgData || !imgData.path) return;
+        lightboxImage.src = toFileUrl(imgData.path);
+    }
+
+    function openLightboxAt(index) {
+        setLightboxOpen(true);
+        showLightboxAt(index);
+    }
+
+    function closeLightbox() {
+        setLightboxOpen(false);
+        if (lightboxImage) lightboxImage.src = "";
+    }
+
+    if (lightboxBackdrop) {
+        lightboxBackdrop.addEventListener("click", () => {
+            if (!lightboxOpen) return;
+            closeLightbox();
+        });
+    }
+
+    if (lightboxClose) {
+        lightboxClose.addEventListener("click", () => {
+            if (!lightboxOpen) return;
+            closeLightbox();
+        });
+    }
+
+    document.addEventListener("keydown", (e) => {
+        if (!lightboxOpen) return;
+        if (!currentImages || currentImages.length === 0) return;
+
+        if (e.key === "Escape") {
+            e.preventDefault();
+            closeLightbox();
+            return;
+        }
+
+        if (e.key === "ArrowRight") {
+            e.preventDefault();
+            showLightboxAt((lightboxIndex + 1) % currentImages.length);
+            return;
+        }
+
+        if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            showLightboxAt((lightboxIndex - 1 + currentImages.length) % currentImages.length);
+            return;
+        }
+    });
 
     if (manageSlideshowBtn) {
         manageSlideshowBtn.addEventListener("click", async () => {
@@ -500,6 +581,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Load Wallpapers
     async function loadWallpapers() {
         const images = await window.api.getWallpapers();
+        currentImages = Array.isArray(images) ? images : [];
         const settings = await window.api.getSettings();
         const selectedImages = (settings.selectedImages || []).map(String);
         selectedSet = new Set(selectedImages);
@@ -510,10 +592,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         gallery.innerHTML = "";
 
-        images.forEach(imgData => {
+        currentImages.forEach((imgData, index) => {
             const card = document.createElement("div");
             card.className = "wallpaper-card";
-            if (selectedSet.has(String(imgData.path))) {
+            if (isManageSlideshowMode && selectedSet.has(String(imgData.path))) {
                 card.classList.add("selected");
             }
 
@@ -534,24 +616,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             const cardActions = document.createElement("div");
             cardActions.className = "card-actions";
 
-            const selectBtn = document.createElement("div");
-            selectBtn.className = "action-btn select-btn";
-            selectBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-            selectBtn.addEventListener("click", async (e) => {
-                e.stopPropagation();
-                const isSelected = !card.classList.contains("selected");
-                if (isSelected) card.classList.add("selected");
-                else card.classList.remove("selected");
-                const key = String(imgData.path);
-                if (isSelected) selectedSet.add(key);
-                else selectedSet.delete(key);
-
-                await window.api.toggleSelection(key, isSelected);
-
-                if (slideshowSelectedCount) slideshowSelectedCount.textContent = String(selectedSet.size);
-                if (isManageSlideshowMode) overlayText.innerText = isSelected ? "Selected" : "Select";
-            });
-
             const deleteBtn = document.createElement("div");
             deleteBtn.className = "action-btn delete-btn";
             deleteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
@@ -564,12 +628,24 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             });
 
-            cardActions.appendChild(selectBtn);
             cardActions.appendChild(deleteBtn);
 
             card.appendChild(img);
             card.appendChild(overlay);
             card.appendChild(cardActions);
+
+            let applyClickTimeout = 0;
+
+            card.addEventListener("dblclick", (e) => {
+                if (isManageSlideshowMode) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (applyClickTimeout) {
+                    clearTimeout(applyClickTimeout);
+                    applyClickTimeout = 0;
+                }
+                openLightboxAt(index);
+            });
 
             card.addEventListener("click", async () => {
                 if (isManageSlideshowMode) {
@@ -586,12 +662,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                     return;
                 }
 
-                overlayText.innerText = "Applying...";
-                await window.api.setWallpaper(imgData.path);
-                overlayText.innerText = "Applied!";
-                setTimeout(() => {
-                    overlayText.innerText = "Set Wallpaper";
-                }, 2000);
+                if (applyClickTimeout) clearTimeout(applyClickTimeout);
+                applyClickTimeout = setTimeout(async () => {
+                    overlayText.innerText = "Applying...";
+                    await window.api.setWallpaper(imgData.path);
+                    overlayText.innerText = "Applied!";
+                    setTimeout(() => {
+                        overlayText.innerText = "Set Wallpaper";
+                    }, 2000);
+                    applyClickTimeout = 0;
+                }, 220);
             });
 
             gallery.appendChild(card);

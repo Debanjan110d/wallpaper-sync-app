@@ -31,6 +31,7 @@ This repo also contains an optional Next.js + Supabase web app under `web/` that
 - Runs silently in the system tray
 - Optional Windows Startup Apps support (enable/disable from Task Manager → Startup apps)
 - App updates (installed builds): checks once on startup, auto-downloads when available, then prompts to install/restart
+- Double-click an image to open a viewer; use Left/Right arrow keys to navigate
 
 ## Project structure
 
@@ -118,13 +119,13 @@ Example commands:
 ```bash
 git status
 git add -A
-git commit -m "release: v2.0.1"
+git commit -m "release: v3.0.1"
 
 # annotated tag is recommended
-git tag -a v2.0.1 -m "v2.0.1"
+git tag -a v3.0.1 -m "v3.0.1"
 
 git push origin main
-git push origin v2.0.1
+git push origin v3.0.1
 ```
 
 When you push the tag, GitHub Actions will:

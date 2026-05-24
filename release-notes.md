@@ -1,18 +1,11 @@
-## 2.0.2 (v2.0.2)
+## 3.0.1 (v3.0.1) — 2026-05-24
 
 ### 🪟 Windows Startup
 
-- Adds native Windows "Startup apps" integration (users can enable/disable from Windows)
-- On startup launches, app starts tray-only (does not open the dashboard)
+- Fixes startup registration getting stuck after a dev run (only registers on packaged installs; tracks registered exe path)
 
-## 2.0.1 (v2.0.1)
+### 🖼️ Gallery & Slideshow UX
 
-### ✨ Improvements
-
-- Removed Auto Sync toggle and background auto-sync behavior
-- Added live sync progress indicator (progress bar + percent)
-- Added accurate local wallpaper count (matches the in-app collection)
-
-### 🧯 UX
-
-- Replaced blocking sync prompts with non-blocking, batch-level toast summaries
+- Slideshow selection can only be toggled while in “Manage Slideshow” mode
+- Double-click a wallpaper to open a viewer; navigate with Left/Right arrow keys, close with Esc
+- Smoother scrolling in the gallery/sidebar
