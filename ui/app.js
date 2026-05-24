@@ -34,14 +34,118 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let isManageSlideshowMode = false;
 
+    // Smooth wheel scrolling for the gallery (helps on Windows/Electron).
+    // Disabled when the user prefers reduced motion.
+    function enableSmoothWheelScroll(el) {
+        if (!el) return;
+        try {
+            const media = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+            if (media && media.matches) return;
+        } catch {
+            // ignore
+        }
+
+        let targetTop = el.scrollTop;
+        let startTop = el.scrollTop;
+        let startTime = 0;
+        let rafId = 0;
+        // Higher = smoother/floatier, lower = snappier.
+        const durationMs = 420;
+        // Mild multiplier to make trackpads/mice feel less "staccato".
+        const scrollMultiplier = 1.15;
+
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+        function clampScrollTop(v) {
+            const max = Math.max(0, el.scrollHeight - el.clientHeight);
+            return Math.max(0, Math.min(max, v));
+        }
+
+        function tick(now) {
+            const elapsed = now - startTime;
+            const t = Math.max(0, Math.min(1, elapsed / durationMs));
+            const eased = easeOutCubic(t);
+            const next = startTop + (targetTop - startTop) * eased;
+            el.scrollTop = next;
+
+            if (t < 1) {
+                rafId = requestAnimationFrame(tick);
+            } else {
+                rafId = 0;
+                el.scrollTop = targetTop;
+            }
+        }
+
+        el.addEventListener(
+            "wheel",
+            (e) => {
+                // Let zoom gestures (ctrl+wheel) and horizontal scrolling behave normally.
+                if (e.ctrlKey) return;
+                if (Math.abs(e.deltaY) < 0.01) return;
+
+                // Trackpads typically emit pixel deltas (deltaMode === 0) and already feel smooth.
+                // Intercepting them can feel "stuck" in responsive layouts, so only smooth
+                // mouse wheel style events (line/page based).
+                if (e.deltaMode === 0) return;
+
+                // If there is nothing to scroll, do nothing.
+                if (el.scrollHeight <= el.clientHeight + 1) return;
+
+                // Normalize delta across devices/browsers.
+                let deltaY = e.deltaY;
+                // 0=pixel, 1=line, 2=page
+                if (e.deltaMode === 1) deltaY *= 16;
+                else if (e.deltaMode === 2) deltaY *= el.clientHeight;
+                deltaY *= scrollMultiplier;
+
+                const max = Math.max(0, el.scrollHeight - el.clientHeight);
+                const atTop = el.scrollTop <= 0.5;
+                const atBottom = el.scrollTop >= max - 0.5;
+                // Don't block native behavior when user tries to scroll past edges.
+                if ((atTop && deltaY < 0) || (atBottom && deltaY > 0)) return;
+
+                e.preventDefault();
+
+                const current = el.scrollTop;
+                targetTop = clampScrollTop(targetTop + deltaY);
+
+                // Restart animation from the current scroll position for continuity.
+                startTop = current;
+                startTime = performance.now();
+
+                if (!rafId) {
+                    rafId = requestAnimationFrame(tick);
+                }
+            },
+            { passive: false }
+        );
+    }
+
+    enableSmoothWheelScroll(gallery);
+
     // Lightbox gallery viewer (double click + arrow navigation)
     const lightbox = document.getElementById("lightbox");
     const lightboxBackdrop = document.getElementById("lightboxBackdrop");
     const lightboxClose = document.getElementById("lightboxClose");
     const lightboxImage = document.getElementById("lightboxImage");
+    const lightboxPrev = document.getElementById("lightboxPrev");
+    const lightboxNext = document.getElementById("lightboxNext");
     let lightboxOpen = false;
     let currentImages = [];
     let lightboxIndex = -1;
+
+    function updateLightboxNavState() {
+        const hasMany = Array.isArray(currentImages) && currentImages.length > 1;
+        const isOpen = !!lightboxOpen;
+        if (lightboxPrev) {
+            lightboxPrev.style.display = (isOpen && hasMany) ? "" : "none";
+            lightboxPrev.disabled = !hasMany;
+        }
+        if (lightboxNext) {
+            lightboxNext.style.display = (isOpen && hasMany) ? "" : "none";
+            lightboxNext.disabled = !hasMany;
+        }
+    }
 
     function toFileUrl(absolutePath) {
         if (!absolutePath) return "";
@@ -90,6 +194,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.body.style.overflow = "hidden";
             lightboxIndex = -1;
         }
+
+        updateLightboxNavState();
     }
 
     function showLightboxAt(index) {
@@ -101,6 +207,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const imgData = currentImages[safeIndex];
         if (!imgData || !imgData.path) return;
         lightboxImage.src = toFileUrl(imgData.path);
+
+        updateLightboxNavState();
     }
 
     function openLightboxAt(index) {
@@ -111,6 +219,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     function closeLightbox() {
         setLightboxOpen(false);
         if (lightboxImage) lightboxImage.src = "";
+    }
+
+    function showPrevLightboxImage() {
+        if (!lightboxOpen) return;
+        if (!Array.isArray(currentImages) || currentImages.length <= 1) return;
+        showLightboxAt((lightboxIndex - 1 + currentImages.length) % currentImages.length);
+    }
+
+    function showNextLightboxImage() {
+        if (!lightboxOpen) return;
+        if (!Array.isArray(currentImages) || currentImages.length <= 1) return;
+        showLightboxAt((lightboxIndex + 1) % currentImages.length);
     }
 
     if (lightboxBackdrop) {
@@ -139,16 +259,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (e.key === "ArrowRight") {
             e.preventDefault();
-            showLightboxAt((lightboxIndex + 1) % currentImages.length);
+            showNextLightboxImage();
             return;
         }
 
         if (e.key === "ArrowLeft") {
             e.preventDefault();
-            showLightboxAt((lightboxIndex - 1 + currentImages.length) % currentImages.length);
+            showPrevLightboxImage();
             return;
         }
     });
+
+    if (lightboxPrev) {
+        lightboxPrev.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showPrevLightboxImage();
+        });
+    }
+
+    if (lightboxNext) {
+        lightboxNext.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showNextLightboxImage();
+        });
+    }
 
     if (manageSlideshowBtn) {
         manageSlideshowBtn.addEventListener("click", async () => {
@@ -286,12 +422,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!supported) {
                 topUpdateActionBtn.disabled = true;
                 topUpdateActionBtn.textContent = "Install required";
-            } else if (downloaded) {
+            } else if (available || downloaded) {
+                // Download happens in the browser (direct installer download).
                 topUpdateActionBtn.disabled = false;
-                topUpdateActionBtn.textContent = "Install";
-            } else if (available) {
-                topUpdateActionBtn.disabled = downloading;
-                topUpdateActionBtn.textContent = downloading ? "Downloading…" : "Download";
+                topUpdateActionBtn.textContent = "Download";
             } else {
                 topUpdateActionBtn.disabled = checking;
                 topUpdateActionBtn.textContent = checking ? "Checking…" : "Check";
@@ -331,11 +465,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             downloadUpdateBtn.textContent = downloading ? "Downloading…" : "Download";
         }
 
-        setButtonVisible(installUpdateBtn, available && downloaded);
-        if (installUpdateBtn) {
-            installUpdateBtn.disabled = false;
-            installUpdateBtn.textContent = "Install";
-        }
+        // No in-app install flow; installer downloads via browser.
+        setButtonVisible(installUpdateBtn, false);
     }
 
     async function refreshUpdateState() {
@@ -365,34 +496,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             try {
                 const state = await window.api.downloadUpdate();
                 renderUpdateState(state);
-                showToast("Downloading update…", "success");
+                showToast("Opening download in browser…", "success");
             } catch (err) {
                 showToast("Download failed: " + (err && err.message ? err.message : String(err)), "error");
             }
         });
     }
 
-    if (installUpdateBtn && window.api.installUpdate) {
-        installUpdateBtn.addEventListener("click", async () => {
-            try {
-                await window.api.installUpdate();
-            } catch (err) {
-                showToast("Install failed: " + (err && err.message ? err.message : String(err)), "error");
-            }
-        });
-    }
+    // Intentionally no install button handler; updates are applied via installer.
 
     if (topUpdateActionBtn) {
         topUpdateActionBtn.addEventListener("click", async () => {
             try {
                 const state = await window.api.getUpdateState();
-                if (state && state.downloaded) {
-                    await window.api.installUpdate();
-                    return;
-                }
-                if (state && state.available) {
+                if (state && (state.available || state.downloaded)) {
                     const nextState = await window.api.downloadUpdate();
                     renderUpdateState(nextState);
+                    showToast("Opening download in browser…", "success");
                     return;
                 }
                 const nextState = await window.api.checkForUpdates();

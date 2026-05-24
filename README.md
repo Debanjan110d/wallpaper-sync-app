@@ -30,8 +30,8 @@ This repo also contains an optional Next.js + Supabase web app under `web/` that
 - Simple image management (delete & organize)
 - Runs silently in the system tray
 - Optional Windows Startup Apps support (enable/disable from Task Manager → Startup apps)
-- App updates (installed builds): checks once on startup, auto-downloads when available, then prompts to install/restart
-- Double-click an image to open a viewer; use Left/Right arrow keys to navigate
+- App updates (installed builds): checks once on startup; when an update is available, the app opens your browser to download the latest installer (`.exe`) from GitHub Releases
+- Double-click an image to open a viewer; use Left/Right arrow keys or the on-screen arrows to navigate
 
 ## Project structure
 
@@ -55,6 +55,8 @@ You can override it either by:
 
 - setting `apiUrl` in the desktop app settings file (stored in Electron's `userData` directory as `settings.json`), or
 - setting the env var `WALLPAPER_SYNC_API_URL`.
+
+Note: on Windows installed builds, the settings file is stored under `%LOCALAPPDATA%\Wallpaper Sync App\settings.json`.
 
 If your web API is protected, you can also set `syncToken` in that same settings file (or `WALLPAPER_SYNC_TOKEN` as an env var).
 

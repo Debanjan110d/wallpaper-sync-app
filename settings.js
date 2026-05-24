@@ -19,6 +19,9 @@ function loadSettings() {
   }
 
   return {
+    // When enabled, the app performs a lightweight server check on startup
+    // (no periodic polling in the background).
+    autoSync: false,
     slideshow: false,
     slideshowRandom: false,
     slideshowInterval: 10000,

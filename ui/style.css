@@ -411,6 +411,8 @@ input:checked + .slider:before {
 .gallery {
     flex: 1;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
     padding: 0 40px 40px;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -477,6 +479,40 @@ input:checked + .slider:before {
 
 .lightbox-close:hover {
     background: rgba(0, 0, 0, 0.75);
+}
+
+.lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(255, 255, 255, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.lightbox-nav:hover {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.lightbox-nav:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.lightbox-nav-prev {
+    left: 12px;
+}
+
+.lightbox-nav-next {
+    right: 12px;
 }
 
 .gallery::-webkit-scrollbar {

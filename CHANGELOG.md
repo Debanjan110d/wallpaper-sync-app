@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.0.2 (v3.0.2) — 2026-05-24
+
+### ⬆️ App Updates (Windows)
+
+- “Download update” now opens the latest installer in the user’s browser (direct `.exe` download from GitHub Releases)
+- Removed in-app update downloading/install flow (no more uncertainty about where the installer is stored)
+
+### ⚡ Performance / Background Optimizations
+
+- Closing the dashboard now closes the window (renderer is destroyed) instead of hiding it, reducing background CPU/RAM usage while staying tray-only
+- Startup “new wallpapers available?” check is now gated behind `autoSync` (disabled by default)
+
+### 🖼️ Gallery
+
+- Lightbox now has clickable left/right arrow buttons (keyboard arrows still work)
+- Even smoother gallery scrolling, and prevents scroll getting stuck in responsive mode
+
+### 🧯 Bug Fixes
+
+- Fixes false “new wallpapers available” notifications caused by an invalid `lastSyncCursor` format (cursor is normalized to strict ISO)
+
 ## 3.0.1 (v3.0.1) — 2026-05-24
 
 ### 🪟 Windows Startup

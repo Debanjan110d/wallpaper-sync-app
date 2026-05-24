@@ -1,4 +1,4 @@
-const { app, Tray, Menu, Notification, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, Tray, Menu, Notification, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -144,6 +144,71 @@ let didStartupUpdateCheck = false;
 let didPromptInstallUpdate = false;
 let pendingInstallPrompt = false;
 
+function parseGithubRepoFromUrl(maybeUrl) {
+  const url = String(maybeUrl || "").trim();
+  if (!url) return null;
+  const match = url.match(/github\.com\/(.*?)\/(.*?)(?:\.git)?$/i);
+  if (!match) return null;
+  const owner = (match[1] || "").replace(/^\/+|\/+$/g, "");
+  const repo = (match[2] || "").replace(/^\/+|\/+$/g, "");
+  if (!owner || !repo) return null;
+  return { owner, repo };
+}
+
+function getGithubRepoFromPackageJson() {
+  try {
+    // Works both in dev and packaged app (asar is disabled).
+    // eslint-disable-next-line global-require
+    const pkg = require("./package.json");
+    const url = pkg && pkg.repository && pkg.repository.url ? pkg.repository.url : "";
+    return parseGithubRepoFromUrl(url);
+  } catch {
+    return null;
+  }
+}
+
+async function getLatestInstallerDownloadUrl() {
+  const fallback = "https://github.com/Debanjan110d/wallpaper-sync-app/releases/latest";
+  const repo = getGithubRepoFromPackageJson() || { owner: "Debanjan110d", repo: "wallpaper-sync-app" };
+
+  try {
+    const apiUrl = `https://api.github.com/repos/${repo.owner}/${repo.repo}/releases/latest`;
+    const res = await axios.get(apiUrl, {
+      timeout: 15_000,
+      headers: {
+        "User-Agent": "wallpaper-sync-app",
+        "Accept": "application/vnd.github+json"
+      }
+    });
+
+    const data = res && res.data ? res.data : null;
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const exeAsset = assets.find((a) => {
+      const name = (a && a.name ? String(a.name) : "").toLowerCase();
+      return name.endsWith(".exe") && !name.endsWith(".exe.blockmap");
+    });
+
+    const direct = exeAsset && exeAsset.browser_download_url ? String(exeAsset.browser_download_url) : "";
+    if (direct) return direct;
+
+    const html = data && data.html_url ? String(data.html_url) : "";
+    return html || fallback;
+  } catch (err) {
+    console.warn("Failed to resolve latest installer URL:", err && err.message ? err.message : String(err));
+    return fallback;
+  }
+}
+
+async function openLatestInstallerDownloadInBrowser() {
+  const url = await getLatestInstallerDownloadUrl();
+  try {
+    await shell.openExternal(url);
+  } catch (err) {
+    console.error("Failed to open browser for download:", err);
+  }
+  return url;
+}
+
 function stripHtml(input) {
   return String(input || "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
@@ -169,6 +234,14 @@ function summarizeReleaseNotes(rawNotes, maxLen = 140) {
   text = stripHtml(text);
   if (text.length > maxLen) return text.slice(0, maxLen - 1) + "…";
   return text;
+}
+
+function normalizeIsoTimestamp(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
 }
 
 function registerWindowsStartupOnce() {
@@ -253,10 +326,10 @@ function createMainWindow() {
   });
 
   mainWindow.on("close", (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
+    // Optimization: when the user closes the dashboard, destroy the window so the
+    // renderer process doesn't keep consuming resources in the background.
+    // The app continues running in the tray.
+    if (!isQuitting) return;
   });
 
   mainWindow.on("closed", () => {
@@ -399,11 +472,15 @@ function getSyncConfig() {
     process.env.WALLPAPER_SYNC_TOKEN ||
     config.SYNC_TOKEN;
 
+  const rawCursor = settings && typeof settings.lastSyncCursor === "string" ? settings.lastSyncCursor : "";
+  const cursorIso = normalizeIsoTimestamp(rawCursor);
+
   return {
     ...config,
     API_URL: apiUrl,
     SYNC_TOKEN: syncToken,
-    LAST_SYNC_CURSOR: settings && typeof settings.lastSyncCursor === "string" ? settings.lastSyncCursor : "",
+    // Always send a strict ISO timestamp. If the saved cursor is invalid, treat as empty.
+    LAST_SYNC_CURSOR: cursorIso || "",
     IGNORED_SERVER_FILES: Array.isArray(settings && settings.ignoredServerFiles)
       ? settings.ignoredServerFiles
       : []
@@ -491,8 +568,11 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
     }
 
     if (maxCreatedAt && typeof maxCreatedAt === "string") {
-      settings.lastSyncCursor = maxCreatedAt;
-      saveSettings(settings);
+      const normalized = normalizeIsoTimestamp(maxCreatedAt);
+      if (normalized) {
+        settings.lastSyncCursor = normalized;
+        saveSettings(settings);
+      }
     }
 
     if (latestFile) {
@@ -537,40 +617,16 @@ function refreshTrayMenu() {
       template.push({ label: updateState.notes, enabled: false });
     }
 
-    if (updateState.downloaded) {
-      template.push({
-        label: "Install and restart",
-        click: () => {
-          try {
-            autoUpdater.quitAndInstall();
-          } catch (err) {
-            console.error("Failed to install update:", err);
-          }
+    template.push({
+      label: "Download installer (browser)",
+      click: async () => {
+        try {
+          await openLatestInstallerDownloadInBrowser();
+        } catch (err) {
+          console.error("Failed to open download in browser:", err);
         }
-      });
-    } else {
-      template.push({
-        label: updateState.downloading ? "Downloading update…" : "Download update",
-        enabled: !updateState.downloading,
-        click: () => {
-          try {
-            updateState.downloading = true;
-            refreshTrayMenu();
-            autoUpdater.downloadUpdate();
-            if (Notification.isSupported()) {
-              new Notification({
-                title: "Wallpaper Sync",
-                body: "Downloading update…"
-              }).show();
-            }
-          } catch (err) {
-            updateState.downloading = false;
-            refreshTrayMenu();
-            console.error("Failed to download update:", err);
-          }
-        }
-      });
-    }
+      }
+    });
   } else {
     template.push({
       label: updateState.checking ? "Checking for updates…" : "Check for updates",
@@ -622,7 +678,7 @@ function setupAutoUpdater() {
   if (!app.isPackaged) return;
   if (process.platform !== "win32") return;
 
-  // Auto-download updates when found, then ask user whether to install.
+  // Keep auto-download disabled; we open the installer in the browser instead.
   autoUpdater.autoDownload = false;
 
   autoUpdater.on("checking-for-update", () => {
@@ -636,7 +692,7 @@ function setupAutoUpdater() {
     updateState.available = true;
     updateState.version = info && info.version ? info.version : null;
     updateState.notes = summarizeReleaseNotes(info && info.releaseNotes);
-    updateState.downloading = true;
+    updateState.downloading = false;
     refreshTrayMenu();
     broadcastUpdateState();
 
@@ -650,21 +706,7 @@ function setupAutoUpdater() {
       }).show();
     }
 
-    // Start download automatically (low background CPU; happens only when an update exists).
-    try {
-      autoUpdater.downloadUpdate();
-      if (Notification.isSupported()) {
-        new Notification({
-          title: "Wallpaper Sync",
-          body: "Downloading update…"
-        }).show();
-      }
-    } catch (err) {
-      updateState.downloading = false;
-      refreshTrayMenu();
-      broadcastUpdateState();
-      console.error("Failed to start update download:", err);
-    }
+    // Do not download inside the app; user will download installer via browser.
   });
 
   autoUpdater.on("update-not-available", () => {
@@ -679,14 +721,14 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("download-progress", () => {
-    updateState.downloading = true;
+    updateState.downloading = false;
     refreshTrayMenu();
     broadcastUpdateState();
   });
 
   autoUpdater.on("update-downloaded", () => {
     updateState.downloading = false;
-    updateState.downloaded = true;
+    updateState.downloaded = false;
     refreshTrayMenu();
     broadcastUpdateState();
 
@@ -697,8 +739,7 @@ function setupAutoUpdater() {
       }).show();
     }
 
-    // Ask user whether to install now.
-    promptInstallUpdateIfPossible();
+    // No in-app install flow; installer is downloaded via browser.
   });
 
   autoUpdater.on("error", (err) => {
@@ -747,8 +788,11 @@ app.whenReady().then(() => {
   settings = loadSettings();
   setupTray();
 
-  // One-time, low-resource new-content check on startup only.
-  checkForNewWallpapersOnce();
+  // Optional: one-time, low-resource new-content check on startup only.
+  // This is gated behind settings.autoSync so background/tray runs can be fully idle.
+  if (settings && settings.autoSync) {
+    checkForNewWallpapersOnce();
+  }
 
   registerWindowsStartupOnce();
 
@@ -776,21 +820,9 @@ ipcMain.handle("updater:check", () => {
 
 ipcMain.handle("updater:download", async () => {
   if (!app.isPackaged || process.platform !== "win32") return getUpdateStateSnapshot();
-  if (!updateState.available || updateState.downloaded || updateState.downloading) return getUpdateStateSnapshot();
-
-  try {
-    updateState.downloading = true;
-    refreshTrayMenu();
-    broadcastUpdateState();
-    await autoUpdater.downloadUpdate();
-  } catch (err) {
-    updateState.downloading = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-    console.error("Failed to download update:", err);
-  }
-
-  return getUpdateStateSnapshot();
+  // Always open the latest installer in the user's browser (direct .exe download).
+  const openedUrl = await openLatestInstallerDownloadInBrowser();
+  return { ...getUpdateStateSnapshot(), openedUrl };
 });
 
 ipcMain.handle("updater:install", () => {
