@@ -16,7 +16,7 @@ const USER_DATA_PATHS = (() => {
 
     // Force Chromium cache to a guaranteed-writable location (Temp).
     // Use a per-launch directory to avoid lock/contention issues that can cause
-    // "Unable to move/create cache" (0x5) on Windows.
+    // "Unable to move/create cache" (0x5) on Windows. so long as the temp dir is writable, this should succeed even in restrictive environments.Hehe
     const desiredCache = path.join(os.tmpdir(), "wallpaper-sync-cache", String(process.pid));
 
     if (desiredUserData && desiredUserData !== oldUserData) {
@@ -26,7 +26,7 @@ const USER_DATA_PATHS = (() => {
     try {
       if (desiredCache) app.setPath("cache", desiredCache);
     } catch {
-      // ignore
+      // ignore it bhai
     }
 
     const activeUserData = app.getPath("userData");
@@ -49,7 +49,7 @@ const USER_DATA_PATHS = (() => {
       // ignore
     }
 
-    // Cache dirs should live under a writable path.
+    // Cache dirs should live under a writable path. so if you do not have write access to the default userData path, at least the cache will work (even if it can't be moved).
     app.commandLine.appendSwitch("disk-cache-dir", activeCache);
     // Ensure Chromium uses our chosen userData directory (avoid internal moves).
     app.commandLine.appendSwitch("user-data-dir", activeUserData);
@@ -143,6 +143,64 @@ let updateState = {
 let didStartupUpdateCheck = false;
 let didPromptInstallUpdate = false;
 let pendingInstallPrompt = false;
+
+// Dev-only diagnostics for single-instance behavior.
+// Helps confirm that all launches share the same userData dir (required for the lock).
+if (!app.isPackaged) {
+  try {
+    const ud = (() => {
+      try { return app.getPath("userData"); } catch { return ""; }
+    })();
+    const cd = (() => {
+      try { return app.getPath("cache"); } catch { return ""; }
+    })();
+    // eslint-disable-next-line no-console
+    console.log(`[startup] pid=${process.pid} name=${app.getName()} userData=${ud} cache=${cd}`);
+  } catch {
+    // ignore
+  }
+}
+
+// Ensure a single running instance. If the user launches the app again,
+// focus (or recreate) the existing dashboard window instead of spawning a new process.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!app.isPackaged) {
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[single-instance] pid=${process.pid} lock=${String(gotSingleInstanceLock)}`);
+  } catch {
+    // ignore
+  }
+}
+
+if (!gotSingleInstanceLock) {
+  // Exit early and reliably (especially important during startup where `app.quit()`
+  // can be deferred). This prevents duplicate tray icons / background processes.
+  app.exit(0);
+} else {
+  app.on("second-instance", async () => {
+    // This can fire very early (even before `whenReady()` resolves) if the user
+    // launches the app twice quickly. Always wait until Electron is ready before
+    // creating or focusing BrowserWindows. I am writing like this cause I forgot to how to use tht multiline comment in JS I am just doing selecting then ctrl + / Hehe 
+    try {
+      await app.whenReady();
+    } catch {
+      // ignore
+    }
+
+    // If we already have a window, bring it to front.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+      return;
+    }
+
+    // If we're running tray-only (startup) or the window was destroyed, recreate it.
+    createMainWindow();
+  });
+}
 
 function parseGithubRepoFromUrl(maybeUrl) {
   const url = String(maybeUrl || "").trim();
@@ -249,7 +307,7 @@ function registerWindowsStartupOnce() {
   if (!settings) return;
 
   // Windows Startup Apps integration is only reliable for installed/packaged builds.
-  // Avoid registering from dev runs (`npm start`) because it can:
+  // Avoid registering from dev runs (`npm start`) because it can: I mean hote pare na amar sathe hoyeche tai sabdhan 
   // - create an unusable login item pointing at Electron
   // - set a "registered" flag that prevents the installed app from registering later
   if (!app.isPackaged) return;
@@ -783,7 +841,7 @@ function checkForUpdates({ userInitiated }) {
   }
 }
 
-app.whenReady().then(() => {
+if (gotSingleInstanceLock) app.whenReady().then(() => {
   migrateUserDataIfNeeded();
   settings = loadSettings();
   setupTray();
