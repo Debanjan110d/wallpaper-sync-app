@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Masonry from "@/components/Masonry";
 
 export type Screenshot = {
   src: string;
@@ -8,17 +8,7 @@ export type Screenshot = {
 };
 
 export default function ScreenshotGrid({ screenshots }: { screenshots: Screenshot[] }) {
-  const initial = useMemo(() => {
-    const map: Record<string, boolean> = {};
-    for (const s of screenshots) map[s.src] = true;
-    return map;
-  }, [screenshots]);
-
-  const [visible, setVisible] = useState<Record<string, boolean>>(initial);
-
-  const anyVisible = screenshots.some((s) => visible[s.src]);
-
-  if (!anyVisible) {
+  if (screenshots.length === 0) {
     return (
       <div className="screensGrid">
         <div className="screenCard">
@@ -50,28 +40,26 @@ export default function ScreenshotGrid({ screenshots }: { screenshots: Screensho
     );
   }
 
+  const items = screenshots.map((s, idx) => ({
+    id: String(idx),
+    img: s.src,
+    // No click-through by default; keeps UX consistent with the old grid.
+    url: undefined
+  }));
+
   return (
-    <div className="screensGrid">
-      {screenshots.map((s) => (
-        <div className="screenCard" key={s.src}>
-          {visible[s.src] ? (
-            <img
-              className="screenImg"
-              src={s.src}
-              alt={s.alt}
-              loading="lazy"
-              onError={() => setVisible((prev) => ({ ...prev, [s.src]: false }))}
-            />
-          ) : (
-            <div className="placeholder">
-              <div>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Missing screenshot</div>
-                <div style={{ lineHeight: 1.55 }}>{s.src}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+    <div style={{ marginTop: 18 }}>
+      <Masonry
+        items={items}
+        ease="power3.out"
+        duration={0.6}
+        stagger={0.05}
+        animateFrom="bottom"
+        scaleOnHover
+        hoverScale={0.98}
+        blurToFocus
+        colorShiftOnHover={false}
+      />
     </div>
   );
 }

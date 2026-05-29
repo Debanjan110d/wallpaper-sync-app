@@ -1,4 +1,5 @@
 import ScreenshotGrid from "./_components/ScreenshotGrid";
+import HeroDecryptedText from "./_components/HeroDecryptedText";
 import Image from "next/image";
 import {
   extractHighlights,
@@ -78,7 +79,7 @@ export default async function HomePage() {
                 <h1 className="hTitle">
                   <span className="titleAccent">Wallpaper Sync</span>
                   <br />
-                  your wallpapers, on autopilot.
+                  <HeroDecryptedText text="your wallpapers, on autopilot." />
                 </h1>
                 <p className="hSub">
                   A lightweight Windows tray app that rotates wallpapers from your local collection — and can
