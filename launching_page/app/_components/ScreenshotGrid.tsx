@@ -1,6 +1,6 @@
 "use client";
 
-import Masonry from "@/components/Masonry";
+import Masonry from "../../components/Masonry";
 
 export type Screenshot = {
   src: string;

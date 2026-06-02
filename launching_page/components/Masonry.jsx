@@ -1,31 +1,37 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 
 const useMedia = (queries, values, defaultValue) => {
-  const get = () => {
+  const get = useCallback(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') {
       return defaultValue;
     }
     return values[queries.findIndex(q => window.matchMedia(q).matches)] ?? defaultValue;
-  };
+  }, [queries, values, defaultValue]);
 
-  const [value, setValue] = useState(get);
+  const [value, setValue] = useState(() => get());
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') return;
-    const handler = () => setValue(get);
+    const mqls = queries.map(q => window.matchMedia(q));
+    const handler = () => setValue(get());
 
+    // Sync once on mount / when inputs change.
+    handler();
 
-    queries.forEach(q => window.matchMedia(q).addEventListener('change', handler));
-    
-    return () => queries.forEach(q => window.matchMedia(q).removeEventListener('change', handler));
-  }, [queries, values, defaultValue]);
+    mqls.forEach(mql => {
+      if (typeof mql.addEventListener === 'function') mql.addEventListener('change', handler);
+      else if (typeof mql.addListener === 'function') mql.addListener(handler);
+    });
 
-  useEffect(() => {
-    setValue(get);
-  }, [queries, values, defaultValue]);
+    return () =>
+      mqls.forEach(mql => {
+        if (typeof mql.removeEventListener === 'function') mql.removeEventListener('change', handler);
+        else if (typeof mql.removeListener === 'function') mql.removeListener(handler);
+      });
+  }, [get, queries]);
 
   return value;
 };
@@ -36,6 +42,7 @@ const useMeasure = () => {
 
   useLayoutEffect(() => {
     if (!ref.current) return;
+    if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       setSize({ width, height });
@@ -256,7 +263,7 @@ const Masonry = ({
             style={{ backgroundImage: `url(${item.img})` }}
           >
             {colorShiftOnHover && (
-              <div className="color-overlay absolute inset-0 rounded-[10px] bg-gradient-to-tr from-pink-500/50 to-sky-500/50 opacity-0 pointer-events-none" />
+              <div className="color-overlay absolute inset-0 rounded-[10px] bg-linear-to-tr from-pink-500/50 to-sky-500/50 opacity-0 pointer-events-none" />
             )}
           </div>
         </div>

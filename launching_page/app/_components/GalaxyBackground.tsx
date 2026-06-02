@@ -1,6 +1,6 @@
 "use client";
 
-import Galaxy from "@/components/Galaxy";
+import Galaxy from "../../components/Galaxy";
 
 export default function GalaxyBackground() {
   return (

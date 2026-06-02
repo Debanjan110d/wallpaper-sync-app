@@ -1,5 +1,6 @@
 import ScreenshotGrid from "./_components/ScreenshotGrid";
 import HeroDecryptedText from "./_components/HeroDecryptedText";
+import TrackLink from "./_components/TrackLink";
 import Image from "next/image";
 import {
   extractHighlights,
@@ -58,7 +59,7 @@ export default async function HomePage() {
               <span className="brandText">Wallpaper Sync</span>
               <span className="badge">Windows · Open Source</span>
             </div>
-            <nav className="nav">
+            <nav className="nav navDesktop" aria-label="Primary">
               <a href="#features">Features</a>
               <a href="#screens">Screens</a>
               <a href="#download">Download</a>
@@ -67,6 +68,23 @@ export default async function HomePage() {
                 GitHub
               </a>
             </nav>
+
+            <details className="navMobile">
+              <summary className="navMobileSummary">Menu</summary>
+              <div className="navMobilePanel" role="navigation" aria-label="Primary">
+                <a href="#features">Features</a>
+                <a href="#screens">Screens</a>
+                <a href="#download">Download</a>
+                <a href="#updates">Updates</a>
+                <a
+                  href="https://github.com/Debanjan110d/wallpaper-sync-app"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  GitHub
+                </a>
+              </div>
+            </details>
           </div>
         </div>
       </header>
@@ -130,9 +148,13 @@ export default async function HomePage() {
 
                         <div className="actions" style={{ marginTop: 14 }}>
                           {latestAsset ? (
-                            <a className="btn btnPrimary" href={latestAsset.browser_download_url}>
+                            <TrackLink
+                              className="btn btnPrimary"
+                              href={latestAsset.browser_download_url}
+                              analyticsEvent="download_click"
+                            >
                               Download {latestAsset.name}
-                            </a>
+                            </TrackLink>
                           ) : (
                             <a className="btn btnPrimary" href={latest.html_url}>
                               Open release
@@ -251,9 +273,13 @@ export default async function HomePage() {
                   </div>
                   <div>
                     {latest && latestAsset ? (
-                      <a className="btn btnPrimary" href={latestAsset.browser_download_url}>
+                      <TrackLink
+                        className="btn btnPrimary"
+                        href={latestAsset.browser_download_url}
+                        analyticsEvent="download_click"
+                      >
                         Download
-                      </a>
+                      </TrackLink>
                     ) : (
                       <a className="btn btnPrimary" href={getReleasePageUrl()}>
                         Releases
@@ -266,7 +292,9 @@ export default async function HomePage() {
                   <div className="assetList">
                     {latest.assets.slice(0, 3).map((a) => (
                       <div className="asset" key={a.id}>
-                        <a href={a.browser_download_url}>{a.name}</a>
+                        <TrackLink href={a.browser_download_url} analyticsEvent="download_click">
+                          {a.name}
+                        </TrackLink>
                         <span>
                           {formatBytes(a.size)} · {a.download_count} downloads
                         </span>
@@ -298,9 +326,13 @@ export default async function HomePage() {
                                     Notes
                                   </a>
                                   {a ? (
-                                    <a className="btn btnPrimary" href={a.browser_download_url}>
+                                    <TrackLink
+                                      className="btn btnPrimary"
+                                      href={a.browser_download_url}
+                                      analyticsEvent="download_click"
+                                    >
                                       Download
-                                    </a>
+                                    </TrackLink>
                                   ) : null}
                                 </div>
                               </div>
