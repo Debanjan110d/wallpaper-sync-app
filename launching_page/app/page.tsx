@@ -1,6 +1,7 @@
 import HeroDecryptedText from "./_components/HeroDecryptedText";
 import TrackLink from "./_components/TrackLink";
 import Image from "next/image";
+import BootTerminal from "./_components/BootTerminal";
 import {
   extractHighlights,
   fetchReleases,
@@ -28,6 +29,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <BootTerminal />
       <header className="header">
         <div className="container">
           <div className="headerInner">
