@@ -1,4 +1,3 @@
-import ScreenshotGrid from "./_components/ScreenshotGrid";
 import HeroDecryptedText from "./_components/HeroDecryptedText";
 import TrackLink from "./_components/TrackLink";
 import Image from "next/image";
@@ -14,29 +13,7 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 
-async function getLocalScreenshots(): Promise<{ src: string; alt: string }[]> {
-  const screenshotsDir = path.join(process.cwd(), "public", "screenshots");
-  try {
-    const entries = await fs.readdir(screenshotsDir, { withFileTypes: true });
-    const files = entries
-      .filter((e) => e.isFile())
-      .map((e) => e.name)
-      .filter((name) => /\.(png|jpe?g|webp|gif)$/i.test(name))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-    return files.map((filename, idx) => ({
-      // Encode spaces and other characters for URL safety.
-      src: encodeURI(`/screenshots/${filename}`),
-      alt: `Wallpaper Sync screenshot ${idx + 1}`,
-    }));
-  } catch {
-    return [];
-  }
-}
-
 export default async function HomePage() {
-  const screenshots = await getLocalScreenshots();
-
   let releases = [] as Awaited<ReturnType<typeof fetchReleases>>;
   let releasesError: string | null = null;
 
@@ -61,7 +38,6 @@ export default async function HomePage() {
             </div>
             <nav className="nav navDesktop" aria-label="Primary">
               <a href="#features">Features</a>
-              <a href="#screens">Screens</a>
               <a href="#download">Download</a>
               <a href="#updates">Updates</a>
               <a href="https://github.com/Debanjan110d/wallpaper-sync-app" target="_blank" rel="noreferrer">
@@ -73,7 +49,6 @@ export default async function HomePage() {
               <summary className="navMobileSummary">Menu</summary>
               <div className="navMobilePanel" role="navigation" aria-label="Primary">
                 <a href="#features">Features</a>
-                <a href="#screens">Screens</a>
                 <a href="#download">Download</a>
                 <a href="#updates">Updates</a>
                 <a
@@ -241,17 +216,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <hr className="hr" />
 
-        <section className="section" id="screens">
-          <div className="container">
-            <h2 className="sectionTitle">Screenshots</h2>
-            <p className="sectionSub">
-              Real screenshots pulled from <b>/public/screenshots</b>.
-            </p>
-            <ScreenshotGrid screenshots={screenshots} />
-          </div>
-        </section>
 
         <hr className="hr" />
 

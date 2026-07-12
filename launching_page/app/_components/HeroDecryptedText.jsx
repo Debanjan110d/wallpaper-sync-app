@@ -6,7 +6,7 @@ export default function HeroDecryptedText({ text }) {
   return (
     <DecryptedText
       text={text}
-      animateOn="hover"
+      animateOn="view"
       sequential
       revealDirection="center"
       speed={25}
