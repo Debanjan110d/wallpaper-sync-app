@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.2.1 (v3.2.1) — 2026-07-13
+
+### Dashboard Redesign & Corrections
+- Added an individual wallpaper metadata edit modal in the dashboard gallery cards to correct category, collection, or tag assignments.
+- Added a collapsible system hierarchy mindmap card on the admin dashboard explaining categories, collections, tags, and synchronization paths.
+- Redesigned the product landing page download section into separate, side-by-side Stable and Beta channels.
+
+### Synchronization & Duplicate Tag Prevention
+- Prevented creating duplicate tags with different casing (case-insensitive duplicate check based on slug).
+- Fixed desktop client drawer metadata assignment to automatically resolve or create a default collection under selected category if left empty.
+- Fixed 404 client sync errors by correctly parsing base API URLs and cleaning route suffix formats.
+
 ## 3.2.0 (v3.2.0) — 2026-07-13
 
 ### Dashboard Redesign
