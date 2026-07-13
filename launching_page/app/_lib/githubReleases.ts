@@ -41,9 +41,7 @@ export async function fetchReleases(): Promise<GitHubRelease[]> {
   }
 
   const releases = (await res.json()) as GitHubRelease[];
-  return releases
-    .filter((r) => !r.draft)
-    .filter((r) => !r.prerelease);
+  return releases.filter((r) => !r.draft);
 }
 
 export function pickPrimaryAsset(assets: GitHubReleaseAsset[]) {
