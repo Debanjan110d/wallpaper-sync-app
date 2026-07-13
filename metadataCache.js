@@ -180,7 +180,13 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     return { status: "offline", error: "Sync API URL not configured" };
   }
 
-  const cleanUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+  let cleanUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+  if (cleanUrl.endsWith("/api/wallpapers")) {
+    cleanUrl = cleanUrl.substring(0, cleanUrl.length - "/api/wallpapers".length);
+  }
+  if (cleanUrl.endsWith("/")) {
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
   
   const headers = {};
   if (syncToken) {

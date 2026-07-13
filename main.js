@@ -1149,7 +1149,13 @@ ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => 
     return { success: true, dismissed: true };
   }
   const syncConfig = getSyncConfig();
-  const cleanUrl = syncConfig.API_URL.endsWith("/") ? syncConfig.API_URL.slice(0, -1) : syncConfig.API_URL;
+  let cleanUrl = syncConfig.API_URL.endsWith("/") ? syncConfig.API_URL.slice(0, -1) : syncConfig.API_URL;
+  if (cleanUrl.endsWith("/api/wallpapers")) {
+    cleanUrl = cleanUrl.substring(0, cleanUrl.length - "/api/wallpapers".length);
+  }
+  if (cleanUrl.endsWith("/")) {
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
   try {
     const res = await axios.post(`${cleanUrl}/api/reviews`, {
       rating: Number(rating),

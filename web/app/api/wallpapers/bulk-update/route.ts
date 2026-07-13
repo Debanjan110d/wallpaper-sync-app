@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     let failed = 0;
 
     for (const item of items) {
-      const { id, collection_id, tags } = item;
+      const { id, collection_id, category_id, tags } = item;
       if (!id) {
         results.push({ status: "failed", error: "Missing wallpaper ID" });
         failed++;
@@ -48,10 +48,82 @@ export async function POST(request: Request) {
       }
 
       try {
+        let finalCollectionId = collection_id;
+
+        if (category_id !== undefined && category_id !== null && !finalCollectionId) {
+          // Resolve category_id to a collection_id
+          const { data: categoryData, error: catErr } = await supabase
+            .from("categories")
+            .select("name")
+            .eq("id", category_id)
+            .single();
+            
+          if (!catErr && categoryData) {
+            const { data: existingCols, error: colsErr } = await supabase
+              .from("collections")
+              .select("id, name")
+              .eq("category_id", category_id);
+              
+            if (!colsErr && existingCols) {
+              const matchByName = existingCols.find(
+                (c) => c.name.toLowerCase() === categoryData.name.toLowerCase()
+              );
+              const matchByDefault = existingCols.find(
+                (c) => ["general", "default", "uncategorized"].includes(c.name.toLowerCase())
+              );
+              const matchedCol = matchByName || matchByDefault || existingCols[0];
+              if (matchedCol) {
+                finalCollectionId = matchedCol.id;
+              }
+            }
+            
+            if (!finalCollectionId) {
+              const slug = categoryData.name
+                .toLowerCase()
+                .trim()
+                .replace(/\s+/g, "-")
+                .replace(/[^\w\-]+/g, "")
+                .replace(/\-\-+/g, "-")
+                .replace(/^-+/, "")
+                .replace(/-+$/, "");
+                
+              const { data: newCol, error: newColErr } = await supabase
+                .from("collections")
+                .insert([
+                  {
+                    name: categoryData.name,
+                    category_id: category_id,
+                    slug,
+                  }
+                ])
+                .select()
+                .single();
+                
+              if (!newColErr && newCol) {
+                finalCollectionId = newCol.id;
+              }
+            }
+          }
+        }
+
         // Update wallpapers table columns (e.g. collection_id)
         const updateData: any = {};
-        if (collection_id !== undefined) {
-          updateData.collection_id = collection_id;
+        if (finalCollectionId !== undefined) {
+          updateData.collection_id = finalCollectionId;
+
+          // Keep 'collection' text column in sync
+          if (finalCollectionId === null) {
+            updateData.collection = null;
+          } else {
+            const { data: colData } = await supabase
+              .from("collections")
+              .select("name")
+              .eq("id", finalCollectionId)
+              .single();
+            if (colData) {
+              updateData.collection = colData.name;
+            }
+          }
         }
 
         if (Object.keys(updateData).length > 0) {

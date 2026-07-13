@@ -734,8 +734,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!currentSelectedImage) return;
 
         const hash = currentSelectedImage.filename.split(".")[0];
-        const colId = drawerCollectionSelect.value;
+        const catId = drawerCategorySelect.value;
+        let colId = drawerCollectionSelect.value;
         
+        // If Category is selected but Collection is empty, auto-resolve/create default collection under that category
+        if (catId && catId !== "CREATE_NEW_CAT" && !colId) {
+            const category = localMetadata.categories.find(c => c.id === Number(catId));
+            if (category) {
+                const cols = localMetadata.collections.filter(c => c.category_id === category.id);
+                // Look for collection with matching name or General/Default
+                const matchByName = cols.find(c => c.name.toLowerCase() === category.name.toLowerCase());
+                const matchByDefault = cols.find(c => ["general", "default", "uncategorized"].includes(c.name.toLowerCase()));
+                const matchedCol = matchByName || matchByDefault || cols[0];
+                
+                if (matchedCol) {
+                    colId = String(matchedCol.id);
+                    drawerCollectionSelect.value = colId;
+                } else {
+                    // Create a new default collection locally
+                    const newCol = await window.api.createCollectionLocally(category.name, category.id);
+                    // Reload local metadata
+                    localMetadata = await window.api.getMetadata();
+                    colId = String(newCol.id);
+                    // Update dropdowns
+                    updateCollectionsDropdowns("", colId);
+                }
+            }
+        }
+
         const checkedTags = [];
         drawerTagsContainer.querySelectorAll("input[type=checkbox]").forEach(cb => {
             if (cb.checked) checkedTags.push(Number(cb.value));

@@ -44,6 +44,9 @@ export async function POST(request: Request) {
     const collectionIdRaw = formData.get("collection_id");
     const collectionId = collectionIdRaw ? Number(collectionIdRaw) : null;
 
+    const categoryIdRaw = formData.get("category_id");
+    const categoryId = categoryIdRaw ? Number(categoryIdRaw) : null;
+
     const tagsRaw = formData.get("tags");
     let tagIds: number[] = [];
     if (typeof tagsRaw === "string" && tagsRaw.trim()) {
@@ -76,6 +79,71 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    let finalCollectionId = collectionId;
+    let finalCollectionName = collection;
+
+    if (!finalCollectionId && categoryId) {
+      // 1. Get the category details to know its name
+      const { data: categoryData, error: catErr } = await supabaseAdmin
+        .from("categories")
+        .select("name")
+        .eq("id", categoryId)
+        .single();
+      
+      if (!catErr && categoryData) {
+        // 2. Try to find a collection under this category that has the same name as the category, or is named "General" or "Default"
+        const { data: existingCols, error: colsErr } = await supabaseAdmin
+          .from("collections")
+          .select("id, name")
+          .eq("category_id", categoryId);
+        
+        if (!colsErr && existingCols) {
+          const matchByName = existingCols.find(
+            (c) => c.name.toLowerCase() === categoryData.name.toLowerCase()
+          );
+          const matchByDefault = existingCols.find(
+            (c) => ["general", "default", "uncategorized"].includes(c.name.toLowerCase())
+          );
+          
+          const matchedCol = matchByName || matchByDefault || existingCols[0];
+          
+          if (matchedCol) {
+            finalCollectionId = matchedCol.id;
+            finalCollectionName = matchedCol.name;
+          }
+        }
+        
+        // 3. If no collection exists at all, create a default one named after the category!
+        if (!finalCollectionId) {
+          const slug = categoryData.name
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/[^\w\-]+/g, "")
+            .replace(/\-\-+/g, "-")
+            .replace(/^-+/, "")
+            .replace(/-+$/, "");
+            
+          const { data: newCol, error: newColErr } = await supabaseAdmin
+            .from("collections")
+            .insert([
+              {
+                name: categoryData.name,
+                category_id: categoryId,
+                slug,
+              }
+            ])
+            .select()
+            .single();
+          
+          if (!newColErr && newCol) {
+            finalCollectionId = newCol.id;
+            finalCollectionName = newCol.name;
+          }
+        }
+      }
+    }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -154,8 +222,8 @@ export async function POST(request: Request) {
           storage_path: storagePath,
           hash,
           status: "ready",
-          collection: collection || null,
-          collection_id: collectionId || null,
+          collection: finalCollectionName || null,
+          collection_id: finalCollectionId || null,
         },
       ])
       .select("id, file_name, storage_path, hash, status, collection, collection_id, created_at")

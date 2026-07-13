@@ -10,6 +10,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMindmap, setShowMindmap] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Metadata Lists
@@ -43,6 +44,7 @@ export default function Page() {
 
   // Bulk Edit Selection
   const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
   const [bulkCollectionId, setBulkCollectionId] = useState<string>("");
   const [bulkTags, setBulkTags] = useState<number[]>([]);
 
@@ -226,6 +228,9 @@ export default function Page() {
       if (selectedCollectionForUpload) {
         formData.append("collection_id", selectedCollectionForUpload);
       }
+      if (selectedCategoryForUpload) {
+        formData.append("category_id", selectedCategoryForUpload);
+      }
       if (selectedTagsForUpload.length > 0) {
         formData.append("tags", JSON.stringify(selectedTagsForUpload));
       }
@@ -387,8 +392,8 @@ export default function Page() {
   // Apply Bulk Updates
   const handleApplyBulkUpdate = async () => {
     if (selectedImageIds.length === 0) return;
-    if (!bulkCollectionId && bulkTags.length === 0) {
-      alert("Please select a collection or tags to apply.");
+    if (!bulkCategoryId && !bulkCollectionId && bulkTags.length === 0) {
+      alert("Please select a category, collection, or tags to apply.");
       return;
     }
 
@@ -398,6 +403,8 @@ export default function Page() {
         const itemUpdate: any = { id };
         if (bulkCollectionId) {
           itemUpdate.collection_id = Number(bulkCollectionId);
+        } else if (bulkCategoryId) {
+          itemUpdate.category_id = Number(bulkCategoryId);
         }
         if (bulkTags.length > 0) {
           itemUpdate.tags = bulkTags;
@@ -415,6 +422,7 @@ export default function Page() {
       if (res.ok) {
         alert(`Successfully updated metadata for ${data.summary.successful} wallpapers!`);
         setSelectedImageIds([]);
+        setBulkCategoryId("");
         setBulkCollectionId("");
         setBulkTags([]);
         fetchGallery();
@@ -436,6 +444,11 @@ export default function Page() {
   // Filter collections by filter category
   const filteredFilterCollections = collections.filter(
     (col) => !selectedCategoryFilter || col.category_id === Number(selectedCategoryFilter)
+  );
+
+  // Filter collections by bulk category
+  const filteredBulkCollections = collections.filter(
+    (col) => !bulkCategoryId || col.category_id === Number(bulkCategoryId)
   );
 
   // Images for Auto-Slider (newest 5 verified wallpapers)
@@ -481,6 +494,105 @@ export default function Page() {
           Documentation
         </Link>
       </div>
+
+      {/* Visual System Architecture Mindmap (Collapsible) */}
+      <div className="card" style={{ marginBottom: "2rem", padding: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowMindmap(!showMindmap)}>
+          <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+            🧠 <span>System Hierarchy & Architecture Map</span>
+          </h3>
+          <button className="btn-secondary" style={{ padding: "4px 10px", fontSize: "0.8rem", borderRadius: "4px" }}>
+            {showMindmap ? "Hide Map" : "Show Map"}
+          </button>
+        </div>
+
+        {showMindmap && (
+          <div className="mindmap-container" style={{ marginTop: "1.5rem" }}>
+            <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
+              How the application structures data for synchronization between the dashboard and Electron desktop clients.
+            </p>
+            
+            <div className="mindmap-flex" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", gap: "2rem", position: "relative" }}>
+              {/* Branch 1: The Core Hierarchy */}
+              <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                <h4 style={{ margin: "0 0 1rem 0", color: "var(--primary)", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>1. Core Data Hierarchy (1-to-Many)</h4>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}>
+                  {/* Category Node */}
+                  <div style={{ background: "rgba(26, 115, 232, 0.15)", border: "1px solid var(--primary)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center", position: "relative" }}>
+                    <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--primary)", fontWeight: "bold" }}>Level 1: Category</div>
+                    <strong style={{ fontSize: "0.95rem" }}>Anime / Game Art</strong>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Broad thematic genres</div>
+                  </div>
+
+                  <div style={{ color: "var(--text-muted)", fontSize: "1.2rem" }}>⬇</div>
+
+                  {/* Collection Node */}
+                  <div style={{ background: "rgba(255, 159, 10, 0.12)", border: "1px solid var(--accent)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center" }}>
+                    <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--accent)", fontWeight: "bold" }}>Level 2: Collection</div>
+                    <strong style={{ fontSize: "0.95rem" }}>Naruto / Cyberpunk</strong>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Specific nested albums</div>
+                  </div>
+
+                  <div style={{ color: "var(--text-muted)", fontSize: "1.2rem" }}>⬇</div>
+
+                  {/* Wallpaper Node */}
+                  <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center" }}>
+                    <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--foreground)", opacity: 0.6, fontWeight: "bold" }}>Level 3: Wallpaper</div>
+                    <strong style={{ fontSize: "0.95rem" }}>naruto_rasengan.jpg</strong>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Actual image file payload</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Branch 2: Many-to-Many Labels */}
+              <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                <h4 style={{ margin: "0 0 1rem 0", color: "#e8eaed", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>2. Tag Labeling (Many-to-Many)</h4>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", height: "100%", justifyContent: "center" }}>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#4K</span>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Dark</span>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Minimal</span>
+                  </div>
+
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "10px 0" }}>🔗 Associated directly to</div>
+                    <strong style={{ fontSize: "0.95rem", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: "6px", display: "inline-block" }}>
+                      Any Wallpaper
+                    </strong>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px" }}>
+                      Allows cross-category filtering regardless of the folder/collection hierarchy.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Branch 3: Offline Sync Engine */}
+              <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                <h4 style={{ margin: "0 0 1rem 0", color: "#34a853", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>3. Offline-First Syncing Engine</h4>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", fontSize: "0.85rem", lineHeight: 1.5 }}>
+                  <div style={{ padding: "8px 12px", background: "rgba(52, 168, 83, 0.12)", border: "1px solid #34a853", borderRadius: "6px" }}>
+                    <strong>1. Local Actions (Offline)</strong><br />
+                    Creating categories/collections or assigning tags saves to a local JSON cache immediately.
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "rgba(52, 168, 83, 0.08)", border: "1px solid rgba(52, 168, 83, 0.3)", borderRadius: "6px" }}>
+                    <strong>2. Synchronization Queue</strong><br />
+                    Pending modifications are pushed into a local `sync_queue` in priority order (categories ➔ collections ➔ tags ➔ wallpaper relationships).
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "rgba(26, 115, 232, 0.08)", border: "1px solid rgba(26, 115, 232, 0.3)", borderRadius: "6px" }}>
+                    <strong>3. DB Sync (Online)</strong><br />
+                    When connection is established, the client flushes queue objects to Supabase APIs and updates local IDs to match server database primary keys.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      
 
       {/* Accessible Auto-Slider for recently added wallpapers */}
       {sliderImages.length > 0 && (
@@ -669,6 +781,11 @@ export default function Page() {
                       </option>
                     ))}
                   </select>
+                )}
+                {selectedCategoryForUpload && !selectedCollectionForUpload && (
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                    💡 Leave empty to assign to the default collection for "{categories.find(c => String(c.id) === selectedCategoryForUpload)?.name}".
+                  </p>
                 )}
               </div>
             </div>
@@ -1064,17 +1181,39 @@ export default function Page() {
             </strong>
           </div>
           <div className="bulk-actions-controls">
+            {/* Assign Category */}
+            <div>
+              <select
+                value={bulkCategoryId}
+                onChange={(e) => {
+                  setBulkCategoryId(e.target.value);
+                  setBulkCollectionId("");
+                }}
+                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}
+              >
+                <option value="">-- Assign Category --</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Assign collection */}
             <div>
               <select
                 value={bulkCollectionId}
                 onChange={(e) => setBulkCollectionId(e.target.value)}
-                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)" }}
+                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}
+                disabled={!bulkCategoryId}
               >
-                <option value="">-- Assign Collection --</option>
-                {collections.map((col) => (
+                <option value="">
+                  {bulkCategoryId ? "-- Assign Collection --" : "Select Category First"}
+                </option>
+                {filteredBulkCollections.map((col) => (
                   <option key={col.id} value={col.id}>
-                    {col.name} ({categories.find((c) => c.id === col.category_id)?.name || "Uncategorized"})
+                    {col.name}
                   </option>
                 ))}
               </select>
@@ -1107,6 +1246,7 @@ export default function Page() {
               className="btn-secondary"
               onClick={() => {
                 setSelectedImageIds([]);
+                setBulkCategoryId("");
                 setBulkCollectionId("");
                 setBulkTags([]);
               }}
