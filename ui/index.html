@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallpaper Sync</title>
+    <title>Wallpaper Sync Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
+    <!-- Drag and Drop Overlay -->
     <div id="dropZoneOverlay" class="drop-zone-overlay hidden">
         <div class="drop-zone-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -19,145 +20,360 @@
                 <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             <h2>Drop Wallpapers Here</h2>
-            <p>Release to add to your collection</p>
+            <p>Add wallpapers to your local collection</p>
         </div>
     </div>
 
+    <!-- Toast Notification Container -->
     <div id="toastContainer" class="toast-container"></div>
-    <div class="app-layout">
-        <aside class="sidebar">
+
+    <div class="app-layout" id="appLayout">
+        <!-- LEFT SIDEBAR: Clean, Spacious Controls -->
+        <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <img src="../icon.png" alt="App Logo" class="app-logo">
                 <h1>Wallpaper Sync</h1>
             </div>
 
-            <div class="sidebar-section">
-                <h3>Controls</h3>
-                <button id="syncNowBtn" class="btn primary-btn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                    Next Wallpaper
-                </button>
-            </div>
-
-            <div class="sidebar-section">
-                <h3>Slideshow</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Enable</span>
-                    <label class="switch">
-                        <input type="checkbox" id="slideshowToggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Random order</span>
-                    <label class="switch">
-                        <input type="checkbox" id="randomToggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Interval</span>
-                    <div class="select-wrapper">
-                        <select id="intervalDropdown">
-                            <option value="10000">10 Seconds</option>
-                            <option value="30000">30 Seconds</option>
-                            <option value="60000">1 Minute</option>
-                            <option value="300000">5 Minutes</option>
-                            <option value="600000">10 Minutes</option>
-                            <option value="1800000">30 Minutes</option>
-                            <option value="3600000">1 Hour</option>
-                            <option value="21600000">6 Hours</option>
-                            <option value="86400000">1 Day</option>
-                        </select>
+            <!-- SLIDESHOW MEDIA PLAYER CARD -->
+            <div class="sidebar-section player-section">
+                <div class="player-card">
+                    <div class="player-status" id="playerStatus">Slideshow Stopped</div>
+                    <div class="player-controls">
+                        <!-- Play Slideshow -->
+                        <button id="playerPlayBtn" class="player-btn" type="button" aria-label="Play Slideshow">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                        </button>
+                        <!-- Pause Slideshow -->
+                        <button id="playerPauseBtn" class="player-btn hidden" type="button" aria-label="Pause Slideshow">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                        </button>
+                        <!-- Skip to Next Wallpaper -->
+                        <button id="playerNextBtn" class="player-btn" type="button" aria-label="Next Wallpaper">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                                <line x1="19" y1="5" x2="19" y2="19"></line>
+                            </svg>
+                        </button>
                     </div>
                 </div>
-
-                <div class="setting-row" style="margin-top: 10px;">
-                    <span class="setting-label">Selected</span>
-                    <span class="setting-label" id="slideshowSelectedCount">0</span>
-                </div>
-                <button id="manageSlideshowBtn" class="primary-btn" style="margin-top: 10px;">
-                    Manage Slideshow
-                </button>
             </div>
 
+            <!-- COLLAPSIBLE: SLIDESHOW SETTINGS -->
             <div class="sidebar-section">
-                <h3>Network</h3>
-                <button id="fetchWallpapersBtn" class="primary-btn" style="margin-top: 1rem;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                <button id="toggleSlideshowSettingsBtn" class="collapsible-header" type="button">
+                    <span>Slideshow Settings</span>
+                    <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
-                    Fetch from Server
                 </button>
+                
+                <div id="slideshowSettingsPanel" class="collapsible-content hidden">
+                    <div class="setting-row">
+                        <span class="setting-label">Source</span>
+                        <div class="select-wrapper">
+                            <select id="slideshowSourceType">
+                                <option value="all">All Wallpapers</option>
+                                <option value="favorites">Favorites Only</option>
+                                <option value="category">Category</option>
+                                <option value="collection">Collection</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <button id="clearLocalBtn" class="primary-btn danger-btn" style="margin-top: 10px;">
-                    Clear Local Wallpapers
-                </button>
+                    <!-- Dynamic source selection dropdown -->
+                    <div class="setting-row hidden" id="slideshowSourceIdRow">
+                        <span class="setting-label">Select Source</span>
+                        <div class="select-wrapper">
+                            <select id="slideshowSourceId">
+                                <!-- Injected dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-row">
+                        <span class="setting-label">Rotation Order</span>
+                        <div class="select-wrapper">
+                            <select id="slideshowOrder">
+                                <option value="sequential">Sequential</option>
+                                <option value="random">Random Selection</option>
+                                <option value="shuffle">Shuffle Playlist</option>
+                                <option value="newest">Newest First</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-row">
+                        <span class="setting-label">Interval</span>
+                        <div class="select-wrapper">
+                            <select id="intervalDropdown">
+                                <option value="10000">10 Seconds</option>
+                                <option value="30000">30 Seconds</option>
+                                <option value="60000">1 Minute</option>
+                                <option value="300000">5 Minutes</option>
+                                <option value="600000">10 Minutes</option>
+                                <option value="1800000">30 Minutes</option>
+                                <option value="3600000">1 Hour</option>
+                                <option value="21600000">6 Hours</option>
+                                <option value="86400000">1 Day</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-row" style="margin-top: 10px;">
+                        <span class="setting-label">Favorites</span>
+                        <span class="setting-label" id="slideshowSelectedCount">0</span>
+                    </div>
+                    <button id="manageSlideshowBtn" class="primary-btn btn-secondary" style="margin-top: 8px; width: 100%;">
+                        Manage Favorites
+                    </button>
+                </div>
             </div>
 
+            <!-- COLLAPSIBLE: MAINTENANCE & SYNC -->
             <div class="sidebar-section">
-                <h3>Wallpaper Info</h3>
-                <p>Total Wallpapers: <span id="wallpaperCount">0</span></p>
-                <p>Sync Progress: <span id="syncProgress">0%</span></p>
-                <div class="progress-track" aria-label="Sync progress">
-                    <div id="syncProgressBarFill" class="progress-fill" style="width: 0%"></div>
-                </div>
-            </div>
+                <button id="toggleMaintenanceBtn" class="collapsible-header" type="button">
+                    <span>Maintenance & Sync</span>
+                    <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
 
-            <div class="sidebar-section" id="updatesSection">
-                <h3>Updates</h3>
-                <div class="update-row">
-                    <span class="update-status" id="updateStatusText">Checking…</span>
-                </div>
-                <div class="update-notes" id="updateNotesText" title=""></div>
-                <div class="update-actions">
-                    <button id="checkUpdatesBtn" class="primary-btn update-btn">Check</button>
-                    <button id="downloadUpdateBtn" class="primary-btn update-btn" style="display:none">Download</button>
-                    <button id="installUpdateBtn" class="primary-btn update-btn" style="display:none">Install</button>
+                <div id="maintenancePanel" class="collapsible-content hidden">
+                    <button id="syncMetadataBtn" class="primary-btn btn-secondary" style="width: 100%; margin-bottom: 8px;">
+                        Sync Metadata
+                    </button>
+                    <button id="fetchWallpapersBtn" class="primary-btn btn-secondary" style="width: 100%; margin-bottom: 8px;">
+                        Fetch Wallpapers
+                    </button>
+                    <button id="clearLocalBtn" class="primary-btn danger-btn" style="width: 100%;">
+                        Clear Local Files
+                    </button>
                 </div>
             </div>
 
             <div class="drag-hint">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
-                <p>Drag & Drop anywhere to add images</p>
+                <p>Drag & drop images here</p>
+            </div>
+
+            <!-- STICKY FOOTER: Stats, Connection status and Credit -->
+            <div class="sidebar-footer">
+                <div id="connectionStatus" class="connection-status-indicator-footer">
+                    <span class="status-dot status-offline"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+                <div class="library-stats">
+                    <span>Wallpapers: <strong id="wallpaperCount">0</strong></span>
+                    <span>Sync: <strong id="syncProgress">0%</strong></span>
+                </div>
+                <div class="progress-track" aria-label="Sync progress">
+                    <div id="syncProgressBarFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div class="sidebar-credit">
+                    Made by <a href="https://github.com/Debanjan110d" target="_blank" class="credit-link">Debanjan Dutta</a>
+                </div>
             </div>
         </aside>
 
-        <main class="gallery-container">
-            <div class="gallery-header">
-                <div class="top-update-banner" id="topUpdateBanner" style="display:none">
-                    <div class="top-update-text" id="topUpdateText">Update available</div>
-                    <button id="topUpdateActionBtn" class="primary-btn update-btn">Download</button>
-                </div>
-                <h2>Your Collection</h2>
-                <div class="gallery-subheader" id="gallerySubheader" style="display:none">
-                    <div class="manage-left">
-                        <span id="manageModeLabel">Manage Slideshow Selection</span>
-                        <div class="selected-preview" id="selectedPreview" style="display:none"></div>
+        <!-- CENTER DASHBOARD: Discovery Page -->
+        <main class="dashboard-content">
+            <!-- Top search & Filter Nav -->
+            <header class="dashboard-header">
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <!-- Minimizer Hamburger Menu Button -->
+                    <button id="toggleSidebarBtn" class="toggle-sidebar-btn" type="button" aria-label="Toggle Sidebar Menu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="search-box-wrapper">
+                        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="globalSearchInput" placeholder="Search title, collection, tags..." />
                     </div>
-                    <button id="manageDoneBtn" class="primary-btn update-btn">Done</button>
                 </div>
-            </div>
-            <div class="gallery" id="gallery">
-                <!-- Wallpapers will be injected here -->
+
+                <!-- TOP-RIGHT HEADER UPDATE CONTROLS -->
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div class="update-compact-header" id="updatesSection">
+                        <span class="update-status" id="updateStatusText">Checking updates...</span>
+                        <div class="update-actions-row" style="display:inline-flex; gap:8px;">
+                            <button id="checkUpdatesBtn" class="btn-link" type="button">Check</button>
+                            <button id="downloadUpdateBtn" class="btn-link" type="button" style="display:none">Download</button>
+                            <button id="installUpdateBtn" class="btn-link" type="button" style="display:none">Install</button>
+                        </div>
+                    </div>
+                    <div class="top-update-banner" id="topUpdateBanner" style="display:none">
+                        <div class="top-update-text" id="topUpdateText">Update available</div>
+                        <button id="topUpdateActionBtn" class="primary-btn update-btn" type="button">Download</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-scrollable-body" id="dashboardBody">
+                <!-- 1. Featured Hero Slider -->
+                <section class="slider-section" id="heroSliderSection">
+                    <!-- Carousel elements will be injected here -->
+                </section>
+
+                <!-- 2. Recently Added Row -->
+                <section class="row-section">
+                    <h2 class="section-title">Recently Added</h2>
+                    <div class="row-scroll" id="recentlyAddedRow">
+                        <!-- Horizontal cards will be injected here -->
+                    </div>
+                </section>
+
+                <!-- 3. Browse Categories Grid -->
+                <section class="row-section">
+                    <h2 class="section-title">Browse Categories</h2>
+                    <div class="categories-horizontal-grid" id="categoriesGrid">
+                        <!-- Large category cards will be injected here -->
+                    </div>
+                </section>
+
+                <!-- 4. Discover Random section -->
+                <section class="row-section">
+                    <h2 class="section-title">Random Discoveries</h2>
+                    <div class="row-scroll" id="randomRow">
+                        <!-- Horizontal cards will be injected here -->
+                    </div>
+                </section>
+
+                <!-- 5. All Wallpapers Grid (Catalog Explorer) -->
+                <section class="row-section catalog-section" id="catalogFilterSection">
+                    <div class="catalog-header">
+                        <h2 class="section-title">Explore All Wallpapers</h2>
+                        <!-- Multi-select / slideshow confirmation banner -->
+                        <div class="gallery-subheader" id="gallerySubheader" style="display:none">
+                            <div class="manage-left">
+                                <span id="manageModeLabel">Select Wallpapers</span>
+                                <div class="selected-preview" id="selectedPreview" style="display:none"></div>
+                            </div>
+                            <button id="manageDoneBtn" class="primary-btn update-btn">Done</button>
+                        </div>
+                    </div>
+
+                    <!-- Catalog Filters -->
+                    <div class="catalog-filters">
+                        <select id="catFilter">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="colFilter" disabled>
+                            <option value="">All Collections</option>
+                        </select>
+                        <select id="tagFilter">
+                            <option value="">All Tags</option>
+                        </select>
+                        <button id="clearFiltersBtn" class="primary-btn btn-secondary">Reset</button>
+                    </div>
+
+                    <!-- Main Gallery grid -->
+                    <div class="gallery" id="gallery">
+                        <!-- Injected dynamically -->
+                    </div>
+                </section>
             </div>
         </main>
+
+        <!-- RIGHT SIDE PANEL: Detailed Info & Editing Drawer -->
+        <aside class="detail-drawer hidden" id="detailDrawer" role="dialog" aria-label="Wallpaper details">
+            <div class="drawer-header">
+                <h3>Wallpaper Details</h3>
+                <button id="closeDrawerBtn" class="close-drawer-btn" aria-label="Close panel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="drawer-body">
+                <div class="drawer-img-container">
+                    <img id="drawerImage" src="" alt="Selected Wallpaper" />
+                </div>
+
+                <div class="drawer-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">File Name</span>
+                        <span class="stat-value" id="drawerFileName">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Resolution</span>
+                        <span class="stat-value" id="drawerResolution">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">File Size</span>
+                        <span class="stat-value" id="drawerSize">-</span>
+                    </div>
+                </div>
+
+                <!-- Edit Metadata section -->
+                <div class="drawer-edit-section">
+                    <h4>Organization</h4>
+                    
+                    <div class="drawer-field">
+                        <label>Category</label>
+                        <div class="select-wrapper">
+                            <select id="drawerCategorySelect">
+                                <option value="">None / Uncategorized</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="drawer-field">
+                        <label>Collection</label>
+                        <div class="select-wrapper">
+                            <select id="drawerCollectionSelect" disabled>
+                                <option value="">Select Category First</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="drawer-field">
+                        <label>Tags Selection</label>
+                        <div class="tags-edit-container" id="drawerTagsContainer">
+                            <!-- Tags checklist checkboxes will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="drawer-actions">
+                    <button id="drawerApplyBtn" class="btn primary-btn" style="width: 100%;">
+                        Apply Wallpaper
+                    </button>
+                    <button id="drawerFavBtn" class="btn btn-secondary" style="width: 100%; margin-top: 8px;">
+                        Add to Favorites
+                    </button>
+                    <button id="drawerDeleteBtn" class="btn btn-danger" style="width: 100%; margin-top: 8px;">
+                        Delete Wallpaper
+                    </button>
+                </div>
+            </div>
+        </aside>
     </div>
 
+    <!-- Lightbox Modal (Double click viewer) -->
     <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Image viewer">
         <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
         <div class="lightbox-content">
             <button id="lightboxPrev" class="lightbox-nav lightbox-nav-prev" type="button" aria-label="Previous image">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
             </button>
@@ -168,13 +384,54 @@
                 </svg>
             </button>
             <img id="lightboxImage" class="lightbox-image" alt="Wallpaper" />
-
             <button id="lightboxNext" class="lightbox-nav lightbox-nav-next" type="button" aria-label="Next image">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
             </button>
+        </div>
+    </div>
+
+    <!-- Inline Creator Modal (Category/Collection creation) -->
+    <div id="creatorModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Create item">
+        <div class="lightbox-backdrop" id="creatorModalBackdrop"></div>
+        <div class="creator-modal-content">
+            <h3 id="creatorModalTitle">Create Item</h3>
+            <div class="creator-modal-body">
+                <input type="text" id="creatorModalInput" placeholder="Name" />
+            </div>
+            <div class="creator-modal-actions">
+                <button id="creatorModalConfirm" class="btn primary-btn">Create</button>
+                <button id="creatorModalCancel" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Feedback / Reviews Modal Prompt -->
+    <div id="reviewModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Submit Feedback">
+        <div class="lightbox-backdrop" id="reviewModalBackdrop"></div>
+        <div class="creator-modal-content review-modal-content">
+            <h3>Enjoying Wallpaper Sync?</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Share your rating and comments to help us improve the application.</p>
+            
+            <div class="review-modal-body" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+                <!-- 1-5 Star Ratings Row -->
+                <div class="rating-stars-row" id="ratingStarsRow" style="display:flex; justify-content:center; gap:8px; font-size:26px; color:rgba(255,255,255,0.15); cursor:pointer;">
+                    <span class="rating-star" data-value="1">★</span>
+                    <span class="rating-star" data-value="2">★</span>
+                    <span class="rating-star" data-value="3">★</span>
+                    <span class="rating-star" data-value="4">★</span>
+                    <span class="rating-star" data-value="5">★</span>
+                </div>
+                
+                <input type="text" id="reviewNameInput" placeholder="Your Name" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:6px; padding:8px; color:white; font-size:12px; font-family:inherit; outline:none;" />
+                <textarea id="reviewCommentInput" placeholder="Write comments or suggestions..." rows="3" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:6px; padding:8px; color:white; font-size:12px; font-family:inherit; outline:none; resize:none;"></textarea>
+            </div>
+            
+            <div class="creator-modal-actions">
+                <button id="reviewConfirmBtn" class="btn primary-btn" disabled>Submit Feedback</button>
+                <button id="reviewCancelBtn" class="btn btn-secondary">Maybe Later</button>
+            </div>
         </div>
     </div>
 

@@ -1,4 +1,12 @@
 const { app, Tray, Menu, Notification, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+
+// Ensure a single running instance at startup
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+  app.exit(0);
+}
+
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -122,6 +130,14 @@ const { syncWallpapers } = require("./downloader");
 const { setWallpaper } = require("./wallpaperManager");
 const { loadSettings, saveSettings } = require("./settings");
 const axios = require("axios");
+const {
+  loadLocalMetadata,
+  createCategoryLocally,
+  createCollectionLocally,
+  createTagLocally,
+  updateWallpaperMetadataLocally,
+  syncMetadataWithServer
+} = require("./metadataCache");
 
 let tray = null;
 let mainWindow = null;
@@ -161,46 +177,24 @@ if (!app.isPackaged) {
   }
 }
 
-// Ensure a single running instance. If the user launches the app again,
-// focus (or recreate) the existing dashboard window instead of spawning a new process.
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-
-if (!app.isPackaged) {
+app.on("second-instance", async () => {
   try {
-    // eslint-disable-next-line no-console
-    console.log(`[single-instance] pid=${process.pid} lock=${String(gotSingleInstanceLock)}`);
+    await app.whenReady();
   } catch {
     // ignore
   }
-}
 
-if (!gotSingleInstanceLock) {
-  // Exit early and reliably (especially important during startup where `app.quit()`
-  // can be deferred). This prevents duplicate tray icons / background processes.
-  app.exit(0);
-} else {
-  app.on("second-instance", async () => {
-    // This can fire very early (even before `whenReady()` resolves) if the user
-    // launches the app twice quickly. Always wait until Electron is ready before
-    // creating or focusing BrowserWindows. I am writing like this cause I forgot to how to use tht multiline comment in JS I am just doing selecting then ctrl + / Hehe 
-    try {
-      await app.whenReady();
-    } catch {
-      // ignore
-    }
+  // If we already have a window, bring it to front.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
 
-    // If we already have a window, bring it to front.
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
-      mainWindow.focus();
-      return;
-    }
-
-    // If we're running tray-only (startup) or the window was destroyed, recreate it.
-    createMainWindow();
-  });
-}
+  // If we're running tray-only (startup) or the window was destroyed, recreate it.
+  createMainWindow();
+});
 
 function parseGithubRepoFromUrl(maybeUrl) {
   const url = String(maybeUrl || "").trim();
@@ -373,6 +367,11 @@ function createMainWindow() {
   });
   mainWindow.loadFile(path.join(__dirname, "ui", "index.html"));
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.on("show", () => {
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("app:window-shown");
+    }
+  });
 
   // If an update finished downloading while we were running tray-only,
   // prompt the user once they open the dashboard.
@@ -478,30 +477,83 @@ async function nextSlideshowImage() {
   let images = getImages();
   if (images.length === 0) return;
 
-  if (settings.selectedImages && settings.selectedImages.length > 0) {
-    const selected = images.filter(img => settings.selectedImages.includes(img.path));
-    if (selected.length > 0) {
-      images = selected;
+  // 1. Filter by slideshowSource
+  const source = settings.slideshowSource || { type: "all" };
+  if (source.type === "favorites") {
+    if (settings.selectedImages && settings.selectedImages.length > 0) {
+      images = images.filter((img) => settings.selectedImages.includes(img.path));
     }
+  } else if (source.type === "collection" && source.id) {
+    const metadata = loadLocalMetadata();
+    const colId = Number(source.id);
+    images = images.filter((img) => {
+      const hash = path.basename(img.filename, path.extname(img.filename));
+      const meta = metadata.wallpaper_metadata[hash];
+      return meta && Number(meta.collection_id) === colId;
+    });
+  } else if (source.type === "category" && source.id) {
+    const metadata = loadLocalMetadata();
+    const catId = Number(source.id);
+    const matchedCols = metadata.collections
+      .filter((c) => c.category_id === catId)
+      .map((c) => c.id);
+    images = images.filter((img) => {
+      const hash = path.basename(img.filename, path.extname(img.filename));
+      const meta = metadata.wallpaper_metadata[hash];
+      return meta && matchedCols.includes(Number(meta.collection_id));
+    });
   }
 
-  const useRandom = !!(settings && settings.slideshowRandom);
+  if (images.length === 0) return;
 
-  if (useRandom && images.length > 1) {
-    let nextIndex = currentImageIndex;
-    for (let tries = 0; tries < 6 && nextIndex === currentImageIndex; tries++) {
-      nextIndex = Math.floor(Math.random() * images.length);
+  // 2. Sort/Order images
+  const order = settings.slideshowOrder || "sequential";
+  if (order === "random") {
+    if (images.length > 1) {
+      let nextIndex = currentImageIndex;
+      for (let tries = 0; tries < 6 && nextIndex === currentImageIndex; tries++) {
+        nextIndex = Math.floor(Math.random() * images.length);
+      }
+      currentImageIndex = nextIndex;
+    } else {
+      currentImageIndex = 0;
     }
-    currentImageIndex = nextIndex;
-  } else {
+  } else if (order === "shuffle") {
+    // Fisher-Yates shuffle algorithm
+    for (let i = images.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = images[i];
+      images[i] = images[j];
+      images[j] = temp;
+    }
     currentImageIndex = (currentImageIndex + 1) % images.length;
+  } else if (order === "newest") {
+    // Sort by modified time descending (newest first)
+    images = images
+      .map((img) => {
+        let mtimeMs = 0;
+        try {
+          mtimeMs = fs.statSync(img.path).mtimeMs;
+        } catch {}
+        return { ...img, mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+    currentImageIndex = (currentImageIndex + 1) % images.length;
+  } else {
+    // Default sequential
+    currentImageIndex = (currentImageIndex + 1) % images.length;
+  }
+
+  // Ensure index is within range if array shrank
+  if (currentImageIndex >= images.length) {
+    currentImageIndex = 0;
   }
 
   const image = images[currentImageIndex];
 
   try {
     // Add a small delay to ensure file is ready
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     await setWallpaper(image.path);
     if (mainWindow) mainWindow.webContents.send("sync-complete");
   } catch (err) {
@@ -846,11 +898,8 @@ if (gotSingleInstanceLock) app.whenReady().then(() => {
   settings = loadSettings();
   setupTray();
 
-  // Optional: one-time, low-resource new-content check on startup only.
-  // This is gated behind settings.autoSync so background/tray runs can be fully idle.
-  if (settings && settings.autoSync) {
-    checkForNewWallpapersOnce();
-  }
+  // Cold launch wallpaper update check (runs exactly once on startup)
+  checkForNewWallpapersOnce();
 
   registerWindowsStartupOnce();
 
@@ -1042,6 +1091,7 @@ ipcMain.handle("set-wallpaper", async (event, absolutePath) => {
   try {
     await setWallpaper(absolutePath);
     settings.activeWallpaper = absolutePath;
+    settings.wallpaperChangesCount = (settings.wallpaperChangesCount || 0) + 1;
     saveSettings(settings);
     if (mainWindow) mainWindow.webContents.send("sync-complete");
     return { success: true };
@@ -1049,5 +1099,68 @@ ipcMain.handle("set-wallpaper", async (event, absolutePath) => {
     console.error("set-wallpaper error:", err);
     if (mainWindow) mainWindow.webContents.send("app-error", "Failed to set desktop wallpaper. File might be invalid.");
     throw err; // Throw so the renderer knows it failed
+  }
+});
+
+// Offline-First Metadata Cache Handlers
+ipcMain.handle("get-local-metadata", () => {
+  return loadLocalMetadata();
+});
+
+ipcMain.handle("create-category-local", (event, name) => {
+  return createCategoryLocally(name);
+});
+
+ipcMain.handle("create-collection-local", (event, name, categoryId) => {
+  return createCollectionLocally(name, categoryId);
+});
+
+ipcMain.handle("create-tag-local", (event, name) => {
+  return createTagLocally(name);
+});
+
+ipcMain.handle("update-wallpaper-metadata-local", (event, hash, collectionId, tagIds) => {
+  return updateWallpaperMetadataLocally(hash, collectionId, tagIds);
+});
+
+ipcMain.handle("sync-metadata-now", async () => {
+  const syncConfig = getSyncConfig();
+  return await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN);
+});
+
+ipcMain.handle("update-slideshow-source", (event, source) => {
+  settings.slideshowSource = source;
+  saveSettings(settings);
+  startSlideshow();
+  return { success: true };
+});
+
+ipcMain.handle("update-slideshow-order", (event, order) => {
+  settings.slideshowOrder = order;
+  saveSettings(settings);
+  startSlideshow();
+  return { success: true };
+});
+
+ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => {
+  if (rating === 0) {
+    settings.wallpaperChangesCount = 0;
+    saveSettings(settings);
+    return { success: true, dismissed: true };
+  }
+  const syncConfig = getSyncConfig();
+  const cleanUrl = syncConfig.API_URL.endsWith("/") ? syncConfig.API_URL.slice(0, -1) : syncConfig.API_URL;
+  try {
+    const res = await axios.post(`${cleanUrl}/api/reviews`, {
+      rating: Number(rating),
+      comment: String(comment || ""),
+      reviewer_name: String(reviewerName || "Anonymous")
+    });
+    settings.alreadyReviewed = true;
+    saveSettings(settings);
+    return { success: true, data: res.data };
+  } catch (err) {
+    console.error("Failed to submit review:", err.message);
+    return { success: false, error: err.message };
   }
 });

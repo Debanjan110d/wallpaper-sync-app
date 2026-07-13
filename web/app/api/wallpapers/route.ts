@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
 import { cookies } from "next/headers";
 
 type DbWallpaper = {
@@ -11,6 +10,23 @@ type DbWallpaper = {
   status: string | null;
   collection: string | null;
   created_at: string | null;
+  collection_id: number | null;
+  collections: {
+    id: number;
+    name: string;
+    category_id: number | null;
+    categories: {
+      id: number;
+      name: string;
+    } | null;
+  } | null;
+  wallpaper_tags: {
+    tag_id: number;
+    tags: {
+      id: number;
+      name: string;
+    } | null;
+  }[] | null;
 };
 
 export async function GET(request: Request) {
@@ -25,8 +41,6 @@ export async function GET(request: Request) {
     const isSyncTokenConfigured = syncToken.length > 0;
     const isValidSyncToken = isSyncTokenConfigured && requestToken === syncToken;
 
-    // If SYNC_TOKEN is configured, require either a valid token or an admin session.
-    // If SYNC_TOKEN is NOT configured, allow public reads (useful for local dev).
     if (!isAdminSession && isSyncTokenConfigured && !isValidSyncToken) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -43,12 +57,105 @@ export async function GET(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Database-first: list verified wallpaper records and then resolve Storage URLs.
     const url = new URL(request.url);
     const sinceParam = (url.searchParams.get("since") || "").trim();
     const countOnly = (url.searchParams.get("countOnly") || "").trim() === "1";
     const since = sinceParam ? new Date(sinceParam) : null;
     const hasValidSince = !!since && !Number.isNaN(since.getTime());
+
+    // Extract filters
+    const categoryId = url.searchParams.get("category");
+    const collectionId = url.searchParams.get("collection");
+    const tagIds = url.searchParams.get("tags");
+
+    // Gather matched wallpaper IDs first if filters are specified
+    let filteredWpIds: string[] | null = null;
+    let noMatch = false;
+
+    if (categoryId) {
+      const { data: cols, error: colsErr } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("category_id", Number(categoryId));
+
+      if (colsErr) {
+        return NextResponse.json({ error: colsErr.message }, { status: 500 });
+      }
+
+      const colIds = (cols || []).map((c) => c.id);
+      if (colIds.length === 0) {
+        noMatch = true;
+      } else {
+        const { data: wps, error: wpsErr } = await supabase
+          .from("wallpapers")
+          .select("id")
+          .in("collection_id", colIds);
+
+        if (wpsErr) {
+          return NextResponse.json({ error: wpsErr.message }, { status: 500 });
+        }
+
+        filteredWpIds = (wps || []).map((w) => w.id);
+      }
+    }
+
+    if (collectionId && !noMatch) {
+      const { data: wps, error: wpsErr } = await supabase
+        .from("wallpapers")
+        .select("id")
+        .eq("collection_id", Number(collectionId));
+
+      if (wpsErr) {
+        return NextResponse.json({ error: wpsErr.message }, { status: 500 });
+      }
+
+      const colWpIds = (wps || []).map((w) => w.id);
+      if (filteredWpIds === null) {
+        filteredWpIds = colWpIds;
+      } else {
+        filteredWpIds = filteredWpIds.filter((id) => colWpIds.includes(id));
+      }
+      if (filteredWpIds.length === 0) {
+        noMatch = true;
+      }
+    }
+
+    if (tagIds && !noMatch) {
+      const idsArr = tagIds
+        .split(",")
+        .map((id) => Number(id.trim()))
+        .filter(Number.isFinite);
+
+      if (idsArr.length > 0) {
+        const { data: wpTags, error: wpTagsErr } = await supabase
+          .from("wallpaper_tags")
+          .select("wallpaper_id")
+          .in("tag_id", idsArr);
+
+        if (wpTagsErr) {
+          return NextResponse.json({ error: wpTagsErr.message }, { status: 500 });
+        }
+
+        const tagWpIds = (wpTags || []).map((wt) => wt.wallpaper_id);
+        if (filteredWpIds === null) {
+          filteredWpIds = tagWpIds;
+        } else {
+          filteredWpIds = filteredWpIds.filter((id) => tagWpIds.includes(id));
+        }
+        if (filteredWpIds.length === 0) {
+          noMatch = true;
+        }
+      }
+    }
+
+    if (noMatch) {
+      return NextResponse.json({
+        wallpapers: [],
+        count: 0,
+        max_created_at: null,
+        since: hasValidSince ? since!.toISOString() : null,
+      });
+    }
 
     // Low-resource mode: only return count + newest created_at (no signed URLs).
     if (countOnly) {
@@ -56,6 +163,10 @@ export async function GET(request: Request) {
         .from("wallpapers")
         .select("created_at", { count: "exact", head: true })
         .neq("status", "deleted");
+
+      if (filteredWpIds !== null) {
+        countQuery = countQuery.in("id", filteredWpIds);
+      }
 
       if (hasValidSince) {
         countQuery = countQuery.gt("created_at", since!.toISOString());
@@ -72,6 +183,10 @@ export async function GET(request: Request) {
         .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .limit(1);
+
+      if (filteredWpIds !== null) {
+        maxQuery = maxQuery.in("id", filteredWpIds);
+      }
 
       if (hasValidSince) {
         maxQuery = maxQuery.gt("created_at", since!.toISOString());
@@ -92,9 +207,38 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("wallpapers")
-      .select("id, file_name, storage_path, hash, status, collection, created_at")
+      .select(`
+        id,
+        file_name,
+        storage_path,
+        hash,
+        status,
+        collection,
+        created_at,
+        collection_id,
+        collections (
+          id,
+          name,
+          category_id,
+          categories (
+            id,
+            name
+          )
+        ),
+        wallpaper_tags (
+          tag_id,
+          tags (
+            id,
+            name
+          )
+        )
+      `)
       .neq("status", "deleted")
       .order("created_at", { ascending: false });
+
+    if (filteredWpIds !== null) {
+      query = query.in("id", filteredWpIds);
+    }
 
     if (hasValidSince) {
       query = query.gt("created_at", since!.toISOString());
@@ -107,13 +251,32 @@ export async function GET(request: Request) {
     }
 
     const wallpapers = await Promise.all(
-      (rows as DbWallpaper[])
+      (rows as unknown as DbWallpaper[])
         .filter((row) => !!row.storage_path)
         .map(async (row) => {
           const storagePath = String(row.storage_path);
           const { data: urlData, error: urlError } = await supabase.storage
             .from("wallpapers")
             .createSignedUrl(storagePath, 60 * 60);
+
+          // Format nested collections structure
+          const collectionDetails = row.collections
+            ? {
+                id: row.collections.id,
+                name: row.collections.name,
+                category_id: row.collections.category_id,
+                category_name: row.collections.categories
+                  ? row.collections.categories.name
+                  : null,
+              }
+            : null;
+
+          // Format nested tags structure
+          const tags = Array.isArray(row.wallpaper_tags)
+            ? row.wallpaper_tags
+                .map((wt) => wt.tags)
+                .filter((t): t is { id: number; name: string } => !!t)
+            : [];
 
           return {
             id: row.id,
@@ -123,6 +286,9 @@ export async function GET(request: Request) {
             status: row.status,
             collection: row.collection,
             created_at: row.created_at,
+            collection_id: row.collection_id,
+            collection_details: collectionDetails,
+            tags: tags,
             // Back-compat for existing clients (Electron/downloader + dashboard UI)
             name: storagePath.split("/").pop() || storagePath,
             url: urlError ? null : (urlData?.signedUrl || null),
@@ -130,7 +296,8 @@ export async function GET(request: Request) {
         })
     );
 
-    const maxCreatedAt = (rows && rows.length > 0) ? (rows[0] as DbWallpaper).created_at : null;
+    const maxCreatedAt =
+      rows && rows.length > 0 ? (rows[0] as unknown as DbWallpaper).created_at : null;
 
     return NextResponse.json({
       wallpapers,
@@ -213,3 +380,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

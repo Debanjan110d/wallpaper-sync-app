@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.2.0 (v3.2.0) — 2026-07-13
+
+### Dashboard Redesign
+- Redesigned the home screen of the desktop app to function as a discovery dashboard rather than a static gallery.
+- Added a hero slider showcase of featured wallpapers that automatically rotates.
+- Added scrollable rows for recently added wallpapers and random discoveries.
+- Added grid cards to browse collection categories.
+
+### Offline-First Architecture
+- Added local metadata caching using a local database structure (local_metadata.json). The desktop application now works completely offline without requiring server access.
+- Implemented background synchronization queues that store local modifications (creating categories, collections, tags, or editing metadata) and push them to the server when connected.
+- Added connection status indicators in the user interface to show connection health (online, offline pending, or unreachable).
+
+### Media Controls and Collapsible Layout
+- Added a media-player slideshow card in the left menu featuring play, pause, and skip controls.
+- Shows active slideshow playlist name in the status block.
+- Consolidated advanced controls and sync tasks into collapsible settings drawers to reduce congestion in the sidebar.
+- Added a toggle button in the main section to minimize the left menu, expanding the catalog viewing layout.
+- Repositioned connection status and count metrics sticky-aligned to the bottom footer of the sidebar.
+
+### Feedback System and Analytics
+- Integrated a review system that prompts users for a rating and comments inside the client app after changing wallpapers five times.
+- Created server-side reviews endpoint to insert ratings into a Supabase database.
+- Added an analytics card at the bottom of the administrator web page displaying review metrics, aggregate averages, and recent feedback entries.
+
+### Miscellaneous
+- Enforced strict single-instance locks at startup in the main process to prevent duplicate windows.
+- Patched Next.js API endpoints to support write authorization using sync token headers.
+- Added project credits for Debanjan Dutta in the sidebar footer.
+
 ## 3.0.2 (v3.0.2) — 2026-05-24
 
 ### ⬆️ App Updates (Windows)

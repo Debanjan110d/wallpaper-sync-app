@@ -41,6 +41,22 @@ export async function POST(request: Request) {
     const collectionRaw = formData.get("collection") || formData.get("username");
     const collection = typeof collectionRaw === "string" ? collectionRaw.trim() : null;
 
+    const collectionIdRaw = formData.get("collection_id");
+    const collectionId = collectionIdRaw ? Number(collectionIdRaw) : null;
+
+    const tagsRaw = formData.get("tags");
+    let tagIds: number[] = [];
+    if (typeof tagsRaw === "string" && tagsRaw.trim()) {
+      try {
+        tagIds = JSON.parse(tagsRaw);
+      } catch {
+        tagIds = tagsRaw
+          .split(",")
+          .map((id) => Number(id.trim()))
+          .filter(Number.isFinite);
+      }
+    }
+
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
@@ -139,9 +155,10 @@ export async function POST(request: Request) {
           hash,
           status: "ready",
           collection: collection || null,
+          collection_id: collectionId || null,
         },
       ])
-      .select("id, file_name, storage_path, hash, status, collection, created_at")
+      .select("id, file_name, storage_path, hash, status, collection, collection_id, created_at")
       .single();
 
     const dbError = insertError as DbError | null;
@@ -161,6 +178,21 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ error: dbError.message }, { status: 500 });
+    }
+
+    if (row && Array.isArray(tagIds) && tagIds.length > 0) {
+      const insertRows = tagIds.map((tagId) => ({
+        wallpaper_id: row.id,
+        tag_id: tagId,
+      }));
+
+      const { error: tagsErr } = await supabaseAdmin
+        .from("wallpaper_tags")
+        .insert(insertRows);
+
+      if (tagsErr) {
+        console.error("Failed to insert wallpaper tags:", tagsErr.message);
+      }
     }
 
     return NextResponse.json({ success: true, data: { upload: uploadData, row } });

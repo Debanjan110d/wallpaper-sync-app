@@ -10,7 +10,11 @@
 
 <p align="center">
   <a href="https://github.com/Debanjan110d/wallpaper-sync-app/releases">
-    <strong>Download Latest Version »</strong>
+    <strong>Download Latest Version</strong>
+  </a>
+  &nbsp;&bull;&nbsp;
+  <a href="RELEASE_NOTES_v3.md">
+    <strong>What's New in Version 3.2</strong>
   </a>
 </p>
 

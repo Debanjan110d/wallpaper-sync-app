@@ -62,3 +62,6 @@ settings.json
 # Local scratch / debug artifacts
 build_output.txt
 scratch/
+
+# Personal developer notes
+PERSONAL_GUIDE.md

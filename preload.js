@@ -21,5 +21,17 @@ contextBridge.exposeInMainWorld("api", {
   onSyncComplete: (callback) => ipcRenderer.on("sync-complete", () => callback()),
   onDownloadProgress: (callback) => ipcRenderer.on("download-progress", (event, percent) => callback(percent)),
   onAppError: (callback) => ipcRenderer.on("app-error", (event, message) => callback(message)),
-  onUpdateState: (callback) => ipcRenderer.on("updater:state", (event, state) => callback(state))
+  onUpdateState: (callback) => ipcRenderer.on("updater:state", (event, state) => callback(state)),
+  
+  // Offline-First Metadata Cache APIs
+  getMetadata: () => ipcRenderer.invoke("get-local-metadata"),
+  createCategoryLocally: (name) => ipcRenderer.invoke("create-category-local", name),
+  createCollectionLocally: (name, categoryId) => ipcRenderer.invoke("create-collection-local", name, categoryId),
+  createTagLocally: (name) => ipcRenderer.invoke("create-tag-local", name),
+  updateWallpaperMetadataLocally: (hash, collectionId, tagIds) => ipcRenderer.invoke("update-wallpaper-metadata-local", hash, collectionId, tagIds),
+  syncMetadataNow: () => ipcRenderer.invoke("sync-metadata-now"),
+  updateSlideshowSource: (source) => ipcRenderer.invoke("update-slideshow-source", source),
+  updateSlideshowOrder: (order) => ipcRenderer.invoke("update-slideshow-order", order),
+  submitReview: (rating, comment, reviewerName) => ipcRenderer.invoke("submit-review", rating, comment, reviewerName),
+  onWindowShown: (callback) => ipcRenderer.on("app:window-shown", () => callback())
 });
