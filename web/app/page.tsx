@@ -48,6 +48,12 @@ export default function Page() {
   const [bulkCollectionId, setBulkCollectionId] = useState<string>("");
   const [bulkTags, setBulkTags] = useState<number[]>([]);
 
+  // Individual Wallpaper Edit Modal State
+  const [editingWallpaper, setEditingWallpaper] = useState<any | null>(null);
+  const [editCategoryId, setEditCategoryId] = useState<string>("");
+  const [editCollectionId, setEditCollectionId] = useState<string>("");
+  const [editTags, setEditTags] = useState<number[]>([]);
+
   const fetchMetadata = async () => {
     try {
       const [resCats, resCols, resTags] = await Promise.all([
@@ -389,6 +395,49 @@ export default function Page() {
     }
   };
 
+  // Handle start editing individual wallpaper
+  const handleStartEdit = (img: any) => {
+    setEditingWallpaper(img);
+    setEditCategoryId(img.collection_details?.category_id ? String(img.collection_details.category_id) : "");
+    setEditCollectionId(img.collection_id ? String(img.collection_id) : "");
+    setEditTags(img.tags ? img.tags.map((t: any) => t.id) : []);
+  };
+
+  // Handle save editing individual wallpaper
+  const handleSaveEdit = async () => {
+    if (!editingWallpaper) return;
+    setLoading(true);
+    try {
+      const itemUpdate: any = { id: editingWallpaper.id };
+      if (editCollectionId) {
+        itemUpdate.collection_id = Number(editCollectionId);
+      } else if (editCategoryId) {
+        itemUpdate.category_id = Number(editCategoryId);
+      } else {
+        itemUpdate.collection_id = null; // Clear collection/category
+      }
+      itemUpdate.tags = editTags; // Override tags
+
+      const res = await fetch("/api/wallpapers/bulk-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [itemUpdate] }),
+      });
+      if (res.ok) {
+        alert("Wallpaper metadata updated successfully!");
+        setEditingWallpaper(null);
+        fetchGallery();
+      } else {
+        const data = await res.json();
+        alert("Failed to update: " + data.error);
+      }
+    } catch (e) {
+      alert("Failed to update: " + e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Apply Bulk Updates
   const handleApplyBulkUpdate = async () => {
     if (selectedImageIds.length === 0) return;
@@ -451,6 +500,11 @@ export default function Page() {
     (col) => !bulkCategoryId || col.category_id === Number(bulkCategoryId)
   );
 
+  // Filter collections by edit category
+  const filteredEditCollections = collections.filter(
+    (col) => !editCategoryId || col.category_id === Number(editCategoryId)
+  );
+
   // Images for Auto-Slider (newest 5 verified wallpapers)
   const sliderImages = galleryImages.slice(0, 5);
 
@@ -509,7 +563,8 @@ export default function Page() {
         {showMindmap && (
           <div className="mindmap-container" style={{ marginTop: "1.5rem" }}>
             <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-              How the application structures data for synchronization between the dashboard and Electron desktop clients.
+              How the application structures data for synchronization between the dashboard and Electron desktop clients. 
+              💡 <strong>Corrections Guide:</strong> If you make a mistake assigning a category, collection, or tag to a wallpaper, you can click the <strong>Edit</strong> button directly on its card in the gallery, or select multiple wallpapers and use the <strong>Bulk Edit Bar</strong> at the bottom of the page to re-assign them in one go.
             </p>
             
             <div className="mindmap-flex" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", gap: "2rem", position: "relative" }}>
@@ -1070,24 +1125,42 @@ export default function Page() {
                       ))}
                   </div>
 
-                  {/* Individual delete */}
-                  <button
-                    onClick={() => deleteImage(img.name)}
-                    className="btn-danger"
-                    style={{
-                      border: "none",
-                      borderRadius: 4,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: "0.75rem",
-                      marginTop: "10px",
-                      width: "100%",
-                      color: "white",
-                    }}
-                  >
-                    Delete
-                  </button>
+                  {/* Individual actions */}
+                  <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+                    <button
+                      onClick={() => handleStartEdit(img)}
+                      className="btn-secondary"
+                      style={{
+                        flex: 1,
+                        border: "1px solid var(--border)",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                        fontSize: "0.75rem",
+                        color: "var(--foreground)",
+                        background: "rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteImage(img.name)}
+                      className="btn-danger"
+                      style={{
+                        flex: 1,
+                        border: "none",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                        fontSize: "0.75rem",
+                        color: "white",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1253,6 +1326,132 @@ export default function Page() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Individual Wallpaper Edit Modal */}
+      {editingWallpaper && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.65)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+        }}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: "500px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "1.5rem 2rem",
+            boxShadow: "var(--shadow)",
+            position: "relative",
+            margin: 0
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Edit Wallpaper Metadata</h3>
+            
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.5rem", wordBreak: "break-all" }}>
+              File: {editingWallpaper.file_name || editingWallpaper.name}
+            </p>
+
+            <div className="form-group">
+              <label>Category</label>
+              <select
+                value={editCategoryId}
+                onChange={(e) => {
+                  setEditCategoryId(e.target.value);
+                  setEditCollectionId(""); // Clear collection on category change
+                }}
+              >
+                <option value="">-- No Category --</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Collection (Series)</label>
+              <select
+                value={editCollectionId}
+                onChange={(e) => setEditCollectionId(e.target.value)}
+                disabled={!editCategoryId}
+              >
+                <option value="">
+                  {editCategoryId ? "-- No Collection (Assign Default) --" : "Select Category First"}
+                </option>
+                {filteredEditCollections.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
+              {editCategoryId && !editCollectionId && (
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                  💡 Will assign to the default collection for "{categories.find(c => String(c.id) === editCategoryId)?.name}".
+                </p>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Tags Selection</label>
+              <div style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px",
+                padding: "8px",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                background: "rgba(0,0,0,0.15)",
+                maxHeight: "100px",
+                overflowY: "auto"
+              }}>
+                {tags.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`tag-chip ${editTags.includes(t.id) ? "active" : ""}`}
+                    onClick={() =>
+                      setEditTags((prev) =>
+                        prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
+                      )
+                    }
+                    style={{ padding: "2px 8px", fontSize: "0.75rem" }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "2rem" }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setEditingWallpaper(null)}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleSaveEdit}
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
           </div>
         </div>
       )}

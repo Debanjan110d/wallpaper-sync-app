@@ -79,6 +79,21 @@ export async function POST(request: Request) {
 
     const slug = slugify(name);
 
+    // Case-insensitive duplicate prevention
+    const { data: existingTag, error: checkErr } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (checkErr) {
+      return NextResponse.json({ error: checkErr.message }, { status: 500 });
+    }
+
+    if (existingTag) {
+      return NextResponse.json({ success: true, tag: existingTag });
+    }
+
     const { data, error } = await supabase
       .from("tags")
       .insert([
