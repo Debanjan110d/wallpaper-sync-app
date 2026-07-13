@@ -175,8 +175,19 @@ function updateWallpaperMetadataLocally(hash, collectionId, tagIds) {
 }
 
 // Background Server Synchronization
-async function syncMetadataWithServer(apiUrl, syncToken) {
+async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
+  const reportProgress = (status, percent) => {
+    if (typeof onProgress === "function") {
+      try {
+        onProgress(status, percent);
+      } catch (err) {
+        console.error("Progress report error:", err);
+      }
+    }
+  };
+
   if (!apiUrl) {
+    reportProgress("Sync API URL not configured", 0);
     return { status: "offline", error: "Sync API URL not configured" };
   }
 
@@ -193,10 +204,6 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     headers["x-sync-token"] = syncToken;
   }
 
-  // To bypass Next.js API admin_session validation for Electron sync:
-  // Ensure Electron uses the SYNC_TOKEN in headers to auth. 
-  // All Next.js API endpoints have been structured to allow read/write with valid x-sync-token too.
-
   const data = loadLocalMetadata();
   const catMapping = {}; // tempId -> serverId
   const colMapping = {}; // tempId -> serverId
@@ -204,13 +211,16 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
 
   try {
     // 1. Check server connectivity
+    reportProgress("Checking server connection...", 5);
     await axios.get(`${cleanUrl}/api/categories`, { headers, timeout: 5000 });
   } catch (err) {
+    reportProgress("Server unreachable", 0);
     return { status: "offline", error: "Server unreachable: " + err.message };
   }
 
   try {
     // 2. Sync categories queue
+    reportProgress("Syncing categories...", 15);
     const pendingCats = [...data.sync_queue.categories];
     for (const cat of pendingCats) {
       try {
@@ -249,6 +259,7 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     }
 
     // 3. Sync collections queue
+    reportProgress("Syncing collections...", 35);
     const pendingCols = [...data.sync_queue.collections];
     for (const col of pendingCols) {
       try {
@@ -289,6 +300,7 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     }
 
     // 4. Sync tags queue
+    reportProgress("Syncing tags...", 55);
     const pendingTags = [...data.sync_queue.tags];
     for (const tag of pendingTags) {
       try {
@@ -336,6 +348,7 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     saveLocalMetadata(data);
 
     // 5. Sync wallpapers metadata updates
+    reportProgress("Updating wallpaper associations...", 75);
     const pendingWps = [...data.sync_queue.wallpapers];
     if (pendingWps.length > 0) {
       // Get the latest wallpaper database records from the server to resolve server UUIDs from file hashes.
@@ -383,6 +396,7 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     }
 
     // 6. Pull server metadata to fully synchronize local tables
+    reportProgress("Fetching latest library data...", 90);
     const [srvCatsRes, srvColsRes, srvTagsRes, srvWpsRes] = await Promise.all([
       axios.get(`${cleanUrl}/api/categories`, { headers }),
       axios.get(`${cleanUrl}/api/collections`, { headers }),
@@ -417,6 +431,8 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
       data.sync_queue.tags.length +
       data.sync_queue.wallpapers.length;
 
+    reportProgress("Metadata sync complete!", 100);
+
     return {
       status: totalQueued > 0 ? "offline-pending" : "connected",
       categoriesCount: data.categories.length,
@@ -425,6 +441,7 @@ async function syncMetadataWithServer(apiUrl, syncToken) {
     };
   } catch (err) {
     console.error("Error during sync runner:", err);
+    reportProgress("Sync failed: " + err.message, 0);
     return { status: "offline", error: err.message };
   }
 }

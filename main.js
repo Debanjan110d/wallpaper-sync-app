@@ -374,6 +374,34 @@ function createMainWindow() {
     }
   });
 
+  let fullscreenSyncInterval = null;
+
+  async function runFullscreenSync() {
+    try {
+      const syncConfig = getSyncConfig();
+      // Silently sync in background when fullscreen
+      await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN);
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send("sync-complete");
+      }
+    } catch (err) {
+      console.error("Fullscreen auto-sync error:", err);
+    }
+  }
+
+  mainWindow.on("enter-full-screen", () => {
+    runFullscreenSync();
+    if (fullscreenSyncInterval) clearInterval(fullscreenSyncInterval);
+    fullscreenSyncInterval = setInterval(runFullscreenSync, 30000);
+  });
+
+  mainWindow.on("leave-full-screen", () => {
+    if (fullscreenSyncInterval) {
+      clearInterval(fullscreenSyncInterval);
+      fullscreenSyncInterval = null;
+    }
+  });
+
   // If an update finished downloading while we were running tray-only,
   // prompt the user once they open the dashboard.
   mainWindow.once("show", () => {
@@ -391,6 +419,10 @@ function createMainWindow() {
   });
 
   mainWindow.on("closed", () => {
+    if (fullscreenSyncInterval) {
+      clearInterval(fullscreenSyncInterval);
+      fullscreenSyncInterval = null;
+    }
     mainWindow = null;
   });
 }
@@ -1126,7 +1158,11 @@ ipcMain.handle("update-wallpaper-metadata-local", (event, hash, collectionId, ta
 
 ipcMain.handle("sync-metadata-now", async () => {
   const syncConfig = getSyncConfig();
-  return await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN);
+  return await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN, (status, percent) => {
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("metadata-sync-progress", { status, percent });
+    }
+  });
 });
 
 ipcMain.handle("update-slideshow-source", (event, source) => {

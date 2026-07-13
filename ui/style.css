@@ -1279,3 +1279,54 @@ body {
         opacity: 1;
     }
 }
+
+/* Spinner Rotation Animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+.spin {
+    animation: spin 1.2s linear infinite;
+}
+
+/* Metadata Sync Modal styling */
+.sync-modal-content {
+    background: #252526;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    color: var(--text-color);
+}
+
+.sync-progress-spinner {
+    box-shadow: 0 0 15px rgba(79, 142, 247, 0.15);
+}
+
+/* Details Drawer buttons layout and styling adjustments */
+.drawer-actions button {
+    height: 40px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.drawer-actions button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+.drawer-actions button:active {
+    transform: translateY(0);
+}
+
+.drawer-actions button svg {
+    margin-right: 2px;
+    flex-shrink: 0;
+}

@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.2.3 (v3.2.3) — 2026-07-14
+
+### Robustness & Download Optimizations
+- Implemented atomic downloads using temporary files (`.tmp`) to prevent corrupted/partial wallpaper files.
+- Added automatic detection and deletion of 0-byte or corrupted local files.
+
+### Metadata Sync Progression & Fullscreen Support
+- Added a detailed metadata sync progress modal in the UI with status descriptions and progress bar.
+- Connected IPC events to update status spinner, success checkmark, or error indicators dynamically.
+- Implemented automatic metadata sync triggers when the desktop client goes into full screen.
+
+### Client UI Enhancements
+- Redesigned the details drawer actions (Apply, Favorites, Delete) with premium SVG icons, animations, and hover micro-interactions.
+- Fixed a bug where categories, collections, and tags were not dynamically refreshed upon sync completion.
+
 ## 3.2.2 (v3.2.2) — 2026-07-13
 
 ### Client UX & Search Improvements

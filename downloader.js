@@ -60,33 +60,85 @@ async function syncWallpapers(config, onProgress) {
       const filename = path.basename(fileKey);
       const destPath = path.join(config.WALLPAPER_DIR, filename);
 
+      // Check if file exists but is corrupted (0 bytes) and delete it
+      let isGlitched = false;
+      if (fs.existsSync(destPath)) {
+        try {
+          const stats = fs.statSync(destPath);
+          if (stats.size === 0) {
+            isGlitched = true;
+          }
+        } catch {
+          isGlitched = true;
+        }
+      }
+      if (isGlitched) {
+        try {
+          fs.unlinkSync(destPath);
+          console.log("Deleted glitched/0-byte wallpaper file:", filename);
+        } catch (err) {
+          console.warn("Failed to delete 0-byte file:", filename, err.message);
+        }
+      }
+
       // Download if we don't already have it
       if (!fs.existsSync(destPath)) {
         console.log("Downloading from API:", filename);
-        const imgRes = await axios({
-          url: wp.url,
-          method: "GET",
-          responseType: "stream"
-        });
-
-        const writer = fs.createWriteStream(destPath);
-        imgRes.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-          writer.on("finish", resolve);
-          writer.on("error", reject);
-        });
-
-        // Preserve server ordering: apply server created_at as local modified time (best-effort).
+        const tempPath = destPath + ".tmp";
+        
         try {
-          const createdAt = wp.created_at ? new Date(wp.created_at) : null;
-          if (createdAt && !Number.isNaN(createdAt.getTime())) {
-            fs.utimesSync(destPath, new Date(), createdAt);
+          // Clean up any stale temp file first
+          if (fs.existsSync(tempPath)) {
+            fs.unlinkSync(tempPath);
           }
-        } catch { }
+        } catch {}
 
-        latestFile = destPath;
-        downloadCount++;
+        try {
+          const imgRes = await axios({
+            url: wp.url,
+            method: "GET",
+            responseType: "stream"
+          });
+
+          const writer = fs.createWriteStream(tempPath);
+          
+          await new Promise((resolve, reject) => {
+            imgRes.data.pipe(writer);
+            imgRes.data.on("error", (err) => {
+              writer.destroy();
+              reject(err);
+            });
+            writer.on("error", (err) => {
+              writer.destroy();
+              reject(err);
+            });
+            writer.on("finish", () => {
+              resolve();
+            });
+          });
+
+          // Rename temp file to final destination
+          fs.renameSync(tempPath, destPath);
+
+          // Preserve server ordering: apply server created_at as local modified time (best-effort).
+          try {
+            const createdAt = wp.created_at ? new Date(wp.created_at) : null;
+            if (createdAt && !Number.isNaN(createdAt.getTime())) {
+              fs.utimesSync(destPath, new Date(), createdAt);
+            }
+          } catch { }
+
+          latestFile = destPath;
+          downloadCount++;
+        } catch (err) {
+          console.error("Failed to download wallpaper:", filename, err.message);
+          try {
+            if (fs.existsSync(tempPath)) {
+              fs.unlinkSync(tempPath);
+            }
+          } catch {}
+          throw err;
+        }
       }
 
       if (typeof onProgress === "function" && total > 0) {

@@ -76,6 +76,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const reviewCancelBtn = document.getElementById("reviewCancelBtn");
     let selectedRating = 0;
 
+    // Metadata Sync Progress Modal elements
+    const metadataSyncModal = document.getElementById("metadataSyncModal");
+    const metadataSyncSpinner = document.getElementById("metadataSyncSpinner");
+    const metadataSyncProgressFill = document.getElementById("metadataSyncProgressFill");
+    const metadataSyncProgressBar = document.getElementById("metadataSyncProgressBar");
+    const metadataSyncStatus = document.getElementById("metadataSyncStatus");
+    const metadataSyncSuccessActions = document.getElementById("metadataSyncSuccessActions");
+    const metadataSyncCloseBtn = document.getElementById("metadataSyncCloseBtn");
+
     // Update checker elements in top header
     const updateStatusText = document.getElementById("updateStatusText");
     const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
@@ -708,7 +717,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderDrawerTags(meta.tags || []);
 
         const isFav = selectedSet.has(String(imgData.path));
-        drawerFavBtn.textContent = isFav ? "Remove Favorite" : "Add to Favorites";
+        updateFavButton(isFav);
+    }
+
+    function updateFavButton(isFav) {
+        if (isFav) {
+            drawerFavBtn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+                <span>Remove Favorite</span>
+            `;
+        } else {
+            drawerFavBtn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+                <span>Add to Favorites</span>
+            `;
+        }
     }
 
     function closeDetailDrawer() {
@@ -812,7 +839,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Detail Action buttons bindings
     drawerApplyBtn.addEventListener("click", async () => {
         if (!currentSelectedImage) return;
-        drawerApplyBtn.textContent = "Applying...";
+        drawerApplyBtn.disabled = true;
+        drawerApplyBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin">
+                <line x1="12" y1="2" x2="12" y2="6"></line>
+                <line x1="12" y1="18" x2="12" y2="22"></line>
+                <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                <line x1="2" y1="12" x2="6" y2="12"></line>
+                <line x1="18" y1="12" x2="22" y2="12"></line>
+                <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+            </svg>
+            <span>Applying...</span>
+        `;
         try {
             await window.api.setWallpaper(currentSelectedImage.path);
             showToast("Desktop wallpaper applied!", "success");
@@ -822,7 +862,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch {
             showToast("Failed to apply wallpaper", "error");
         }
-        drawerApplyBtn.textContent = "Apply Wallpaper";
+        drawerApplyBtn.disabled = false;
+        drawerApplyBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span>Apply Wallpaper</span>
+        `;
     });
 
     drawerFavBtn.addEventListener("click", async () => {
@@ -834,11 +882,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!isFav) {
             selectedSet.add(key);
             showToast("Added to favorites", "success");
-            drawerFavBtn.textContent = "Remove Favorite";
+            updateFavButton(true);
         } else {
             selectedSet.delete(key);
             showToast("Removed from favorites", "success");
-            drawerFavBtn.textContent = "Add to Favorites";
+            updateFavButton(false);
         }
 
         slideshowSelectedCount.textContent = String(selectedSet.size);
@@ -1040,13 +1088,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     globalSearchInput.addEventListener("input", renderCatalog);
 
     // Sync metadata click bindings
-    syncMetadataBtn.addEventListener("click", async () => {
-        syncMetadataBtn.disabled = true;
-        syncMetadataBtn.textContent = "Syncing...";
-        await triggerBackgroundSync();
-        syncMetadataBtn.textContent = "Sync Metadata";
-        syncMetadataBtn.disabled = false;
-    });
+    let isManualSyncInProgress = false;
+
+    if (syncMetadataBtn) {
+        syncMetadataBtn.addEventListener("click", async () => {
+            isManualSyncInProgress = true;
+            
+            // Show modal and reset to starting state
+            metadataSyncModal.classList.remove("hidden");
+            metadataSyncSuccessActions.style.display = "none";
+            metadataSyncSpinner.style.display = "flex";
+            metadataSyncSpinner.style.animation = "spin 1.2s linear infinite";
+            metadataSyncSpinner.style.borderColor = "rgba(255,255,255,0.05)";
+            metadataSyncSpinner.style.borderTopColor = "var(--accent)";
+            metadataSyncSpinner.innerHTML = ""; // clean spinner
+            metadataSyncProgressFill.style.display = "block";
+            metadataSyncProgressBar.style.width = "0%";
+            metadataSyncStatus.textContent = "Initializing sync...";
+            metadataSyncCloseBtn.disabled = true;
+
+            syncMetadataBtn.disabled = true;
+            syncMetadataBtn.textContent = "Syncing...";
+            
+            try {
+                await triggerBackgroundSync();
+            } catch (err) {
+                console.error("Manual sync failed:", err);
+            }
+            
+            syncMetadataBtn.textContent = "Sync Metadata";
+            syncMetadataBtn.disabled = false;
+        });
+    }
+
+    if (metadataSyncCloseBtn) {
+        metadataSyncCloseBtn.addEventListener("click", () => {
+            metadataSyncModal.classList.add("hidden");
+            isManualSyncInProgress = false;
+        });
+    }
 
     // Smart Slideshow parameter updates
     intervalDropdown.addEventListener("change", async (e) => {
@@ -1326,10 +1406,59 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.api.onDownloadProgress((percent) => setSyncProgress(percent));
     }
     if (window.api.onSyncComplete) {
-        window.api.onSyncComplete(() => loadWallpapers());
+        window.api.onSyncComplete(async () => {
+            await refreshMetadata();
+            await loadWallpapers();
+        });
     }
     if (window.api.onAppError) {
         window.api.onAppError((msg) => showToast(msg, "error"));
+    }
+
+    if (window.api.onMetadataSyncProgress) {
+        window.api.onMetadataSyncProgress((data) => {
+            if (!isManualSyncInProgress) return;
+            
+            const { status, percent } = data;
+            
+            metadataSyncStatus.textContent = status;
+            metadataSyncProgressBar.style.width = `${percent}%`;
+
+            if (percent === 100) {
+                // Success state
+                metadataSyncSpinner.innerHTML = `
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2ec946" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                `;
+                metadataSyncSpinner.style.animation = "none";
+                metadataSyncSpinner.style.borderColor = "#2ec946";
+                
+                metadataSyncStatus.innerHTML = `<span style="color:#2ec946; font-weight:600;">${status}</span>`;
+                metadataSyncSuccessActions.style.display = "flex";
+                metadataSyncCloseBtn.disabled = false;
+            } else if (status.toLowerCase().includes("failed") || status.toLowerCase().includes("unreachable")) {
+                // Error state
+                metadataSyncSpinner.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                `;
+                metadataSyncSpinner.style.animation = "none";
+                metadataSyncSpinner.style.borderColor = "#ff453a";
+                
+                metadataSyncStatus.innerHTML = `<span style="color:#ff453a; font-weight:600;">${status}</span>`;
+                metadataSyncSuccessActions.style.display = "flex";
+                metadataSyncCloseBtn.disabled = false;
+            } else {
+                // Normal progress state
+                metadataSyncSpinner.innerHTML = "";
+                metadataSyncSpinner.style.animation = "spin 1.2s linear infinite";
+                metadataSyncSpinner.style.borderColor = "rgba(255,255,255,0.05)";
+                metadataSyncSpinner.style.borderTopColor = "var(--accent)";
+            }
+        });
     }
 
     // Listen for update state broadcasts
