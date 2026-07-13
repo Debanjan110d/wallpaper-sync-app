@@ -29,14 +29,9 @@ export default function ReviewsPage() {
     getReviews();
   }, []);
 
-  const defaultReviews = [
-    { id: 1, reviewer_name: "Alex Mercer", rating: 5, comment: "Wallpaper Sync has completely simplified my desktop customization. The offline caching is extremely reliable and synchronization works in the background without high resources.", created_at: new Date().toISOString() },
-    { id: 2, reviewer_name: "Sarah Chen", rating: 5, comment: "I really love the smart slideshow feature. Being able to restrict rotation to collections nested under specific categories makes organizing clean. Recommended!", created_at: new Date().toISOString() },
-    { id: 3, reviewer_name: "Debanjan Dutta", rating: 5, comment: "Built to be lightweight and single-instance locked for stable execution. More updates coming soon.", created_at: new Date().toISOString() }
-  ];
-
-  const displayReviews = reviews.length > 0 ? reviews : defaultReviews;
-  const averageRating = (displayReviews.reduce((acc, r) => acc + r.rating, 0) / displayReviews.length).toFixed(1);
+  const averageRating = reviews.length > 0
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : "0.0";
 
   return (
     <div style={{
@@ -94,34 +89,51 @@ export default function ReviewsPage() {
           <div>
             <div style={{ fontSize: "0.85rem", color: "rgba(233, 238, 252, 0.52)", textTransform: "uppercase", letterSpacing: "1px" }}>Total Submissions</div>
             <div style={{ fontSize: "3rem", fontWeight: 800, marginTop: "0.5rem" }}>
-              {displayReviews.length}
+              {reviews.length}
             </div>
           </div>
         </div>
 
         {/* Reviews Feed */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {displayReviews.map((r) => (
-            <div key={r.id} style={{
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-              borderRadius: "10px",
-              padding: "1.5rem"
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                <strong style={{ fontSize: "1.05rem" }}>{r.reviewer_name}</strong>
-                <span style={{ color: "#ff9f0a", fontWeight: "bold", fontSize: "0.95rem", letterSpacing: "2px" }}>
-                  {"★".repeat(r.rating) + "☆".repeat(5 - r.rating)}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
-                {r.comment || "No comment provided"}
-              </p>
-              <div style={{ fontSize: "0.75rem", color: "rgba(233, 238, 252, 0.4)", marginTop: "1rem", textAlign: "right" }}>
-                Verified submission on {new Date(r.created_at).toLocaleDateString()}
-              </div>
+          {loading ? (
+            <div style={{ textAlign: "center", color: "rgba(233, 238, 252, 0.6)", padding: "2rem" }}>
+              Loading reviews...
             </div>
-          ))}
+          ) : reviews.length > 0 ? (
+            reviews.map((r) => (
+              <div key={r.id} style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: "10px",
+                padding: "1.5rem"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                  <strong style={{ fontSize: "1.05rem" }}>{r.reviewer_name}</strong>
+                  <span style={{ color: "#ff9f0a", fontWeight: "bold", fontSize: "0.95rem", letterSpacing: "2px" }}>
+                    {"★".repeat(r.rating) + "☆".repeat(5 - r.rating)}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
+                  {r.comment || "No comment provided"}
+                </p>
+                <div style={{ fontSize: "0.75rem", color: "rgba(233, 238, 252, 0.4)", marginTop: "1rem", textAlign: "right" }}>
+                  Verified submission on {new Date(r.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div style={{
+              textAlign: "center",
+              color: "rgba(233, 238, 252, 0.5)",
+              padding: "3rem 1.5rem",
+              background: "rgba(255, 255, 255, 0.01)",
+              border: "1px dashed rgba(255, 255, 255, 0.1)",
+              borderRadius: "10px"
+            }}>
+              No user reviews submitted yet. Feedback requested in desktop client.
+            </div>
+          )}
         </div>
       </main>
 
