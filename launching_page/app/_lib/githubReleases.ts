@@ -33,7 +33,7 @@ export async function fetchReleases(): Promise<GitHubRelease[]> {
       Accept: "application/vnd.github+json",
     },
     // Cache for a bit so the page updates automatically without hammering GitHub.
-    next: { revalidate: 60 * 30 },
+    next: { revalidate: 60 },
   });
 
   if (!res.ok) {

@@ -15,6 +15,8 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 
+export const revalidate = 60; // Revalidate page data every 60 seconds
+
 export default async function HomePage() {
   let releases = [] as Awaited<ReturnType<typeof fetchReleases>>;
   let releasesError: string | null = null;
