@@ -89,6 +89,7 @@ export default function Page() {
   };
 
   const [reviews, setReviews] = useState<any[]>([]);
+  const [releases, setReleases] = useState<any[]>([]);
 
   const fetchReviews = async () => {
     try {
@@ -100,9 +101,22 @@ export default function Page() {
     }
   };
 
+  const fetchReleases = async () => {
+    try {
+      const res = await fetch("https://api.github.com/repos/Debanjan110d/wallpaper-sync-app/releases");
+      if (res.ok) {
+        const data = await res.json();
+        setReleases(data || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch releases:", e);
+    }
+  };
+
   useEffect(() => {
     fetchMetadata();
     fetchReviews();
+    fetchReleases();
   }, []);
 
   useEffect(() => {
@@ -549,228 +563,275 @@ export default function Page() {
         </section>
       )}
 
-      {/* Upload Wallpaper Card */}
-      <div className="card">
-        <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>Upload New Wallpapers</h2>
-        <form onSubmit={handleUpload}>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            <div className="form-group" style={{ flex: "1 1 200px" }}>
-              <label>Admin Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
+      {/* Main Top Grid Section: Upload controls and Application Releases side-by-side */}
+      <div className="grid-two-columns" style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+        gap: "2rem",
+        marginBottom: "2rem"
+      }}>
+        {/* Upload Wallpaper Card */}
+        <div className="card" style={{ margin: 0, display: "flex", flexDirection: "column" }}>
+          <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>Upload New Wallpapers</h2>
+          <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+              <div className="form-group" style={{ flex: "1 1 200px" }}>
+                <label>Admin Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
 
-            {/* Category selection */}
-            <div className="form-group" style={{ flex: "1 1 250px" }}>
-              <label style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Category</span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
-                  onClick={() => setShowNewCatInput((prev) => !prev)}
-                >
-                  {showNewCatInput ? "Cancel" : "+ New"}
-                </button>
-              </label>
-              {showNewCatInput ? (
-                <div style={{ display: "flex", gap: "4px" }}>
-                  <input
-                    type="text"
-                    placeholder="New category name"
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                  />
-                  <button type="button" className="btn" onClick={handleCreateCategory}>
-                    Create
+              {/* Category selection */}
+              <div className="form-group" style={{ flex: "1 1 250px" }}>
+                <label style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Category</span>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
+                    onClick={() => setShowNewCatInput((prev) => !prev)}
+                  >
+                    {showNewCatInput ? "Cancel" : "+ New"}
                   </button>
-                </div>
-              ) : (
-                <select
-                  value={selectedCategoryForUpload}
-                  onChange={(e) => {
-                    setSelectedCategoryForUpload(e.target.value);
-                    setSelectedCollectionForUpload("");
-                  }}
-                >
-                  <option value="">-- Select Category --</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+                </label>
+                {showNewCatInput ? (
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                      type="text"
+                      placeholder="New category name"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                    />
+                    <button type="button" className="btn" onClick={handleCreateCategory}>
+                      Create
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedCategoryForUpload}
+                    onChange={(e) => {
+                      setSelectedCategoryForUpload(e.target.value);
+                      setSelectedCollectionForUpload("");
+                    }}
+                  >
+                    <option value="">-- Select Category --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-            {/* Collection selection (filtered by Category) */}
-            <div className="form-group" style={{ flex: "1 1 250px" }}>
-              <label style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Collection (Series)</span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
-                  disabled={!selectedCategoryForUpload}
-                  onClick={() => setShowNewColInput((prev) => !prev)}
-                >
-                  {showNewColInput ? "Cancel" : "+ New"}
-                </button>
-              </label>
-              {showNewColInput ? (
-                <div style={{ display: "flex", gap: "4px" }}>
-                  <input
-                    type="text"
-                    placeholder="New collection name"
-                    value={newColName}
-                    onChange={(e) => setNewColName(e.target.value)}
-                  />
-                  <button type="button" className="btn" onClick={handleCreateCollection}>
-                    Create
+              {/* Collection selection (filtered by Category) */}
+              <div className="form-group" style={{ flex: "1 1 250px" }}>
+                <label style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Collection (Series)</span>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
+                    disabled={!selectedCategoryForUpload}
+                    onClick={() => setShowNewColInput((prev) => !prev)}
+                  >
+                    {showNewColInput ? "Cancel" : "+ New"}
                   </button>
-                </div>
-              ) : (
-                <select
-                  value={selectedCollectionForUpload}
-                  onChange={(e) => setSelectedCollectionForUpload(e.target.value)}
-                  disabled={!selectedCategoryForUpload}
-                >
-                  <option value="">
-                    {selectedCategoryForUpload ? "-- Select Collection --" : "Select Category First"}
-                  </option>
-                  {filteredUploadCollections.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.name}
+                </label>
+                {showNewColInput ? (
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                      type="text"
+                      placeholder="New collection name"
+                      value={newColName}
+                      onChange={(e) => setNewColName(e.target.value)}
+                    />
+                    <button type="button" className="btn" onClick={handleCreateCollection}>
+                      Create
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedCollectionForUpload}
+                    onChange={(e) => setSelectedCollectionForUpload(e.target.value)}
+                    disabled={!selectedCategoryForUpload}
+                  >
+                    <option value="">
+                      {selectedCategoryForUpload ? "-- Select Collection --" : "Select Category First"}
                     </option>
-                  ))}
-                </select>
-              )}
+                    {filteredUploadCollections.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Tags Selection & Tag Creator */}
-          <div className="form-group">
-            <label>Tags Selection</label>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
-                padding: "8px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                background: "rgba(0,0,0,0.15)",
-                marginBottom: "0.5rem",
-              }}
-            >
-              {tags.map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleToggleTagUpload(tag.id)}
-                  className={`tag-chip ${selectedTagsForUpload.includes(tag.id) ? "active" : ""}`}
-                >
-                  {tag.name}
-                </button>
-              ))}
-              {tags.length === 0 && (
-                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                  No tags created yet.
-                </span>
-              )}
-            </div>
-            {/* Inline tag creator */}
-            <div style={{ display: "flex", gap: "6px", maxWidth: 400 }}>
-              <input
-                type="text"
-                placeholder="Add new tag"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                style={{ padding: "4px 8px", fontSize: "0.85rem" }}
-              />
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ padding: "4px 12px", fontSize: "0.85rem" }}
-                onClick={handleCreateTag}
+            {/* Tags Selection & Tag Creator */}
+            <div className="form-group">
+              <label>Tags Selection</label>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  padding: "8px",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  background: "rgba(0,0,0,0.15)",
+                  marginBottom: "0.5rem",
+                }}
               >
-                + Add Tag
-              </button>
-            </div>
-          </div>
-
-          {/* Drag and Drop Zone */}
-          <div className="form-group">
-            <label>Wallpaper Images</label>
-            <div
-              className={`dropzone ${isDragging ? "dragging" : ""}`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <p>Drag & Drop landscape images here or click to browse</p>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                style={{ display: "none" }}
-              />
-            </div>
-          </div>
-
-          {/* Selected File list */}
-          {files.length > 0 && (
-            <div className="file-list">
-              <h4 style={{ margin: 0 }}>Selected Files ({files.length}):</h4>
-              <ul>
-                {files.map((f, i) => (
-                  <li key={i}>
-                    <div className="file-list-header">
-                      <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{f.name}</span>
-                      <button type="button" onClick={() => removeFile(i)}>
-                        ✕ Remove
-                      </button>
-                    </div>
-                  </li>
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleToggleTagUpload(tag.id)}
+                    className={`tag-chip ${selectedTagsForUpload.includes(tag.id) ? "active" : ""}`}
+                  >
+                    {tag.name}
+                  </button>
                 ))}
-              </ul>
+                {tags.length === 0 && (
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                    No tags created yet.
+                  </span>
+                )}
+              </div>
+              {/* Inline tag creator */}
+              <div style={{ display: "flex", gap: "6px", maxWidth: 400 }}>
+                <input
+                  type="text"
+                  placeholder="Add new tag"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  style={{ padding: "4px 8px", fontSize: "0.85rem" }}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: "4px 12px", fontSize: "0.85rem" }}
+                  onClick={handleCreateTag}
+                >
+                  + Add Tag
+                </button>
+              </div>
             </div>
-          )}
 
-          <button
-            type="submit"
-            className="btn"
-            disabled={loading || files.length === 0}
-            style={{ width: "100%", marginTop: "1rem" }}
-          >
-            {loading ? `Processing Uploads...` : `Upload ${files.length} Wallpaper(s)`}
-          </button>
+            {/* Drag and Drop Zone */}
+            <div className="form-group">
+              <label>Wallpaper Images</label>
+              <div
+                className={`dropzone ${isDragging ? "dragging" : ""}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <p>Drag & Drop landscape images here or click to browse</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }}
+                />
+              </div>
+            </div>
 
-          {messages.length > 0 && (
-            <div
-              className="messages"
-              style={{
-                marginTop: "1rem",
-                padding: "1rem",
-                background: "rgba(0,0,0,0.2)",
-                borderRadius: 8,
-              }}
+            {/* Selected File list */}
+            {files.length > 0 && (
+              <div className="file-list">
+                <h4 style={{ margin: 0 }}>Selected Files ({files.length}):</h4>
+                <ul>
+                  {files.map((f, i) => (
+                    <li key={i}>
+                      <div className="file-list-header">
+                        <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{f.name}</span>
+                        <button type="button" onClick={() => removeFile(i)}>
+                          ✕ Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn"
+              disabled={loading || files.length === 0}
+              style={{ width: "100%", marginTop: "auto" }}
             >
-              {messages.map((msg, i) => (
-                <p key={i} style={{ margin: "0.5rem 0", fontSize: "0.9rem" }}>
-                  {msg}
-                </p>
-              ))}
-            </div>
-          )}
-        </form>
+              {loading ? `Processing Uploads...` : `Upload ${files.length} Wallpaper(s)`}
+            </button>
+
+            {messages.length > 0 && (
+              <div
+                className="messages"
+                style={{
+                  marginTop: "1rem",
+                  padding: "1rem",
+                  background: "rgba(0,0,0,0.2)",
+                  borderRadius: 8,
+                }}
+              >
+                {messages.map((msg, i) => (
+                  <p key={i} style={{ margin: "0.5rem 0", fontSize: "0.9rem" }}>
+                    {msg}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* GitHub Releases Card */}
+        <div className="card" style={{ margin: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+          <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>Latest Application Releases</h2>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+            Releases compiled and published dynamically from GitHub Actions build releases pipeline.
+          </p>
+          <div style={{ flex: 1, overflowY: "auto", maxHeight: "490px", paddingRight: "6px" }}>
+            {releases.map((rel) => {
+              const exeAsset = rel.assets?.find((a: any) => a.name.endsWith(".exe"));
+              return (
+                <div key={rel.id} className="release-item">
+                  <div className="release-header">
+                    <span className="release-tag">{rel.tag_name}</span>
+                    <span className="release-date">{new Date(rel.published_at).toLocaleDateString()}</span>
+                  </div>
+                  <strong style={{ fontSize: "0.95rem", display: "block", marginBottom: "4px" }}>
+                    {rel.name || `Release ${rel.tag_name}`}
+                  </strong>
+                  {exeAsset && (
+                    <a href={exeAsset.browser_download_url} className="release-download-btn" target="_blank" rel="noopener noreferrer">
+                      Download Windows Installer ({Math.round(exeAsset.size / (1024 * 1024) * 10) / 10} MB)
+                    </a>
+                  )}
+                  {rel.body && (
+                    <div className="release-notes-box">
+                      {rel.body}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {releases.length === 0 && (
+              <div style={{ textAlign: "center", padding: "3rem 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                Checking GitHub releases...
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Gallery Filter & Grid Card */}
