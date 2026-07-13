@@ -1,6 +1,7 @@
 import HeroDecryptedText from "./_components/HeroDecryptedText";
 import TrackLink from "./_components/TrackLink";
 import Image from "next/image";
+import Link from "next/link";
 import BootTerminal from "./_components/BootTerminal";
 import {
   extractHighlights,
@@ -42,6 +43,8 @@ export default async function HomePage() {
               <a href="#features">Features</a>
               <a href="#download">Download</a>
               <a href="#updates">Updates</a>
+              <Link href="/docs">Docs</Link>
+              <Link href="/reviews">Reviews</Link>
               <a href="https://github.com/Debanjan110d/wallpaper-sync-app" target="_blank" rel="noreferrer">
                 GitHub
               </a>
@@ -53,6 +56,8 @@ export default async function HomePage() {
                 <a href="#features">Features</a>
                 <a href="#download">Download</a>
                 <a href="#updates">Updates</a>
+                <Link href="/docs">Docs</Link>
+                <Link href="/reviews">Reviews</Link>
                 <a
                   href="https://github.com/Debanjan110d/wallpaper-sync-app"
                   target="_blank"
