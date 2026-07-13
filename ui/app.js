@@ -223,36 +223,39 @@ document.addEventListener("DOMContentLoaded", async () => {
         colFilter.innerHTML = '<option value="">All Collections</option>';
         const filterCatId = catFilter.value;
         
+        colFilter.disabled = false;
         if (filterCatId) {
-            colFilter.disabled = false;
             localMetadata.collections
                 .filter(col => col.category_id === Number(filterCatId))
                 .forEach(col => {
                     colFilter.innerHTML += `<option value="${col.id}">${col.name}</option>`;
                 });
-            colFilter.value = selectedColFilterId;
         } else {
-            colFilter.disabled = true;
+            localMetadata.collections.forEach(col => {
+                colFilter.innerHTML += `<option value="${col.id}">${col.name}</option>`;
+            });
         }
+        colFilter.value = selectedColFilterId;
 
         // 2. Drawer collections dropdown
         drawerCollectionSelect.innerHTML = '<option value="">None / Select Collection</option>';
         const drawerCatId = drawerCategorySelect.value;
 
+        drawerCollectionSelect.disabled = false;
         if (drawerCatId && drawerCatId !== "CREATE_NEW_CAT") {
-            drawerCollectionSelect.disabled = false;
             // Add Create new option
             drawerCollectionSelect.innerHTML += '<option value="CREATE_NEW_COL" style="font-weight:600; color:var(--accent);">+ Create New Collection</option>';
-            
             localMetadata.collections
                 .filter(col => col.category_id === Number(drawerCatId))
                 .forEach(col => {
                     drawerCollectionSelect.innerHTML += `<option value="${col.id}">${col.name}</option>`;
                 });
-            drawerCollectionSelect.value = selectedDrawerColId;
         } else {
-            drawerCollectionSelect.disabled = true;
+            localMetadata.collections.forEach(col => {
+                drawerCollectionSelect.innerHTML += `<option value="${col.id}">${col.name}</option>`;
+            });
         }
+        drawerCollectionSelect.value = selectedDrawerColId;
     }
 
     // Trigger metadata background sync and update indicators
@@ -327,8 +330,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             const colors = ["#2b5c8f", "#126e51", "#8f3b2b", "#772b8f", "#8f7c2b", "#1a73e8"];
             const color = colors[Math.abs(cat.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length];
 
+            if (cat.cover_image) {
+                card.style.backgroundImage = `url('${cat.cover_image}')`;
+                card.style.backgroundSize = "cover";
+                card.style.backgroundPosition = "center";
+            } else {
+                card.style.backgroundColor = color;
+            }
+
             card.innerHTML = `
-                <div class="category-card-overlay" style="background: linear-gradient(rgba(0,0,0,0.1), ${color});">
+                <div class="category-card-overlay" style="background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.75));">
                     <span class="category-card-title">${cat.name}</span>
                     <span class="category-card-subtitle">${stats.count} collections</span>
                 </div>
@@ -511,12 +522,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             const colName = col ? col.name : "None";
             const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
 
+            const tagNames = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)).map(t => `#${t.name}`).join(" ") : "";
+            const displayName = tagNames ? tagNames : (colName && colName !== "None" ? colName : "Wallpaper");
+
             const card = document.createElement("div");
             card.className = "horizontal-card";
+            card.title = img.filename;
             card.innerHTML = `
                 <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
                 <div class="horizontal-card-info">
-                    <div class="horizontal-card-title">${img.filename}</div>
+                    <div class="horizontal-card-title">${displayName}</div>
                     <div class="horizontal-card-meta">
                         <span>${catName}</span>
                         <span>${colName}</span>
@@ -549,12 +564,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             const colName = col ? col.name : "None";
             const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
 
+            const tagNames = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)).map(t => `#${t.name}`).join(" ") : "";
+            const displayName = tagNames ? tagNames : (colName && colName !== "None" ? colName : "Wallpaper");
+
             const card = document.createElement("div");
             card.className = "horizontal-card";
+            card.title = img.filename;
             card.innerHTML = `
                 <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
                 <div class="horizontal-card-info">
-                    <div class="horizontal-card-title">${img.filename}</div>
+                    <div class="horizontal-card-title">${displayName}</div>
                     <div class="horizontal-card-meta">
                         <span>${catName}</span>
                         <span>${colName}</span>
@@ -594,10 +613,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             if (query) {
-                const inName = img.filename.toLowerCase().includes(query);
-                const inCol = col ? col.name.toLowerCase().includes(query) : false;
-                const inCat = cat ? cat.name.toLowerCase().includes(query) : false;
-                const inTags = wtags.some(t => t.name.toLowerCase().includes(query));
+                const inName = fuzzyMatch(img.filename, query);
+                const inCol = col ? fuzzyMatch(col.name, query) : false;
+                const inCat = cat ? fuzzyMatch(cat.name, query) : false;
+                const inTags = wtags.some(t => fuzzyMatch(t.name, query));
                 return inName || inCol || inCat || inTags;
             }
 
@@ -734,25 +753,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!currentSelectedImage) return;
 
         const hash = currentSelectedImage.filename.split(".")[0];
-        const catId = drawerCategorySelect.value;
+        let catId = drawerCategorySelect.value;
         let colId = drawerCollectionSelect.value;
+
+        // If Collection is selected but Category is empty, auto-select Category
+        if (colId && !catId) {
+            const selectedCol = localMetadata.collections.find(c => String(c.id) === String(colId));
+            if (selectedCol && selectedCol.category_id) {
+                catId = String(selectedCol.category_id);
+                drawerCategorySelect.value = catId;
+            }
+        }
         
         // If Category is selected but Collection is empty, auto-resolve/create default collection under that category
         if (catId && catId !== "CREATE_NEW_CAT" && !colId) {
             const category = localMetadata.categories.find(c => c.id === Number(catId));
             if (category) {
                 const cols = localMetadata.collections.filter(c => c.category_id === category.id);
-                // Look for collection with matching name or General/Default
+                // Look for collection named Default, General, etc. first
+                const matchByDefault = cols.find(c => ["default", "general", "uncategorized"].includes(c.name.toLowerCase()));
                 const matchByName = cols.find(c => c.name.toLowerCase() === category.name.toLowerCase());
-                const matchByDefault = cols.find(c => ["general", "default", "uncategorized"].includes(c.name.toLowerCase()));
-                const matchedCol = matchByName || matchByDefault || cols[0];
+                const matchedCol = matchByDefault || matchByName || cols[0];
                 
                 if (matchedCol) {
                     colId = String(matchedCol.id);
                     drawerCollectionSelect.value = colId;
                 } else {
                     // Create a new default collection locally
-                    const newCol = await window.api.createCollectionLocally(category.name, category.id);
+                    const newCol = await window.api.createCollectionLocally("Default", category.id);
                     // Reload local metadata
                     localMetadata = await window.api.getMetadata();
                     colId = String(newCol.id);
@@ -847,6 +875,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             openCreatorModal("collection");
             drawerCollectionSelect.value = "";
             return;
+        }
+        // If a collection is selected but category is empty, auto-fill the category!
+        if (val && !drawerCategorySelect.value) {
+            const selectedCol = localMetadata.collections.find(c => String(c.id) === String(val));
+            if (selectedCol && selectedCol.category_id) {
+                drawerCategorySelect.value = String(selectedCol.category_id);
+            }
         }
         await saveDrawerMetadata();
     });
@@ -996,9 +1031,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearFiltersBtn.addEventListener("click", () => {
         catFilter.value = "";
         colFilter.value = "";
-        colFilter.disabled = true;
         tagFilter.value = "";
         globalSearchInput.value = "";
+        updateCollectionsDropdowns("", "");
         renderCatalog();
     });
 
@@ -1361,6 +1396,58 @@ document.addEventListener("DOMContentLoaded", async () => {
         installUpdateBtn.addEventListener("click", async () => {
             await window.api.installUpdate();
         });
+    }
+
+    function levenshteinDistance(a, b) {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b[i - 1] === a[j - 1]) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        matrix[i][j - 1] + 1,     // insertion
+                        matrix[i - 1][j] + 1      // deletion
+                    );
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    }
+
+    function fuzzyMatch(text, query) {
+        if (!text || !query) return false;
+        text = text.toLowerCase().trim();
+        query = query.toLowerCase().trim();
+        if (text.includes(query)) return true;
+
+        let qIdx = 0;
+        for (let tIdx = 0; tIdx < text.length; tIdx++) {
+            if (text[tIdx] === query[qIdx]) {
+                qIdx++;
+                if (qIdx === query.length) return true;
+            }
+        }
+
+        const textWords = text.split(/[\s_\-\.\(\)\[\]]+/);
+        const queryWords = query.split(/[\s_\-\.\(\)\[\]]+/);
+
+        for (const qw of queryWords) {
+            if (qw.length < 2) continue;
+            for (const tw of textWords) {
+                if (tw.length < 2) continue;
+                if (tw.includes(qw) || qw.includes(tw)) return true;
+                
+                const maxDistance = qw.length > 4 ? 2 : 1;
+                if (levenshteinDistance(tw, qw) <= maxDistance) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // Trigger loading

@@ -94,27 +94,28 @@ function ensureDir(p) {
   }
 }
 
-function migrateUserDataIfNeeded() {
+async function migrateUserDataIfNeeded() {
   try {
     const oldBase = USER_DATA_PATHS.oldUserData;
     const newBase = USER_DATA_PATHS.activeUserData;
     if (!oldBase || !newBase || oldBase === newBase) return;
 
-    ensureDir(newBase);
+    await fs.promises.mkdir(newBase, { recursive: true });
 
     const oldSettings = path.join(oldBase, "settings.json");
     const newSettings = path.join(newBase, "settings.json");
     if (fs.existsSync(oldSettings) && !fs.existsSync(newSettings)) {
-      fs.copyFileSync(oldSettings, newSettings);
+      await fs.promises.copyFile(oldSettings, newSettings);
     }
 
     const oldWallpapers = path.join(oldBase, "wallpapers");
     const newWallpapers = path.join(newBase, "wallpapers");
     if (fs.existsSync(oldWallpapers) && !fs.existsSync(newWallpapers)) {
-      fs.mkdirSync(newWallpapers, { recursive: true });
-      for (const f of fs.readdirSync(oldWallpapers)) {
+      await fs.promises.mkdir(newWallpapers, { recursive: true });
+      const files = await fs.promises.readdir(oldWallpapers);
+      for (const f of files) {
         try {
-          fs.copyFileSync(path.join(oldWallpapers, f), path.join(newWallpapers, f));
+          await fs.promises.copyFile(path.join(oldWallpapers, f), path.join(newWallpapers, f));
         } catch {
           // ignore per-file errors
         }
@@ -893,8 +894,8 @@ function checkForUpdates({ userInitiated }) {
   }
 }
 
-if (gotSingleInstanceLock) app.whenReady().then(() => {
-  migrateUserDataIfNeeded();
+if (gotSingleInstanceLock) app.whenReady().then(async () => {
+  await migrateUserDataIfNeeded();
   settings = loadSettings();
   setupTray();
 

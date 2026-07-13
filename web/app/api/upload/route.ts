@@ -99,14 +99,14 @@ export async function POST(request: Request) {
           .eq("category_id", categoryId);
         
         if (!colsErr && existingCols) {
+          const matchByDefault = existingCols.find(
+            (c) => ["default", "general", "uncategorized"].includes(c.name.toLowerCase())
+          );
           const matchByName = existingCols.find(
             (c) => c.name.toLowerCase() === categoryData.name.toLowerCase()
           );
-          const matchByDefault = existingCols.find(
-            (c) => ["general", "default", "uncategorized"].includes(c.name.toLowerCase())
-          );
           
-          const matchedCol = matchByName || matchByDefault || existingCols[0];
+          const matchedCol = matchByDefault || matchByName || existingCols[0];
           
           if (matchedCol) {
             finalCollectionId = matchedCol.id;
@@ -114,22 +114,15 @@ export async function POST(request: Request) {
           }
         }
         
-        // 3. If no collection exists at all, create a default one named after the category!
+        // 3. If no collection exists at all, create a default one named "Default"
         if (!finalCollectionId) {
-          const slug = categoryData.name
-            .toLowerCase()
-            .trim()
-            .replace(/\s+/g, "-")
-            .replace(/[^\w\-]+/g, "")
-            .replace(/\-\-+/g, "-")
-            .replace(/^-+/, "")
-            .replace(/-+$/, "");
+          const slug = "default";
             
           const { data: newCol, error: newColErr } = await supabaseAdmin
             .from("collections")
             .insert([
               {
-                name: categoryData.name,
+                name: "Default",
                 category_id: categoryId,
                 slug,
               }

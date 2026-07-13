@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.2.2 (v3.2.2) — 2026-07-13
+
+### Client UX & Search Improvements
+- Fixed select option dropdown background and text contrast on Windows.
+- Added fuzzy search with typo tolerance in the client search bar.
+- Replaced hashed filenames with tags/metadata in card titles.
+- Enabled category cover images as card backgrounds.
+- Enabled standalone collection filtering without requiring a category selection.
+- Handled defaulting missing collections to "Default" instead of matching category names.
+
+### Performance & Database Reset
+- Optimized Electron startup by making user data migration asynchronous to prevent launch freezes.
+- Cleaned up database categories, collections, tags, and mapping associations to allow starting fresh.
+
 ## 3.2.1 (v3.2.1) — 2026-07-13
 
 ### Dashboard Redesign & Corrections

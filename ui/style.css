@@ -257,6 +257,13 @@ body {
     -webkit-appearance: none;
 }
 
+.select-wrapper select option,
+.catalog-filters select option,
+.drawer-field select option {
+    background-color: #252526;
+    color: #f8fafc;
+}
+
 .select-wrapper select:hover,
 .catalog-filters select:hover,
 .drawer-field select:hover {
