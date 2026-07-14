@@ -43,6 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const colFilter = document.getElementById("colFilter");
     const tagFilter = document.getElementById("tagFilter");
     const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+    const headerBackBtn = document.getElementById("headerBackBtn");
 
     // Detail Drawer
     const detailDrawer = document.getElementById("detailDrawer");
@@ -629,6 +630,30 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (catSect) catSect.style.display = isSearching ? "none" : "";
         if (randSect) randSect.style.display = isSearching ? "none" : "";
 
+        // Show or hide header back button
+        if (headerBackBtn) {
+            headerBackBtn.style.display = isSearching ? "inline-flex" : "none";
+        }
+
+        // Dynamically update section header text
+        const catalogTitle = document.getElementById("catalogTitle");
+        if (catalogTitle) {
+            if (query) {
+                catalogTitle.innerText = `Search Results for "${globalSearchInput.value.trim()}"`;
+            } else if (colFilterId) {
+                const col = localMetadata.collections.find(c => String(c.id) === String(colFilterId));
+                catalogTitle.innerText = col ? `Collection: ${col.name}` : "Explore Wallpapers";
+            } else if (catFilterId) {
+                const cat = localMetadata.categories.find(c => String(c.id) === String(catFilterId));
+                catalogTitle.innerText = cat ? `Category: ${cat.name}` : "Explore Wallpapers";
+            } else if (tagFilterId) {
+                const tag = localMetadata.tags.find(t => String(t.id) === String(tagFilterId));
+                catalogTitle.innerText = tag ? `Tag: ${tag.name}` : "Explore Wallpapers";
+            } else {
+                catalogTitle.innerText = "Explore All Wallpapers";
+            }
+        }
+
         const filtered = currentImages.filter(img => {
             const hash = img.filename.split(".")[0];
             const meta = localMetadata.wallpaper_metadata[hash] || {};
@@ -1128,6 +1153,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateCollectionsDropdowns("", "");
         renderCatalog();
     });
+
+    if (headerBackBtn) {
+        headerBackBtn.addEventListener("click", () => {
+            catFilter.value = "";
+            colFilter.value = "";
+            tagFilter.value = "";
+            globalSearchInput.value = "";
+            updateCollectionsDropdowns("", "");
+            renderCatalog();
+            // Scroll back up to the top of the dashboard
+            document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        headerBackBtn.addEventListener("mouseenter", () => {
+            headerBackBtn.style.background = "rgba(255,255,255,0.15)";
+        });
+        headerBackBtn.addEventListener("mouseleave", () => {
+            headerBackBtn.style.background = "rgba(255,255,255,0.08)";
+        });
+    }
 
     globalSearchInput.addEventListener("input", renderCatalog);
 

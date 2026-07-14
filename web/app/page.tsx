@@ -70,6 +70,7 @@ export default function Page() {
     failed: number;
     currentWallpaper: string;
   } | null>(null);
+  const [showProgressCard, setShowProgressCard] = useState(false);
 
   const checkIndexingStatus = async () => {
     try {
@@ -77,6 +78,9 @@ export default function Page() {
       if (res.ok) {
         const data = await res.json();
         setIndexingProgress(data);
+        if (data && data.active) {
+          setShowProgressCard(true);
+        }
         return data;
       }
     } catch (e) {
@@ -1211,7 +1215,7 @@ export default function Page() {
           </div>
         )}
 
-        {indexingProgress && indexingProgress.active && (
+        {indexingProgress && showProgressCard && (
           <div
             style={{
               background: "rgba(255, 255, 255, 0.03)",
@@ -1224,39 +1228,69 @@ export default function Page() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
               <span style={{ fontWeight: 600, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>⚡ AI Indexing Progress</span>
-                <span className="spinner" style={{
-                  width: "12px",
-                  height: "12px",
-                  border: "2px solid rgba(255,255,255,0.2)",
-                  borderTopColor: "var(--primary)",
-                  borderRadius: "50%",
-                  animation: "spin 1s linear infinite"
-                }}></span>
+                <span>
+                  {indexingProgress.active
+                    ? "⚡ AI Indexing Progress"
+                    : (indexingProgress.processed + indexingProgress.failed >= indexingProgress.total)
+                      ? "✅ AI Indexing Completed"
+                      : "🛑 AI Indexing Stopped"
+                  }
+                </span>
+                {indexingProgress.active && (
+                  <span className="spinner" style={{
+                    width: "12px",
+                    height: "12px",
+                    border: "2px solid rgba(255,255,255,0.2)",
+                    borderTopColor: "var(--primary)",
+                    borderRadius: "50%",
+                    animation: "spin 1s linear infinite"
+                  }}></span>
+                )}
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
                   {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
                 </span>
-                <button
-                  type="button"
-                  style={{
-                    padding: "4px 8px",
-                    fontSize: "0.75rem",
-                    background: "rgba(219, 68, 85, 0.2)",
-                    border: "1px solid #db4455",
-                    color: "#ff6b7b",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                  disabled={indexingLoading}
-                  onClick={handleCancelIndexing}
-                >
-                  🛑 Stop
-                </button>
+                {indexingProgress.active ? (
+                  <button
+                    type="button"
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: "0.75rem",
+                      background: "rgba(219, 68, 85, 0.2)",
+                      border: "1px solid #db4455",
+                      color: "#ff6b7b",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    disabled={indexingLoading}
+                    onClick={handleCancelIndexing}
+                  >
+                    🛑 Stop
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: "0.75rem",
+                      background: "rgba(255, 255, 255, 0.1)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                      color: "#fff",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => setShowProgressCard(false)}
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             </div>
             
@@ -1283,7 +1317,7 @@ export default function Page() {
               <span>
                 Processed: <strong style={{ color: "#34a853" }}>{indexingProgress.processed}</strong> • Failed: <strong style={{ color: "#db4455" }}>{indexingProgress.failed}</strong>
               </span>
-              {indexingProgress.currentWallpaper && (
+              {indexingProgress.active && indexingProgress.currentWallpaper && (
                 <span style={{ maxWidth: "60%", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                   Analyzing: <i>{indexingProgress.currentWallpaper}</i>
                 </span>

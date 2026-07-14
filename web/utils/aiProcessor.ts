@@ -101,9 +101,9 @@ ${categoriesAndCollectionsPrompt}
 
 Return ONLY a JSON object matching this schema:
 {
-  "category": "Choose the most appropriate category name. You should try to match one of the existing categories from the list above if it is a good fit. If none of them fit, or if the list is empty, you can output a new, suitable category name (e.g. 'Anime', 'Nature', 'Gaming', 'Abstract', 'Sci-Fi', etc.).",
+  "category": "Choose the most appropriate category name. You must match one of the existing categories from the list above. If none of them fit, or if the list is empty, you can output a new, suitable category name (e.g. 'Anime', 'Nature', 'Gaming', 'Abstract', 'Sci-Fi', etc.).",
   "collection": "Choose the most appropriate collection name for this wallpaper. If choosing an existing category, you should try to match one of its associated collections if it fits. If no associated collection fits, or if you are creating a new category, output a new, specific collection name (e.g. 'Cyberpunk 2077', 'Sunset', 'Minimalist Landscapes') or null if it belongs to no specific collection.",
-  "tags": ["List of 8 to 15 descriptive tags. CRITICAL: You must identify and include specific characters (e.g. 'Goku', 'Spider-Man', 'Naruto', 'Hatsune Miku') and specific franchise/universe/property names (e.g. 'Dragon Ball', 'Marvel', 'Vocaloid', 'Cyberpunk 2077') if present in the image. You must also identify and include specific objects, vehicles, items, animals, or prominent focal elements (e.g. 'sportscar', 'katana', 'mech', 'cybernetic arm', 'skull', 'dragon', 'floating island') rather than just generic terms. Avoid generic tags like 'wallpaper', 'image', 'photo', 'picture', 'desktop', 'background'. Ensure no duplicates."],
+  "tags": [],
   "style": "Choose the visual style, e.g. 'Realistic', 'Minimal', 'Illustration', '3D Render', 'Anime', 'Pixel Art', 'Cyberpunk', 'Oil Painting', etc.",
   "primary_color": "The dominant color family, e.g. 'Blue', 'Dark', 'Black', 'White', 'Red', etc.",
   "quality": "Estimate quality of visual details: 'HD', 'QHD', 'UHD/4K', or '8K'.",
@@ -244,7 +244,8 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
       throw new Error(`Failed to update wallpaper attributes: ${updateErr.message}`);
     }
 
-    // 8. Process Tags (Find or Create & Link)
+    // 8. Process Tags (Disabled for now as requested)
+    /*
     const tagsToProcess = Array.isArray(metadata.tags)
       ? metadata.tags.map((t) => t.trim()).filter((t) => t.length > 0)
       : [];
@@ -292,6 +293,7 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
           .maybeSingle();
       }
     }
+    */
 
     return { success: true };
   } catch (error: any) {

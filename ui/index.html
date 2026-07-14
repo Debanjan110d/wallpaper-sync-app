@@ -198,6 +198,13 @@
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
+                    <button id="headerBackBtn" class="back-btn" style="display:none; align-items:center; gap:6px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:var(--text); padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:500; font-size:0.85rem; transition: background 0.2s; outline:none;" type="button">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <line x1="19" y1="12" x2="5" y2="12"></line>
+                             <polyline points="12 19 5 12 12 5"></polyline>
+                         </svg>
+                         Back to Home
+                    </button>
                     <div class="search-box-wrapper">
                         <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -257,7 +264,7 @@
                 <!-- 5. All Wallpapers Grid (Catalog Explorer) -->
                 <section class="row-section catalog-section" id="catalogFilterSection">
                     <div class="catalog-header">
-                        <h2 class="section-title">Explore All Wallpapers</h2>
+                        <h2 class="section-title" id="catalogTitle">Explore All Wallpapers</h2>
                         <!-- Multi-select / slideshow confirmation banner -->
                         <div class="gallery-subheader" id="gallerySubheader" style="display:none">
                             <div class="manage-left">
