@@ -81,7 +81,7 @@ export async function processWallpaperAI(
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // 4. Construct Prompt
     const prompt = `You are an expert wallpaper cataloger. Analyze the provided wallpaper image and generate structured metadata in JSON format.
