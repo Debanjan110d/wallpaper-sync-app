@@ -54,6 +54,32 @@ export default function Page() {
   const [editCollectionId, setEditCollectionId] = useState<string>("");
   const [editTags, setEditTags] = useState<number[]>([]);
 
+  // AI Indexing Trigger State
+  const [indexingLoading, setIndexingLoading] = useState(false);
+  const [indexingMessage, setIndexingMessage] = useState<string | null>(null);
+
+  const handleTriggerIndexing = async () => {
+    setIndexingLoading(true);
+    setIndexingMessage(null);
+    try {
+      const res = await fetch("/api/wallpapers/batch-index", {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIndexingMessage(`Success: ${data.message}`);
+        // Refresh gallery metadata to reflect the new state (e.g. status changes to pending_ai)
+        setTimeout(fetchGallery, 2000);
+      } else {
+        setIndexingMessage(`Error: ${data.error || "Failed to trigger indexing"}`);
+      }
+    } catch (err: any) {
+      setIndexingMessage(`Error: ${err.message || err}`);
+    } finally {
+      setIndexingLoading(false);
+    }
+  };
+
   const fetchMetadata = async () => {
     try {
       const [resCats, resCols, resTags] = await Promise.all([
@@ -1020,10 +1046,66 @@ export default function Page() {
           }}
         >
           <h2 style={{ margin: 0 }}>Manage Collection</h2>
-          <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-            {galleryImages.length} wallpapers found
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+            {(() => {
+              const unindexedCount = galleryImages.filter(
+                (wp) => wp.status !== "deleted" && (!wp.indexed_at || wp.status === "uploaded")
+              ).length;
+              
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                    {galleryImages.length} wallpapers ({unindexedCount} unindexed)
+                  </span>
+                  {unindexedCount > 0 && (
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ 
+                        padding: "6px 12px", 
+                        fontSize: "0.85rem", 
+                        background: "var(--primary)", 
+                        border: "none", 
+                        borderRadius: "4px",
+                        cursor: "pointer"
+                      }}
+                      disabled={indexingLoading}
+                      onClick={handleTriggerIndexing}
+                    >
+                      {indexingLoading ? "Triggering..." : "⚡ Run AI Indexing"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
+
+        {indexingMessage && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: indexingMessage.startsWith("Error") ? "rgba(219, 68, 85, 0.15)" : "rgba(52, 168, 83, 0.15)",
+              border: indexingMessage.startsWith("Error") ? "1px solid #db4455" : "1px solid #34a853",
+              borderRadius: "6px",
+              fontSize: "0.9rem",
+              marginBottom: "1rem",
+              color: "var(--foreground)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}
+          >
+            <span>{indexingMessage}</span>
+            <button
+              type="button"
+              onClick={() => setIndexingMessage(null)}
+              style={{ background: "none", border: "none", color: "var(--foreground)", cursor: "pointer", fontSize: "1rem" }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Dynamic Filter Controls */}
         <div className="filter-bar">
