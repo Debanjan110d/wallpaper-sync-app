@@ -92,18 +92,35 @@ export async function processWallpaperAI(
     const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // 4. Construct Prompt
-    const prompt = `You are an expert wallpaper cataloger. Analyze the provided wallpaper image and generate structured metadata in JSON format.
+    const prompt = `You are an expert wallpaper cataloger. You have deep knowledge of pop culture, anime, games, art styles, and movies.
+Analyze the provided wallpaper image and generate structured metadata in JSON format.
 
 Below is the list of available categories and their associated collections.
 
 Available Categories and Collections:
 ${categoriesAndCollectionsPrompt}
 
+Rules for Category and Collection Mapping:
+1. Prioritize mapping to the existing Categories and Collections listed above.
+2. Carefully inspect the main subject(s), characters, vehicles, brands, franchise logo, or overall themes.
+3. BE EXTREMELY PRECISE in character and franchise identification. Do NOT misclassify characters. For example, if you see Gojo Satoru, Kakashi, or Tanjiro, do not default to "Black Clover" or other generic categories unless they are actually from that specific series.
+4. If a wallpaper is from a specific game, anime, movie, or series:
+   - Identify the franchise. If the franchise matches one of the collections under "Gaming" or "Anime" or "Marvel" or "DC" or "TV Shows" (e.g. "Jujutsu Kaisen", "Minecraft", "Avengers", "Batman", "Stranger Things"), you MUST set the "category" to the corresponding parent category (e.g. "Anime", "Gaming", "Marvel", etc.) and the "collection" to that franchise name exactly.
+5. If the wallpaper belongs to a category (e.g. "Nature") but there is no specific collection matching the image subject, map it to one of the general collections (like "Mountains", "Forests", "Sunset", "Ocean") or set "collection" to null.
+6. If the wallpaper is definitely of a category/franchise not in the list, you can suggest a new category name and/or a new collection name.
+
+Rules for Tag Extraction:
+1. Extract 5 to 12 highly relevant, lowercase keywords (tags) describing the image details, main characters, visual elements, and mood.
+2. Include the character names if present (e.g. "gojo satoru", "asta", "spiderman").
+3. Include the franchise name (e.g. "jujutsu kaisen", "marvel", "demon slayer").
+4. Include visual style descriptors (e.g. "neon lights", "cyberpunk", "minimalist", "silhouette").
+5. Do NOT include generic words like "wallpaper", "image", "photo", "picture", "desktop", "background".
+
 Return ONLY a JSON object matching this schema:
 {
-  "category": "Choose the most appropriate category name. You must match one of the existing categories from the list above. If none of them fit, or if the list is empty, you can output a new, suitable category name (e.g. 'Anime', 'Nature', 'Gaming', 'Abstract', 'Sci-Fi', etc.).",
-  "collection": "Choose the most appropriate collection name for this wallpaper. If choosing an existing category, you should try to match one of its associated collections if it fits. If no associated collection fits, or if you are creating a new category, output a new, specific collection name (e.g. 'Cyberpunk 2077', 'Sunset', 'Minimalist Landscapes') or null if it belongs to no specific collection.",
-  "tags": [],
+  "category": "The selected category name (must match one from the list above, or be a new suitable one if none fit)",
+  "collection": "The selected collection name (must match one of the associated collections under the category, or be a new suitable franchise/topic name, or null)",
+  "tags": ["tag1", "tag2", "tag3", "tag4", ...],
   "style": "Choose the visual style, e.g. 'Realistic', 'Minimal', 'Illustration', '3D Render', 'Anime', 'Pixel Art', 'Cyberpunk', 'Oil Painting', etc.",
   "primary_color": "The dominant color family, e.g. 'Blue', 'Dark', 'Black', 'White', 'Red', etc.",
   "quality": "Estimate quality of visual details: 'HD', 'QHD', 'UHD/4K', or '8K'.",
@@ -244,8 +261,7 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
       throw new Error(`Failed to update wallpaper attributes: ${updateErr.message}`);
     }
 
-    // 8. Process Tags (Disabled for now as requested)
-    /*
+    // 8. Process Tags
     const tagsToProcess = Array.isArray(metadata.tags)
       ? metadata.tags.map((t) => t.trim()).filter((t) => t.length > 0)
       : [];
@@ -280,6 +296,16 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
 
         if (!tagInsertErr && newTag) {
           tagId = newTag.id;
+        } else if (tagInsertErr) {
+          // Retry to find in case of concurrent insert race condition
+          const { data: retryTag } = await supabaseAdmin
+            .from("tags")
+            .select("id")
+            .eq("slug", tagSlug)
+            .maybeSingle();
+          if (retryTag) {
+            tagId = retryTag.id;
+          }
         }
       }
 
@@ -293,7 +319,6 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
           .maybeSingle();
       }
     }
-    */
 
     return { success: true };
   } catch (error: any) {
