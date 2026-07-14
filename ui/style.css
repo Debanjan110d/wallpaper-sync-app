@@ -1362,3 +1362,77 @@ body {
     margin-right: 2px;
     flex-shrink: 0;
 }
+
+/* Read-Only Details Drawer Styles */
+.drawer-field-readonly {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.drawer-field-readonly:last-of-type {
+    border-bottom: none;
+}
+
+.drawer-field-readonly .field-label {
+    color: var(--text-muted);
+}
+
+.drawer-field-readonly .field-value {
+    font-weight: 500;
+    color: var(--text-color);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drawer-field-tags {
+    margin-top: 18px;
+}
+
+.drawer-field-tags label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.tags-readonly-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px 0;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.tags-readonly-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.tags-readonly-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.tag-badge {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text-color);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tag-badge:hover {
+    background: rgba(79, 142, 247, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}

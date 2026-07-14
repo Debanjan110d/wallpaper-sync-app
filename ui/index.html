@@ -329,32 +329,24 @@
                     </div>
                 </div>
 
-                <!-- Edit Metadata section -->
+                <!-- Metadata section -->
                 <div class="drawer-edit-section">
                     <h4>Organization</h4>
                     
-                    <div class="drawer-field">
-                        <label>Category</label>
-                        <div class="select-wrapper">
-                            <select id="drawerCategorySelect">
-                                <option value="">None / Uncategorized</option>
-                            </select>
-                        </div>
+                    <div class="drawer-field-readonly">
+                        <span class="field-label">Category</span>
+                        <span class="field-value" id="drawerCategoryText">-</span>
                     </div>
 
-                    <div class="drawer-field">
-                        <label>Collection</label>
-                        <div class="select-wrapper">
-                            <select id="drawerCollectionSelect" disabled>
-                                <option value="">Select Category First</option>
-                            </select>
-                        </div>
+                    <div class="drawer-field-readonly">
+                        <span class="field-label">Collection</span>
+                        <span class="field-value" id="drawerCollectionText">-</span>
                     </div>
 
-                    <div class="drawer-field">
-                        <label>Tags Selection</label>
-                        <div class="tags-edit-container" id="drawerTagsContainer">
-                            <!-- Tags checklist checkboxes will be injected here -->
+                    <div class="drawer-field-tags">
+                        <label>Tags</label>
+                        <div class="tags-readonly-container" id="drawerTagsContainer">
+                            <!-- Tags badges will be injected here -->
                         </div>
                     </div>
                 </div>
@@ -413,20 +405,7 @@
         </div>
     </div>
 
-    <!-- Inline Creator Modal (Category/Collection creation) -->
-    <div id="creatorModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Create item">
-        <div class="lightbox-backdrop" id="creatorModalBackdrop"></div>
-        <div class="creator-modal-content">
-            <h3 id="creatorModalTitle">Create Item</h3>
-            <div class="creator-modal-body">
-                <input type="text" id="creatorModalInput" placeholder="Name" />
-            </div>
-            <div class="creator-modal-actions">
-                <button id="creatorModalConfirm" class="btn primary-btn">Create</button>
-                <button id="creatorModalCancel" class="btn btn-secondary">Cancel</button>
-            </div>
-        </div>
-    </div>
+
 
     <!-- User Feedback / Reviews Modal Prompt -->
     <div id="reviewModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Submit Feedback">

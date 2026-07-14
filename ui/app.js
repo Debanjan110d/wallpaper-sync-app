@@ -52,20 +52,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const drawerFileName = document.getElementById("drawerFileName");
     const drawerResolution = document.getElementById("drawerResolution");
     const drawerSize = document.getElementById("drawerSize");
-    const drawerCategorySelect = document.getElementById("drawerCategorySelect");
-    const drawerCollectionSelect = document.getElementById("drawerCollectionSelect");
+    const drawerCategoryText = document.getElementById("drawerCategoryText");
+    const drawerCollectionText = document.getElementById("drawerCollectionText");
     const drawerTagsContainer = document.getElementById("drawerTagsContainer");
     const drawerApplyBtn = document.getElementById("drawerApplyBtn");
     const drawerFavBtn = document.getElementById("drawerFavBtn");
     const drawerDeleteBtn = document.getElementById("drawerDeleteBtn");
-
-    // Creator Modal
-    const creatorModal = document.getElementById("creatorModal");
-    const creatorModalBackdrop = document.getElementById("creatorModalBackdrop");
-    const creatorModalTitle = document.getElementById("creatorModalTitle");
-    const creatorModalInput = document.getElementById("creatorModalInput");
-    const creatorModalConfirm = document.getElementById("creatorModalConfirm");
-    const creatorModalCancel = document.getElementById("creatorModalCancel");
 
     // Feedback / Review Modal elements
     const reviewModal = document.getElementById("reviewModal");
@@ -191,45 +183,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-    // Populate Category, Collection, and Tag filters and selects
+    // Populate Category, Collection, and Tag filters
     function populateFiltersAndDropdowns() {
         const activeCatFilter = catFilter.value;
         const activeColFilter = colFilter.value;
         const activeTagFilter = tagFilter.value;
-        const activeDrawerCat = drawerCategorySelect.value;
-        const activeDrawerCol = drawerCollectionSelect.value;
 
         // Clear dropdown filters
         catFilter.innerHTML = '<option value="">All Categories</option>';
         colFilter.innerHTML = '<option value="">All Collections</option>';
         tagFilter.innerHTML = '<option value="">All Tags</option>';
-        
-        drawerCategorySelect.innerHTML = '<option value="">None / Uncategorized</option><option value="CREATE_NEW_CAT" style="font-weight:600; color:var(--accent);">+ Create New Category</option>';
-        drawerCollectionSelect.innerHTML = '<option value="">None / Select Collection</option>';
 
         // 1. Populate categories
         localMetadata.categories.forEach(cat => {
             const opt = `<option value="${cat.id}">${cat.name}</option>`;
             catFilter.innerHTML += opt;
-            drawerCategorySelect.innerHTML += opt;
         });
 
-        // 2. Populate tags
+        // 2. Populate tags (without # prefix)
         localMetadata.tags.forEach(tag => {
-            tagFilter.innerHTML += `<option value="${tag.id}">#${tag.name}</option>`;
+            tagFilter.innerHTML += `<option value="${tag.id}">${tag.name}</option>`;
         });
 
         // Restore selections
         catFilter.value = activeCatFilter;
         tagFilter.value = activeTagFilter;
-        drawerCategorySelect.value = activeDrawerCat;
 
         // Populate collections filters/dropdowns
-        updateCollectionsDropdowns(activeColFilter, activeDrawerCol);
+        updateCollectionsDropdowns(activeColFilter);
     }
 
-    function updateCollectionsDropdowns(selectedColFilterId = "", selectedDrawerColId = "") {
-        // 1. Catalog collections filter
+    function updateCollectionsDropdowns(selectedColFilterId = "") {
+        // Catalog collections filter
         colFilter.innerHTML = '<option value="">All Collections</option>';
         const filterCatId = catFilter.value;
         
@@ -246,26 +231,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
         colFilter.value = selectedColFilterId;
-
-        // 2. Drawer collections dropdown
-        drawerCollectionSelect.innerHTML = '<option value="">None / Select Collection</option>';
-        const drawerCatId = drawerCategorySelect.value;
-
-        drawerCollectionSelect.disabled = false;
-        if (drawerCatId && drawerCatId !== "CREATE_NEW_CAT") {
-            // Add Create new option
-            drawerCollectionSelect.innerHTML += '<option value="CREATE_NEW_COL" style="font-weight:600; color:var(--accent);">+ Create New Collection</option>';
-            localMetadata.collections
-                .filter(col => col.category_id === Number(drawerCatId))
-                .forEach(col => {
-                    drawerCollectionSelect.innerHTML += `<option value="${col.id}">${col.name}</option>`;
-                });
-        } else {
-            localMetadata.collections.forEach(col => {
-                drawerCollectionSelect.innerHTML += `<option value="${col.id}">${col.name}</option>`;
-            });
-        }
-        drawerCollectionSelect.value = selectedDrawerColId;
     }
 
     // Trigger metadata background sync and update indicators
@@ -672,7 +637,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             if (query) {
-                const inName = fuzzyMatch(img.filename, query);
+                const originalName = meta.file_name || img.filename;
+                const inName = fuzzyMatch(originalName, query) || fuzzyMatch(img.filename, query);
                 const inCol = col ? fuzzyMatch(col.name, query) : false;
                 const inCat = cat ? fuzzyMatch(cat.name, query) : false;
                 const inTags = wtags.some(t => fuzzyMatch(t.name, query));
@@ -774,19 +740,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
 
         const hash = imgData.filename.split(".")[0];
-        const meta = localMetadata.wallpaper_metadata[hash] || { collection_id: null, tags: [] };
+        const meta = localMetadata.wallpaper_metadata[hash] || { collection_id: null, tags: [], file_name: null };
         
-        const col = localMetadata.collections.find(c => c.id === meta.collection_id);
-        const activeCatId = col ? col.category_id : "";
-        const activeColId = col ? col.id : "";
+        // Show original file name in drawer header
+        drawerFileName.textContent = meta.file_name || imgData.filename;
 
-        drawerCategorySelect.value = activeCatId;
-        updateCollectionsDropdowns("", activeColId);
+        const col = localMetadata.collections.find(c => c.id === meta.collection_id);
+        const cat = col ? localMetadata.categories.find(c => c.id === col.category_id) : null;
+
+        drawerCategoryText.textContent = cat ? cat.name : "None / Uncategorized";
+        drawerCollectionText.textContent = col ? col.name : "None / Select Collection";
 
         renderDrawerTags(meta.tags || []);
 
         const isFav = selectedSet.has(String(imgData.path));
         updateFavButton(isFav);
+    }
+
+    function closeDetailDrawer() {
+        detailDrawer.classList.add("hidden");
+        currentSelectedImage = null;
     }
 
     function updateFavButton(isFav) {
@@ -807,102 +780,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-    function closeDetailDrawer() {
-        detailDrawer.classList.add("hidden");
-        currentSelectedImage = null;
-    }
-
     function renderDrawerTags(selectedTagIds) {
         drawerTagsContainer.innerHTML = "";
-        if (localMetadata.tags.length === 0) {
-            drawerTagsContainer.innerHTML = '<span style="color:var(--text-muted); font-size:11px;">No tags created yet.</span>';
+        
+        const activeTags = localMetadata.tags.filter(tag => selectedTagIds.includes(Number(tag.id)));
+        
+        if (activeTags.length === 0) {
+            drawerTagsContainer.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">No tags</span>';
             return;
         }
 
-        const createBtn = document.createElement("button");
-        createBtn.type = "button";
-        createBtn.className = "btn-secondary";
-        createBtn.style.padding = "4px";
-        createBtn.style.fontSize = "11px";
-        createBtn.style.marginBottom = "8px";
-        createBtn.style.width = "100%";
-        createBtn.textContent = "+ Create New Tag";
-        createBtn.addEventListener("click", () => openCreatorModal("tag"));
-        drawerTagsContainer.appendChild(createBtn);
-
-        localMetadata.tags.forEach(tag => {
-            const row = document.createElement("div");
-            row.className = "tag-checkbox-row";
-            
-            const isChecked = selectedTagIds.includes(Number(tag.id)) ? "checked" : "";
-            row.innerHTML = `
-                <input type="checkbox" id="drawerTag_${tag.id}" value="${tag.id}" ${isChecked} />
-                <label for="drawerTag_${tag.id}">#${tag.name}</label>
-            `;
-
-            row.querySelector("input").addEventListener("change", saveDrawerMetadata);
-            drawerTagsContainer.appendChild(row);
+        activeTags.forEach(tag => {
+            const badge = document.createElement("span");
+            badge.className = "tag-badge";
+            badge.textContent = tag.name; // Display name directly (no # prefix)
+            drawerTagsContainer.appendChild(badge);
         });
-    }
-
-    async function saveDrawerMetadata() {
-        if (!currentSelectedImage) return;
-
-        const hash = currentSelectedImage.filename.split(".")[0];
-        let catId = drawerCategorySelect.value;
-        let colId = drawerCollectionSelect.value;
-
-        // If Collection is selected but Category is empty, auto-select Category
-        if (colId && !catId) {
-            const selectedCol = localMetadata.collections.find(c => String(c.id) === String(colId));
-            if (selectedCol && selectedCol.category_id) {
-                catId = String(selectedCol.category_id);
-                drawerCategorySelect.value = catId;
-            }
-        }
-        
-        // If Category is selected but Collection is empty, auto-resolve/create default collection under that category
-        if (catId && catId !== "CREATE_NEW_CAT" && !colId) {
-            const category = localMetadata.categories.find(c => c.id === Number(catId));
-            if (category) {
-                const cols = localMetadata.collections.filter(c => c.category_id === category.id);
-                // Look for collection named Default, General, etc. first
-                const matchByDefault = cols.find(c => ["default", "general", "uncategorized"].includes(c.name.toLowerCase()));
-                const matchByName = cols.find(c => c.name.toLowerCase() === category.name.toLowerCase());
-                const matchedCol = matchByDefault || matchByName || cols[0];
-                
-                if (matchedCol) {
-                    colId = String(matchedCol.id);
-                    drawerCollectionSelect.value = colId;
-                } else {
-                    // Create a new default collection locally
-                    const newCol = await window.api.createCollectionLocally("Default", category.id);
-                    // Reload local metadata
-                    localMetadata = await window.api.getMetadata();
-                    colId = String(newCol.id);
-                    // Update dropdowns
-                    updateCollectionsDropdowns("", colId);
-                }
-            }
-        }
-
-        const checkedTags = [];
-        drawerTagsContainer.querySelectorAll("input[type=checkbox]").forEach(cb => {
-            if (cb.checked) checkedTags.push(Number(cb.value));
-        });
-
-        await window.api.updateWallpaperMetadataLocally(
-            hash,
-            colId ? Number(colId) : null,
-            checkedTags
-        );
-
-        await refreshMetadata();
-        renderCatalog();
-        renderRecentlyAdded();
-        renderRandomDiscoveries();
-        
-        triggerBackgroundSync();
     }
 
     // Detail Action buttons bindings
@@ -974,95 +867,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     closeDrawerBtn.addEventListener("click", closeDetailDrawer);
 
-    // Dropdowns changes in detail drawer
-    drawerCategorySelect.addEventListener("change", async (e) => {
-        const val = e.target.value;
-        if (val === "CREATE_NEW_CAT") {
-            openCreatorModal("category");
-            drawerCategorySelect.value = "";
-            return;
-        }
-        updateCollectionsDropdowns("", "");
-        await saveDrawerMetadata();
-    });
 
-    drawerCollectionSelect.addEventListener("change", async (e) => {
-        const val = e.target.value;
-        if (val === "CREATE_NEW_COL") {
-            openCreatorModal("collection");
-            drawerCollectionSelect.value = "";
-            return;
-        }
-        // If a collection is selected but category is empty, auto-fill the category!
-        if (val && !drawerCategorySelect.value) {
-            const selectedCol = localMetadata.collections.find(c => String(c.id) === String(val));
-            if (selectedCol && selectedCol.category_id) {
-                drawerCategorySelect.value = String(selectedCol.category_id);
-            }
-        }
-        await saveDrawerMetadata();
-    });
-
-    // Inline Creator Modal Binding
-    let creatorType = ""; // category, collection, tag
-    function openCreatorModal(type) {
-        creatorType = type;
-        creatorModal.classList.remove("hidden");
-        creatorModalInput.value = "";
-        creatorModalInput.focus();
-
-        if (type === "category") {
-            creatorModalTitle.textContent = "Create New Category";
-        } else if (type === "collection") {
-            creatorModalTitle.textContent = "Create New Collection";
-        } else {
-            creatorModalTitle.textContent = "Create New Tag";
-        }
-    }
-
-    function closeCreatorModal() {
-        creatorModal.classList.add("hidden");
-        creatorType = "";
-    }
-
-    creatorModalConfirm.addEventListener("click", async () => {
-        const name = creatorModalInput.value.trim();
-        if (!name) return;
-
-        try {
-            if (creatorType === "category") {
-                const res = await window.api.createCategoryLocally(name);
-                await refreshMetadata();
-                drawerCategorySelect.value = res.id;
-                updateCollectionsDropdowns("", "");
-            } else if (creatorType === "collection") {
-                const catId = drawerCategorySelect.value;
-                if (!catId) return;
-                const res = await window.api.createCollectionLocally(name, Number(catId));
-                await refreshMetadata();
-                drawerCollectionSelect.value = res.id;
-            } else if (creatorType === "tag") {
-                const res = await window.api.createTagLocally(name);
-                await refreshMetadata();
-                if (currentSelectedImage) {
-                    const hash = currentSelectedImage.filename.split(".")[0];
-                    const meta = localMetadata.wallpaper_metadata[hash] || { collection_id: null, tags: [] };
-                    meta.tags.push(res.id);
-                    await window.api.updateWallpaperMetadataLocally(hash, meta.collection_id, meta.tags);
-                    await refreshMetadata();
-                    openDetailDrawer(currentSelectedImage);
-                }
-            }
-            showToast("Item created locally!", "success");
-            closeCreatorModal();
-            triggerBackgroundSync();
-        } catch (err) {
-            showToast("Failed to create item", "error");
-        }
-    });
-
-    creatorModalCancel.addEventListener("click", closeCreatorModal);
-    creatorModalBackdrop.addEventListener("click", closeCreatorModal);
 
     // Feedback / Review Modal logic
     function checkReviewEligibility() {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.4.0 (v3.4.0) — 2026-07-15
+
+### Architectural Simplification
+- Converted metadata synchronization into a clean, one-directional client pull from the server (Server -> Client).
+- Removed the local offline queueing and database write/upload features from the desktop client to make metadata management strictly server-centric.
+
+### Desktop Client UI & Experience
+- Replaced select dropdowns and checklist checkboxes in the details drawer with premium, read-only labels and static tag badges.
+- Removed '#' prefix formatting from tags across all filters and badges (displaying tag names like "nature" directly).
+- Removed the inline creator modal and creator buttons from the client.
+
+### Bug Fixes
+- Fixed a search filtering bug by adding file_name to the local cache and modifying fuzzy search matching to check original human-readable file names (meta.file_name) rather than only hashed local filenames.
+
 ## 3.3.0 (v3.3.0) — 2026-07-14
 
 ### Desktop Client UI & Experience revamps
