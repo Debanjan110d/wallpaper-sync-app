@@ -57,6 +57,41 @@ export default function Page() {
   // AI Indexing Trigger State
   const [indexingLoading, setIndexingLoading] = useState(false);
   const [indexingMessage, setIndexingMessage] = useState<string | null>(null);
+  const [indexingProgress, setIndexingProgress] = useState<{
+    active: boolean;
+    total: number;
+    processed: number;
+    failed: number;
+    currentWallpaper: string;
+  } | null>(null);
+
+  const checkIndexingStatus = async () => {
+    try {
+      const res = await fetch("/api/wallpapers/batch-index");
+      if (res.ok) {
+        const data = await res.json();
+        setIndexingProgress(data);
+        return data;
+      }
+    } catch (e) {
+      console.error("Failed to check indexing status:", e);
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    checkIndexingStatus();
+
+    const intervalTime = indexingProgress?.active ? 2000 : 10000;
+    const interval = setInterval(async () => {
+      const progress = await checkIndexingStatus();
+      if (progress && !progress.active && indexingProgress?.active) {
+        fetchGallery();
+      }
+    }, intervalTime);
+
+    return () => clearInterval(interval);
+  }, [indexingProgress?.active]);
 
   const handleTriggerIndexing = async () => {
     setIndexingLoading(true);
@@ -68,8 +103,7 @@ export default function Page() {
       const data = await res.json();
       if (res.ok) {
         setIndexingMessage(`Success: ${data.message}`);
-        // Refresh gallery metadata to reflect the new state (e.g. status changes to pending_ai)
-        setTimeout(fetchGallery, 2000);
+        await checkIndexingStatus();
       } else {
         setIndexingMessage(`Error: ${data.error || "Failed to trigger indexing"}`);
       }
@@ -1104,6 +1138,71 @@ export default function Page() {
             >
               ✕
             </button>
+          </div>
+        )}
+
+        {indexingProgress && indexingProgress.active && (
+          <div
+            style={{
+              background: "rgba(255, 255, 255, 0.03)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              padding: "1rem",
+              marginBottom: "1.5rem",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>⚡ AI Indexing Progress</span>
+                <span className="spinner" style={{
+                  width: "12px",
+                  height: "12px",
+                  border: "2px solid rgba(255,255,255,0.2)",
+                  borderTopColor: "var(--primary)",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite"
+                }}></span>
+              </span>
+              <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
+                {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
+              </span>
+            </div>
+            
+            {/* Progress Track */}
+            <div style={{
+              width: "100%",
+              height: "8px",
+              background: "rgba(255,255,255,0.1)",
+              borderRadius: "4px",
+              overflow: "hidden",
+              marginBottom: "0.5rem",
+              position: "relative"
+            }}>
+              <div style={{
+                width: `${((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)",
+                borderRadius: "4px",
+                transition: "width 0.4s ease-out"
+              }}></div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)", flexWrap: "wrap", gap: "0.5rem" }}>
+              <span>
+                Processed: <strong style={{ color: "#34a853" }}>{indexingProgress.processed}</strong> • Failed: <strong style={{ color: "#db4455" }}>{indexingProgress.failed}</strong>
+              </span>
+              {indexingProgress.currentWallpaper && (
+                <span style={{ maxWidth: "60%", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                  Analyzing: <i>{indexingProgress.currentWallpaper}</i>
+                </span>
+              )}
+            </div>
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes spin {
+                to { transform: rotate(360deg); }
+              }
+            `}} />
           </div>
         )}
 
