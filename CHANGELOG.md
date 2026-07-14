@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.3.0 (v3.3.0) — 2026-07-14
+
+### Desktop Client UI & Experience revamps
+- Repositioned search results directly underneath the search bar by hiding home dashboard rows dynamically during active searches.
+- Embedded corner quality badges (`4K`, `HD`) and visual style tags directly overlaying gallery cards.
+- Clamped tags list in horizontal cards to a maximum of 3 chips plus an elegant `+x` overflow badge.
+- Added desktop-level notification/toasts for manual and background library synchronizations, rotation events, and connection alerts.
+- Integrated `content-visibility: auto` to optimize scrolling performance and minimize browser layout repaint memory costs.
+
+### Official Landing Page & Technical Docs
+- Redesigned the landing page to feature a unified, simplified release container instead of separating stable and beta.
+- Featured the new Gemini 2.5 Flash indexing engine capabilities directly in the hero layout.
+- Added comprehensive technical documentation covering base64 indexing architectures, db constraints, tray sync parameters, and offline fuzzy search logic.
+
+## 3.3 (v3.3) — 2026-07-14
+
+### Desktop Client UI & Experience revamps
+- Repositioned search results directly underneath the search bar by hiding home dashboard rows dynamically during active searches.
+- Embedded corner quality badges (`4K`, `HD`) and visual style tags directly overlaying gallery cards.
+- Clamped tags list in horizontal cards to a maximum of 3 chips plus an elegant `+x` overflow badge.
+- Added desktop-level notification/toasts for manual and background library synchronizations, rotation events, and connection alerts.
+- Integrated `content-visibility: auto` to optimize scrolling performance and minimize browser layout repaint memory costs.
+
+### Official Landing Page & Technical Docs
+- Redesigned the landing page to feature a unified, simplified release container instead of separating stable and beta.
+- Featured the new Gemini 2.5 Flash indexing engine capabilities directly in the hero layout.
+- Added comprehensive technical documentation covering base64 indexing architectures, db constraints, tray sync parameters, and offline fuzzy search logic.
+
 ## 3.2.3 (v3.2.3) — 2026-07-14
 
 ### Robustness & Download Optimizations
