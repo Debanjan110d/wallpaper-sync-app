@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       currentWallpaper: "",
       started_at: new Date().toISOString()
     };
-    saveProgress(progress);
+    fs.writeFileSync(progressFilePath, JSON.stringify(progress, null, 2), "utf8");
 
     // Run batch indexing asynchronously in the background to avoid API timeouts
     (async () => {
