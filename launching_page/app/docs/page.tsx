@@ -14,77 +14,102 @@ export default function DocsPage() {
         borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         padding: "1rem 0",
         background: "rgba(5, 6, 10, 0.8)",
-        backdropFilter: "blur(8px)"
+        backdropFilter: "blur(8px)",
+        position: "sticky",
+        top: 0,
+        zIndex: 10
       }}>
         <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "0 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", color: "inherit" }}>
             <Image src="/logo.png" alt="Wallpaper Sync" width={34} height={34} />
-            <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>Wallpaper Sync</span>
+            <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>Wallpaper Sync</span>
           </Link>
           <nav style={{ display: "flex", gap: "1.5rem", fontSize: "0.9rem" }}>
             <Link href="/" style={{ color: "rgba(233, 238, 252, 0.72)", textDecoration: "none" }}>Home</Link>
             <Link href="/reviews" style={{ color: "rgba(233, 238, 252, 0.72)", textDecoration: "none" }}>Reviews</Link>
+            <a href="https://github.com/Debanjan110d/wallpaper-sync-app" target="_blank" rel="noreferrer" style={{ color: "rgba(233, 238, 252, 0.72)", textDecoration: "none" }}>GitHub</a>
           </nav>
         </div>
       </header>
 
       {/* Main Container */}
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 1.5rem" }}>
-        <h1 style={{ fontSize: "2.4rem", fontWeight: 800, marginBottom: "0.5rem", letterSpacing: "-0.5px" }}>
+        <div style={{ display: "inline-flex", background: "rgba(43, 123, 255, 0.1)", border: "1px solid rgba(43, 123, 255, 0.2)", color: "#4f8ef7", padding: "4px 12px", borderRadius: "100px", fontSize: "0.8rem", fontWeight: 600, marginBottom: "1rem" }}>
+          Technical Guides
+        </div>
+        <h1 style={{ fontSize: "2.8rem", fontWeight: 800, marginBottom: "0.5rem", letterSpacing: "-0.5px", background: "linear-gradient(90deg, #fff, #4f8ef7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           Documentation
         </h1>
-        <p style={{ color: "rgba(233, 238, 252, 0.6)", fontSize: "1.1rem", marginBottom: "3rem" }}>
-          Understand how Wallpaper Sync operates, how to configure the desktop client, and advanced offline features.
+        <p style={{ color: "rgba(233, 238, 252, 0.6)", fontSize: "1.1rem", marginBottom: "3rem", lineHeight: 1.5 }}>
+          Understand how Wallpaper Sync operates, how the AI Metadata Engine organizes wallpapers, and how to utilize offline client search.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "3rem" }}>
-          <section style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "12px", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "1rem", color: "#2b7bff" }}>
-              1. Overview & Setup
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+
+          {/* Section 1 */}
+          <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>1</span>
+              Overview & Installation
             </h2>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
-              Wallpaper Sync is a lightweight, open-source utility that runs in your Windows system tray. It automates loading desktop wallpapers from your local collection, keeps them organized in folders, and schedules changes based on user preferences.
+              Wallpaper Sync is a lightweight, system-tray utility built with Electron for Windows. It rotates wallpapers from your local cache based on scheduled intervals, or automatically synchronizes a shared catalog from a central web database.
             </p>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
-              To install, download the latest setup executable from the home page. Once launched, check the system tray on your taskbar to open the dashboard controls.
+              To get started, install the latest compiled executable from our homepage. On launch, the application registers in the Windows tray. Right-click the tray icon or open the double-click dashboard to customize folder sources.
             </p>
           </section>
 
-          <section style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "12px", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "1rem", color: "#2b7bff" }}>
-              2. How Wallpapers Are Set
+          {/* Section 2 */}
+          <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>2</span>
+              AI Metadata Indexing Engine
             </h2>
-            <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
-              The client utilizes a hybrid wallpaper applying system designed for Windows stability:
+            <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1.2rem" }}>
+              Our system runs a **Generate Once, Search Locally** pipeline. When an admin uploads a wallpaper, the Vercel API sends the image data to **Gemini 2.5 Flash Vision** to perform automatic indexing:
             </p>
-            <ul style={{ paddingLeft: "1.5rem", lineHeight: 1.8, color: "rgba(233, 238, 252, 0.8)" }}>
+            <ul style={{ paddingLeft: "1.5rem", lineHeight: 1.8, color: "rgba(233, 238, 252, 0.8)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <li>
-                <strong>Primary Module:</strong> Executes a dynamic call importing native bindings to write wallpapers directly.
+                <strong>Category & Collection Mapping:</strong> Predefined categories (e.g. <em>Gaming</em>, <em>Anime</em>) and collections (e.g. <em>Naruto</em>) are fetched from the database and supplied to Gemini. The model selects the closest fit, mapping it safely without generating ad-hoc values.
               </li>
               <li>
-                <strong>Registry Fallback:</strong> If the primary method is blocked by system permissions, the client executes fallback registry commands to write the image path directly to control panel settings, restarting explorer.exe automatically to refresh the layout.
+                <strong>Visual Style Detection:</strong> Classifies the style of the wallpaper (e.g. <em>Minimal</em>, <em>Cyberpunk</em>, <em>3D Render</em>, <em>Realistic</em>).
+              </li>
+              <li>
+                <strong>Color Family extraction:</strong> Identifies dominant primary color families (e.g. <em>Blue</em>, <em>Dark</em>, <em>Purple</em>) to support future search improvements.
+              </li>
+              <li>
+                <strong>Tag Resolution:</strong> Generates up to 15 descriptive search keywords, checking if the tag already exists in the database before creating a relationship link.
               </li>
             </ul>
           </section>
 
-          <section style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "12px", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "1rem", color: "#2b7bff" }}>
-              3. Offline-First Caching
+          {/* Section 3 */}
+          <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>3</span>
+              Offline-First Fuzzy Search
             </h2>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
-              The application maintains all organizational variables offline. Categories, collections, and tags created while disconnected are cached locally inside the user data directories.
+              During client sync, the desktop app downloads categories, collections, tags, and AI attributes to a local cache file (`local_metadata.json`).
             </p>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
-              Once connection is restored, a background queue pushes synchronization payloads to the remote server, updating data collections seamlessly.
+              {"Fuzzy matching algorithms analyze search strings against the wallpaper filenames, category names, collection titles, mapped style fields, quality tags, and tag lists. This means you can type 'realistic', 'anime' , '4K', or 'blue' and find results instantaneously without hits to the internet."}
             </p>
           </section>
 
-          <section style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "12px", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "1rem", color: "#2b7bff" }}>
-              4. Smart Slideshows
+          {/* Section 4 */}
+          <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>4</span>
+              Troubleshooting & registry fallbacks
             </h2>
+            <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
+              In cases where user administrative locks prevent the primary bindings from changing the background, Wallpaper Sync activates its registry fallback layer:
+            </p>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
-              Configure rotation cycles to target specific collections or genres. You can shuffle playlists, play sequentially, select images at random, or filter by your Favorites tags checklist.
+              The application writes the file path directly to the Windows registry control panel key and restarts the Windows Shell (<code>explorer.exe</code>) in the background to force reload the desktop window without interrupting other programs.
             </p>
           </section>
         </div>
@@ -94,13 +119,13 @@ export default function DocsPage() {
       <footer style={{
         marginTop: "6rem",
         borderTop: "1px solid rgba(255, 255, 255, 0.08)",
-        padding: "2rem 0",
+        padding: "2.5rem 0",
         textAlign: "center",
         fontSize: "0.85rem",
-        color: "rgba(233, 238, 252, 0.52)"
+        color: "rgba(233, 238, 252, 0.42)"
       }}>
         <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "0 1.5rem" }}>
-          Wallpaper Sync - Open Source - Built by Debanjan Dutta
+          Wallpaper Sync · Open Source Project · Built by Debanjan Dutta (c) 2026
         </div>
       </footer>
     </div>

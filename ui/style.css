@@ -592,14 +592,16 @@ body {
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
     box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    content-visibility: auto;
+    contain-intrinsic-size: 220px 180px;
 }
 
 .horizontal-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-hover);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    transform: translateY(-4px) scale(1.02);
+    border-color: var(--accent);
+    box-shadow: 0 12px 24px rgba(79, 142, 247, 0.25), 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .horizontal-card-img {
@@ -843,13 +845,43 @@ body {
     background: var(--surface);
     border: 1px solid var(--border);
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+    content-visibility: auto;
+    contain-intrinsic-size: 260px 162px;
 }
 
 .wallpaper-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-hover);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    transform: translateY(-4px) scale(1.02);
+    border-color: var(--accent);
+    box-shadow: 0 12px 24px rgba(79, 142, 247, 0.25), 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Card quality and style badges */
+.card-badge {
+    position: absolute;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 6px;
+    backdrop-filter: blur(8px);
+    z-index: 2;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.quality-badge {
+    top: 8px;
+    right: 8px;
+    background: rgba(79, 142, 247, 0.8);
+    color: white;
+}
+
+.style-badge {
+    top: 8px;
+    left: 8px;
+    background: rgba(32, 34, 37, 0.85);
+    color: var(--text-color);
+    border: 1px solid rgba(255,255,255,0.06);
 }
 
 .wallpaper-card img {

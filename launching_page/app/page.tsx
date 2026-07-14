@@ -27,14 +27,9 @@ export default async function HomePage() {
     releasesError = e?.message || "Failed to load releases";
   }
 
-  const stableReleases = releases.filter((r) => !r.prerelease);
-  const betaReleases = releases.filter((r) => r.prerelease);
-
-  const latestStable = stableReleases[0] || null;
-  const latestStableAsset = latestStable ? pickPrimaryAsset(latestStable.assets || []) : null;
-
-  const latestBeta = betaReleases[0] || null;
-  const latestBetaAsset = latestBeta ? pickPrimaryAsset(latestBeta.assets || []) : null;
+  const latestRelease = releases[0] || null;
+  const latestReleaseAsset = latestRelease ? pickPrimaryAsset(latestRelease.assets || []) : null;
+  const olderReleases = releases.slice(1, 6);
 
   return (
     <>
@@ -113,23 +108,23 @@ export default async function HomePage() {
               <div className="heroCards">
                 <div className="card">
                   <div className="cardInner">
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>Latest stable release</div>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>Latest Release</div>
 
-                    {latestStable ? (
+                    {latestRelease ? (
                       <>
                         <div className="kpiRow">
                           <div className="kpi">
                             <div className="kpiLabel">Version</div>
-                            <div className="kpiValue">{latestStable.tag_name}</div>
+                            <div className="kpiValue">{latestRelease.tag_name}</div>
                           </div>
                           <div className="kpi">
                             <div className="kpiLabel">Published</div>
-                            <div className="kpiValue">{formatDate(latestStable.published_at)}</div>
+                            <div className="kpiValue">{formatDate(latestRelease.published_at)}</div>
                           </div>
                         </div>
 
                         <div style={{ marginTop: 12, color: "var(--muted)", lineHeight: 1.55 }}>
-                          {extractHighlights(latestStable.body, 3).map((h) => (
+                          {extractHighlights(latestRelease.body, 3).map((h) => (
                             <div key={h} style={{ marginTop: 6 }}>
                               • {h}
                             </div>
@@ -137,20 +132,20 @@ export default async function HomePage() {
                         </div>
 
                         <div className="actions" style={{ marginTop: 14 }}>
-                          {latestStableAsset ? (
+                          {latestReleaseAsset ? (
                             <TrackLink
                               className="btn btnPrimary"
-                              href={latestStableAsset.browser_download_url}
+                              href={latestReleaseAsset.browser_download_url}
                               analyticsEvent="download_click"
                             >
-                              Download {latestStableAsset.name}
+                              Download {latestReleaseAsset.name}
                             </TrackLink>
                           ) : (
-                            <a className="btn btnPrimary" href={latestStable.html_url}>
+                            <a className="btn btnPrimary" href={latestRelease.html_url}>
                               Open release
                             </a>
                           )}
-                          <a className="btn" href={latestStable.html_url}>
+                          <a className="btn" href={latestRelease.html_url}>
                             Release notes
                           </a>
                         </div>
@@ -181,10 +176,9 @@ export default async function HomePage() {
 
                 <div className="card">
                   <div className="cardInner">
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>What it does</div>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>AI Metadata Engine</div>
                     <div style={{ color: "var(--muted)", lineHeight: 1.6 }}>
-                      Drag & drop wallpapers, rotate them on a schedule, run tray-only, and optionally keep a
-                      shared collection synced.
+                      Every uploaded wallpaper is automatically analyzed by Gemini 2.5 Flash. It instantly maps tags, collections, styles, quality, and color families for offline-first catalog searches.
                     </div>
                   </div>
                 </div>
@@ -236,198 +230,103 @@ export default async function HomePage() {
         <hr className="hr" />
 
         <section className="section" id="download">
-          <div className="container">
-            <h2 className="sectionTitle">Download</h2>
+          <div className="container" style={{ maxWidth: "800px" }}>
+            <h2 className="sectionTitle">Download Wallpaper Sync</h2>
             <p className="sectionSub">
-              Choose between our recommended Stable builds and experimental Beta/Pre-releases.
+              Get the latest installer for Windows. No account needed.
             </p>
 
-            <div className="downloadGrid">
-              {/* Stable Channel Column */}
-              <div className="releaseItem stableCol">
-                <div className="releaseTop">
-                  <div>
-                    <div className="releaseName" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>Stable Release</div>
-                    <div className="releaseMeta" style={{ marginTop: 4 }}>
-                      {latestStable ? `${latestStable.tag_name} · ${formatDate(latestStable.published_at)}` : "No stable release found"}
+            <div className="releaseItem stableCol" style={{ border: "1px solid var(--cardBorder)", background: "var(--card)", padding: "2rem", borderRadius: "var(--radius)" }}>
+              {latestRelease ? (
+                <>
+                  <div className="releaseTop" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+                    <div>
+                      <div className="releaseName" style={{ fontSize: "1.5rem", color: "var(--accent)", fontWeight: 700 }}>
+                        Latest Version: {latestRelease.tag_name}
+                      </div>
+                      <div className="releaseMeta" style={{ marginTop: 4, color: "var(--muted)" }}>
+                        Published on {formatDate(latestRelease.published_at)}
+                      </div>
+                    </div>
+                    <div>
+                      {latestReleaseAsset && (
+                        <TrackLink
+                          className="btn btnPrimary"
+                          href={latestReleaseAsset.browser_download_url}
+                          analyticsEvent="download_click"
+                          style={{ padding: "12px 28px", fontSize: "1rem" }}
+                        >
+                          Download for Windows
+                        </TrackLink>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    {latestStable && latestStableAsset ? (
-                      <TrackLink
-                        className="btn btnPrimary"
-                        href={latestStableAsset.browser_download_url}
-                        analyticsEvent="download_click"
-                      >
-                        Download Stable
-                      </TrackLink>
-                    ) : (
-                      <a className="btn btnPrimary" href={getReleasePageUrl()}>
-                        Releases
-                      </a>
-                    )}
-                  </div>
-                </div>
 
-                {latestStable && latestStable.assets?.length ? (
-                  <div className="assetList" style={{ marginTop: "1rem" }}>
-                    {latestStable.assets.slice(0, 3).map((a) => (
-                      <div className="asset" key={a.id}>
-                        <TrackLink href={a.browser_download_url} analyticsEvent="download_click">
-                          {a.name}
-                        </TrackLink>
-                        <span>
-                          {formatBytes(a.size)} · {a.download_count} downloads
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {latestStable && latestStable.body && (
-                  <div className="releaseBody" style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-                    <strong>Highlights:</strong>
-                    {extractHighlights(latestStable.body, 3).map((h) => (
-                      <div key={h} style={{ marginTop: 4 }}>
-                        • {h}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <details className="details" style={{ marginTop: "1.5rem" }}>
-                  <summary>Older stable versions</summary>
-                  <div style={{ marginTop: 10 }}>
-                    {stableReleases.length <= 1 ? (
-                      <div style={{ color: "var(--muted)", lineHeight: 1.6, fontSize: "0.85rem" }}>
-                        No older stable versions found.
-                      </div>
-                    ) : (
-                      <div className="releaseList" style={{ gap: 8 }}>
-                        {stableReleases.slice(1, 5).map((r) => {
-                          const a = pickPrimaryAsset(r.assets || []);
-                          return (
-                            <div className="releaseItem" key={r.id} style={{ padding: 10, background: "rgba(0,0,0,0.1)" }}>
-                              <div className="releaseTop">
-                                <div>
-                                  <div className="releaseName" style={{ fontSize: "0.9rem" }}>{r.tag_name}</div>
-                                  <div className="releaseMeta">{formatDate(r.published_at)}</div>
-                                </div>
-                                <div>
-                                  {a ? (
-                                    <TrackLink
-                                      className="btn btnPrimary"
-                                      href={a.browser_download_url}
-                                      analyticsEvent="download_click"
-                                      style={{ padding: "4px 8px", fontSize: "0.75rem" }}
-                                    >
-                                      Download
-                                    </TrackLink>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </details>
-              </div>
-
-              {/* Beta Channel Column */}
-              <div className="releaseItem betaCol">
-                <div className="releaseTop">
-                  <div>
-                    <div className="releaseName" style={{ fontSize: "1.2rem", color: "var(--accent2)" }}>Beta Release (Pre-release)</div>
-                    <div className="releaseMeta" style={{ marginTop: 4 }}>
-                      {latestBeta ? `${latestBeta.tag_name} · ${formatDate(latestBeta.published_at)}` : "No beta release found"}
+                  {latestRelease.assets?.length ? (
+                    <div className="assetList" style={{ marginTop: "1.5rem", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "1rem" }}>
+                      <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "0.9rem" }}>Available Artifacts:</div>
+                      {latestRelease.assets.map((a) => (
+                        <div className="asset" key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginTop: 4 }}>
+                          <TrackLink href={a.browser_download_url} analyticsEvent="download_click" style={{ color: "var(--fg)", textDecoration: "underline" }}>
+                            {a.name}
+                          </TrackLink>
+                          <span style={{ color: "var(--muted2)" }}>
+                            {formatBytes(a.size)} · {a.download_count} downloads
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <div>
-                    {latestBeta && latestBetaAsset ? (
-                      <TrackLink
-                        className="btn btnPrimary"
-                        href={latestBetaAsset.browser_download_url}
-                        analyticsEvent="download_click"
-                        style={{ background: "var(--accent2)" }}
-                      >
-                        Download Beta
-                      </TrackLink>
-                    ) : (
-                      <a className="btn" href={getReleasePageUrl()} style={{ opacity: 0.5, pointerEvents: "none" }}>
-                        No Beta
-                      </a>
-                    )}
-                  </div>
+                  ) : null}
+
+                  {latestRelease.body && (
+                    <div className="releaseBody" style={{ marginTop: "1.5rem", fontSize: "0.9rem", color: "var(--muted)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "1rem" }}>
+                      <strong style={{ display: "block", marginBottom: "0.5rem" }}>Release Highlights:</strong>
+                      {extractHighlights(latestRelease.body, 6).map((h) => (
+                        <div key={h} style={{ marginTop: 4 }}>
+                          • {h}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: "center", color: "var(--muted)" }}>
+                  {releasesError || "No releases found."}
                 </div>
-
-                {latestBeta && latestBeta.assets?.length ? (
-                  <div className="assetList" style={{ marginTop: "1rem" }}>
-                    {latestBeta.assets.slice(0, 3).map((a) => (
-                      <div className="asset" key={a.id}>
-                        <TrackLink href={a.browser_download_url} analyticsEvent="download_click">
-                          {a.name}
-                        </TrackLink>
-                        <span>
-                          {formatBytes(a.size)} · {a.download_count} downloads
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {latestBeta && latestBeta.body && (
-                  <div className="releaseBody" style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-                    <strong>Beta Highlights:</strong>
-                    {extractHighlights(latestBeta.body, 3).map((h) => (
-                      <div key={h} style={{ marginTop: 4 }}>
-                        • {h}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <details className="details" style={{ marginTop: "1.5rem" }}>
-                  <summary>Older beta versions</summary>
-                  <div style={{ marginTop: 10 }}>
-                    {betaReleases.length <= 1 ? (
-                      <div style={{ color: "var(--muted)", lineHeight: 1.6, fontSize: "0.85rem" }}>
-                        No older beta versions found.
-                      </div>
-                    ) : (
-                      <div className="releaseList" style={{ gap: 8 }}>
-                        {betaReleases.slice(1, 5).map((r) => {
-                          const a = pickPrimaryAsset(r.assets || []);
-                          return (
-                            <div className="releaseItem" key={r.id} style={{ padding: 10, background: "rgba(0,0,0,0.1)" }}>
-                              <div className="releaseTop">
-                                <div>
-                                  <div className="releaseName" style={{ fontSize: "0.9rem" }}>{r.tag_name}</div>
-                                  <div className="releaseMeta">{formatDate(r.published_at)}</div>
-                                </div>
-                                <div>
-                                  {a ? (
-                                    <TrackLink
-                                      className="btn"
-                                      href={a.browser_download_url}
-                                      analyticsEvent="download_click"
-                                      style={{ padding: "4px 8px", fontSize: "0.75rem", background: "rgba(255,255,255,0.05)" }}
-                                    >
-                                      Download
-                                    </TrackLink>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </details>
-              </div>
+              )}
             </div>
+
+            {/* Older Releases List */}
+            {olderReleases.length > 0 && (
+              <details className="details" style={{ marginTop: "2rem", width: "100%" }}>
+                <summary style={{ cursor: "pointer", padding: "10px", fontWeight: 600, color: "var(--accent)" }}>Older Versions</summary>
+                <div style={{ marginTop: 15, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {olderReleases.map((r) => {
+                    const a = pickPrimaryAsset(r.assets || []);
+                    return (
+                      <div className="releaseItem" key={r.id} style={{ padding: "12px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div className="releaseName" style={{ fontSize: "1rem", fontWeight: 600 }}>{r.tag_name}</div>
+                          <div className="releaseMeta" style={{ fontSize: "0.8rem", color: "var(--muted2)" }}>{formatDate(r.published_at)}</div>
+                        </div>
+                        <div>
+                          {a ? (
+                            <TrackLink
+                              className="btn btnPrimary"
+                              href={a.browser_download_url}
+                              analyticsEvent="download_click"
+                              style={{ padding: "6px 14px", fontSize: "0.8rem" }}
+                            >
+                              Download
+                            </TrackLink>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
         </section>
 

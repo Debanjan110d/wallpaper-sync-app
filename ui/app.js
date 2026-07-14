@@ -270,6 +270,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Trigger metadata background sync and update indicators
     async function triggerBackgroundSync() {
         updateConnectionDot("offline", "Syncing...");
+        showToast("Syncing library metadata...", "success");
         try {
             const syncRes = await window.api.syncMetadataNow();
             if (syncRes && !syncRes.error) {
@@ -281,16 +282,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 if (pendingCount > 0) {
                     updateConnectionDot("offline", `Offline (${pendingCount} pending)`);
+                    showToast(`Synced! ${pendingCount} updates cached offline.`, "success");
                 } else {
                     updateConnectionDot("online", "Connected");
+                    showToast("Library metadata synced successfully!", "success");
                 }
                 await refreshMetadata();
                 await loadWallpapers();
             } else {
                 updateConnectionDot("unreachable", syncRes.error || "Server offline");
+                showToast("Sync failed: " + (syncRes.error || "Server offline"), "error");
             }
         } catch (err) {
             updateConnectionDot("unreachable", "Sync failed");
+            showToast("Sync failed: Connection lost", "error");
         }
     }
 
@@ -531,8 +536,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const colName = col ? col.name : "None";
             const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
 
-            const tagNames = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)).map(t => `#${t.name}`).join(" ") : "";
-            const displayName = tagNames ? tagNames : (colName && colName !== "None" ? colName : "Wallpaper");
+            const friendlyName = colName && colName !== "None" ? colName : img.filename.split(".")[0];
+            const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
+            const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
+            const extraCount = wtags.length - 3;
+            const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
 
             const card = document.createElement("div");
             card.className = "horizontal-card";
@@ -540,7 +548,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.innerHTML = `
                 <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
                 <div class="horizontal-card-info">
-                    <div class="horizontal-card-title">${displayName}</div>
+                    <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
+                    <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
                     <div class="horizontal-card-meta">
                         <span>${catName}</span>
                         <span>${colName}</span>
@@ -573,8 +582,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const colName = col ? col.name : "None";
             const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
 
-            const tagNames = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)).map(t => `#${t.name}`).join(" ") : "";
-            const displayName = tagNames ? tagNames : (colName && colName !== "None" ? colName : "Wallpaper");
+            const friendlyName = colName && colName !== "None" ? colName : img.filename.split(".")[0];
+            const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
+            const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
+            const extraCount = wtags.length - 3;
+            const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
 
             const card = document.createElement("div");
             card.className = "horizontal-card";
@@ -582,7 +594,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.innerHTML = `
                 <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
                 <div class="horizontal-card-info">
-                    <div class="horizontal-card-title">${displayName}</div>
+                    <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
+                    <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
                     <div class="horizontal-card-meta">
                         <span>${catName}</span>
                         <span>${colName}</span>
@@ -603,6 +616,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         const catFilterId = catFilter.value;
         const colFilterId = colFilter.value;
         const tagFilterId = tagFilter.value;
+
+        // Reposition search: hide other browsing sections when search is active
+        const isSearching = !!query || !!catFilterId || !!colFilterId || !!tagFilterId;
+        const sliderSect = document.getElementById("heroSliderSection");
+        const addedSect = document.getElementById("recentlyAddedSection");
+        const catSect = document.getElementById("categoriesSection");
+        const randSect = document.getElementById("randomSection");
+
+        if (sliderSect) sliderSect.style.display = isSearching ? "none" : "";
+        if (addedSect) addedSect.style.display = isSearching ? "none" : "";
+        if (catSect) catSect.style.display = isSearching ? "none" : "";
+        if (randSect) randSect.style.display = isSearching ? "none" : "";
 
         const filtered = currentImages.filter(img => {
             const hash = img.filename.split(".")[0];
@@ -662,6 +687,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             overlay.appendChild(overlayText);
             card.appendChild(img);
             card.appendChild(overlay);
+
+            // Add metadata quality and style corner badges
+            const hash = imgData.filename.split(".")[0];
+            const meta = localMetadata.wallpaper_metadata[hash] || {};
+            if (meta.quality) {
+                const qBadge = document.createElement("span");
+                qBadge.className = "card-badge quality-badge";
+                qBadge.innerText = meta.quality;
+                card.appendChild(qBadge);
+            }
+            if (meta.style) {
+                const sBadge = document.createElement("span");
+                sBadge.className = "card-badge style-badge";
+                sBadge.innerText = meta.style;
+                card.appendChild(sBadge);
+            }
 
             card.addEventListener("dblclick", (e) => {
                 if (isManageSlideshowMode) return;
