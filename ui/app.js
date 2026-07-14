@@ -626,7 +626,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const inCol = col ? fuzzyMatch(col.name, query) : false;
                 const inCat = cat ? fuzzyMatch(cat.name, query) : false;
                 const inTags = wtags.some(t => fuzzyMatch(t.name, query));
-                return inName || inCol || inCat || inTags;
+                const inStyle = meta.style ? fuzzyMatch(meta.style, query) : false;
+                const inColor = meta.primary_color ? fuzzyMatch(meta.primary_color, query) : false;
+                const inQuality = meta.quality ? fuzzyMatch(meta.quality, query) : false;
+                return inName || inCol || inCat || inTags || inStyle || inColor || inQuality;
             }
 
             return true;

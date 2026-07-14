@@ -418,6 +418,11 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
           data.wallpaper_metadata[sw.hash] = {
             collection_id: sw.collection_id ? Number(sw.collection_id) : null,
             tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
+            style: sw.style || null,
+            primary_color: sw.primary_color || null,
+            quality: sw.quality || null,
+            confidence: sw.confidence || null,
+            indexed_at: sw.indexed_at || null,
           };
         }
       }

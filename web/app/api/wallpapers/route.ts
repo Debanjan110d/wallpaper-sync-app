@@ -11,6 +11,11 @@ type DbWallpaper = {
   collection: string | null;
   created_at: string | null;
   collection_id: number | null;
+  style?: string | null;
+  primary_color?: string | null;
+  quality?: string | null;
+  confidence?: number | null;
+  indexed_at?: string | null;
   collections: {
     id: number;
     name: string;
@@ -161,8 +166,13 @@ export async function GET(request: Request) {
     if (countOnly) {
       let countQuery = supabase
         .from("wallpapers")
-        .select("created_at", { count: "exact", head: true })
-        .neq("status", "deleted");
+        .select("created_at", { count: "exact", head: true });
+
+      if (isAdminSession) {
+        countQuery = countQuery.neq("status", "deleted");
+      } else {
+        countQuery = countQuery.eq("status", "published");
+      }
 
       if (filteredWpIds !== null) {
         countQuery = countQuery.in("id", filteredWpIds);
@@ -180,9 +190,14 @@ export async function GET(request: Request) {
       let maxQuery = supabase
         .from("wallpapers")
         .select("created_at")
-        .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .limit(1);
+
+      if (isAdminSession) {
+        maxQuery = maxQuery.neq("status", "deleted");
+      } else {
+        maxQuery = maxQuery.eq("status", "published");
+      }
 
       if (filteredWpIds !== null) {
         maxQuery = maxQuery.in("id", filteredWpIds);
@@ -215,7 +230,11 @@ export async function GET(request: Request) {
         status,
         collection,
         created_at,
-        collection_id,
+        style,
+        primary_color,
+        quality,
+        confidence,
+        indexed_at,
         collections (
           id,
           name,
@@ -233,8 +252,13 @@ export async function GET(request: Request) {
           )
         )
       `)
-      .neq("status", "deleted")
       .order("created_at", { ascending: false });
+
+    if (isAdminSession) {
+      query = query.neq("status", "deleted");
+    } else {
+      query = query.eq("status", "published");
+    }
 
     if (filteredWpIds !== null) {
       query = query.in("id", filteredWpIds);
@@ -289,6 +313,11 @@ export async function GET(request: Request) {
             collection_id: row.collection_id,
             collection_details: collectionDetails,
             tags: tags,
+            style: row.style || null,
+            primary_color: row.primary_color || null,
+            quality: row.quality || null,
+            confidence: row.confidence || null,
+            indexed_at: row.indexed_at || null,
             // Back-compat for existing clients (Electron/downloader + dashboard UI)
             name: storagePath.split("/").pop() || storagePath,
             url: urlError ? null : (urlData?.signedUrl || null),

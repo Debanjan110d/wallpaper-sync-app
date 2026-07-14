@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { imageSize } from "image-size";
+import { processWallpaperAI } from "@/utils/aiProcessor";
 
 type DbError = {
   message: string;
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
           file_name: file.name,
           storage_path: storagePath,
           hash,
-          status: "ready",
+          status: "uploaded",
           collection: finalCollectionName || null,
           collection_id: finalCollectionId || null,
         },
@@ -254,6 +255,12 @@ export async function POST(request: Request) {
       if (tagsErr) {
         console.error("Failed to insert wallpaper tags:", tagsErr.message);
       }
+    }
+
+    if (row && row.id) {
+      processWallpaperAI(row.id, buffer, file.type).catch((err) => {
+        console.error("Background AI processing failed:", err);
+      });
     }
 
     return NextResponse.json({ success: true, data: { upload: uploadData, row } });
