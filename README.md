@@ -145,6 +145,12 @@ When you push the tag, GitHub Actions will:
 
 See `CONTRIBUTING.md` for setup, workflow, and release/changelog rules.
 
+## Disclaimer & Wallpaper Ownership
+
+The wallpapers cataloged or indexed in this application are **not owned** by the application creator. They are sourced/downloaded from public platforms such as Instagram, Unsplash, or Pinterest.
+
+If you are the copyright owner of any wallpaper present in this catalog and wish to have it removed, please contact the maintainers directly via email at debanjangamedu@gmail.com or by raising a GitHub Issue.
+
 ## License
 
-MIT
+ISC
