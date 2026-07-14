@@ -28,6 +28,17 @@ function getProgress() {
 
 function saveProgress(progress: any) {
   try {
+    if (fs.existsSync(progressFilePath)) {
+      try {
+        const fileContent = fs.readFileSync(progressFilePath, "utf8");
+        const currentData = JSON.parse(fileContent);
+        if (currentData && currentData.active === false) {
+          progress.active = false;
+        }
+      } catch (e) {
+        // Ignore read/parse errors
+      }
+    }
     fs.writeFileSync(progressFilePath, JSON.stringify(progress, null, 2), "utf8");
   } catch (e) {
     console.error("Failed to write progress file:", e);

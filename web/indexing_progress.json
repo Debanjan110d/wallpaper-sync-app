@@ -1,8 +1,8 @@
 {
-  "active": true,
+  "active": false,
   "total": 387,
   "processed": 9,
   "failed": 1,
-  "currentWallpaper": "desktop-419908.jpg",
+  "currentWallpaper": "",
   "started_at": "2026-07-14T18:59:58.548Z"
 }

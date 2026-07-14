@@ -101,8 +101,8 @@ ${categoriesAndCollectionsPrompt}
 
 Return ONLY a JSON object matching this schema:
 {
-  "category": "Choose exactly ONE category name from the list above. Do NOT invent new categories. It must match one of the listed categories exactly.",
-  "collection": "Choose exactly ONE collection name listed UNDER your chosen category above, or null if no appropriate collection is listed under that category or fits the wallpaper. Do NOT choose a collection from a different category.",
+  "category": "Choose the most appropriate category name. You should try to match one of the existing categories from the list above if it is a good fit. If none of them fit, or if the list is empty, you can output a new, suitable category name (e.g. 'Anime', 'Nature', 'Gaming', 'Abstract', 'Sci-Fi', etc.).",
+  "collection": "Choose the most appropriate collection name for this wallpaper. If choosing an existing category, you should try to match one of its associated collections if it fits. If no associated collection fits, or if you are creating a new category, output a new, specific collection name (e.g. 'Cyberpunk 2077', 'Sunset', 'Minimalist Landscapes') or null if it belongs to no specific collection.",
   "tags": ["List of 8 to 15 descriptive tags. CRITICAL: You must identify and include specific characters (e.g. 'Goku', 'Spider-Man', 'Naruto', 'Hatsune Miku') and specific franchise/universe/property names (e.g. 'Dragon Ball', 'Marvel', 'Vocaloid', 'Cyberpunk 2077') if present in the image. You must also identify and include specific objects, vehicles, items, animals, or prominent focal elements (e.g. 'sportscar', 'katana', 'mech', 'cybernetic arm', 'skull', 'dragon', 'floating island') rather than just generic terms. Avoid generic tags like 'wallpaper', 'image', 'photo', 'picture', 'desktop', 'background'. Ensure no duplicates."],
   "style": "Choose the visual style, e.g. 'Realistic', 'Minimal', 'Illustration', '3D Render', 'Anime', 'Pixel Art', 'Cyberpunk', 'Oil Painting', etc.",
   "primary_color": "The dominant color family, e.g. 'Blue', 'Dark', 'Black', 'White', 'Red', etc.",
@@ -135,7 +135,7 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
     let finalCollectionId: number | null = null;
     let finalCollectionName: string | null = null;
 
-    const matchedCategory = (categories || []).find(
+    let matchedCategory = (categories || []).find(
       (c) => {
         const cSlug = c.slug || slugify(c.name);
         const metaCatSlug = slugify(metadata.category || "");
@@ -143,9 +143,27 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
       }
     );
 
+    // If no existing category matched and AI suggested a new one, create it dynamically
+    if (!matchedCategory && metadata.category && metadata.category.trim()) {
+      const catName = metadata.category.trim();
+      const catSlug = slugify(catName);
+      const { data: newCat, error: newCatErr } = await supabaseAdmin
+        .from("categories")
+        .insert([{ name: catName, slug: catSlug }])
+        .select()
+        .single();
+
+      if (!newCatErr && newCat) {
+        matchedCategory = newCat;
+        console.log(`[AI Processor] Created new category: ${catName}`);
+      } else if (newCatErr) {
+        console.error(`[AI Processor] Failed to create new category:`, newCatErr.message);
+      }
+    }
+
     if (matchedCategory) {
       // Find collection inside category (support slug/loose matching fallback)
-      const matchedCollection = (collections || []).find(
+      let matchedCollection = (collections || []).find(
         (col) => {
           if (col.category_id !== matchedCategory.id) return false;
           const colSlug = col.slug || slugify(col.name);
@@ -153,6 +171,24 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
           return colSlug === metaColSlug || col.name.toLowerCase() === (metadata.collection || "").toLowerCase();
         }
       );
+
+      // If no existing collection matched and AI suggested one, create it dynamically under the category
+      if (!matchedCollection && metadata.collection && metadata.collection.trim()) {
+        const colName = metadata.collection.trim();
+        const colSlug = slugify(colName);
+        const { data: newCol, error: newColErr } = await supabaseAdmin
+          .from("collections")
+          .insert([{ name: colName, category_id: matchedCategory.id, slug: colSlug }])
+          .select()
+          .single();
+
+        if (!newColErr && newCol) {
+          matchedCollection = newCol;
+          console.log(`[AI Processor] Created new collection: ${colName} under category ${matchedCategory.name}`);
+        } else if (newColErr) {
+          console.error(`[AI Processor] Failed to create new collection:`, newColErr.message);
+        }
+      }
 
       if (matchedCollection) {
         finalCollectionId = matchedCollection.id;
@@ -164,7 +200,21 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
             col.category_id === matchedCategory.id &&
             ["default", "general", "uncategorized"].includes(col.name.toLowerCase())
         );
-        const fallbackCol = defaultCol || (collections || []).find((col) => col.category_id === matchedCategory.id);
+        let fallbackCol = defaultCol || (collections || []).find((col) => col.category_id === matchedCategory.id);
+
+        if (!fallbackCol) {
+          // Create a "Default" collection for this category if none exists at all
+          const { data: newCol, error: newColErr } = await supabaseAdmin
+            .from("collections")
+            .insert([{ name: "Default", category_id: matchedCategory.id, slug: "default" }])
+            .select()
+            .single();
+
+          if (!newColErr && newCol) {
+            fallbackCol = newCol;
+            console.log(`[AI Processor] Created fallback Default collection under category ${matchedCategory.name}`);
+          }
+        }
 
         if (fallbackCol) {
           finalCollectionId = fallbackCol.id;

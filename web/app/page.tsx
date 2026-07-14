@@ -37,6 +37,12 @@ export default function Page() {
 
   const [newTagName, setNewTagName] = useState("");
 
+  // Tag Search states for different forms
+  const [tagSearchUpload, setTagSearchUpload] = useState("");
+  const [tagSearchFilter, setTagSearchFilter] = useState("");
+  const [tagSearchBulk, setTagSearchBulk] = useState("");
+  const [tagSearchEdit, setTagSearchEdit] = useState("");
+
   // Auto-Slider Banner State
   const [sliderIndex, setSliderIndex] = useState(0);
   const [sliderPaused, setSliderPaused] = useState(false);
@@ -933,6 +939,22 @@ export default function Page() {
             {/* Tags Selection & Tag Creator */}
             <div className="form-group">
               <label>Tags Selection</label>
+              <input
+                type="text"
+                placeholder="🔍 Search tags..."
+                value={tagSearchUpload}
+                onChange={(e) => setTagSearchUpload(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "rgba(0,0,0,0.2)",
+                  color: "white",
+                  fontSize: "0.85rem",
+                  marginBottom: "0.5rem",
+                }}
+              />
               <div
                 style={{
                   display: "flex",
@@ -943,18 +965,25 @@ export default function Page() {
                   borderRadius: 6,
                   background: "rgba(0,0,0,0.15)",
                   marginBottom: "0.5rem",
+                  maxHeight: "120px",
+                  overflowY: "auto",
                 }}
               >
-                {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => handleToggleTagUpload(tag.id)}
-                    className={`tag-chip ${selectedTagsForUpload.includes(tag.id) ? "active" : ""}`}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
+                {tags
+                  .filter((t) =>
+                    t.name.toLowerCase().includes(tagSearchUpload.toLowerCase()) ||
+                    selectedTagsForUpload.includes(t.id)
+                  )
+                  .map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => handleToggleTagUpload(tag.id)}
+                      className={`tag-chip ${selectedTagsForUpload.includes(tag.id) ? "active" : ""}`}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
                 {tags.length === 0 && (
                   <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
                     No tags created yet.
@@ -1305,17 +1334,43 @@ export default function Page() {
 
           <div className="filter-group" style={{ width: "100%" }}>
             <label style={{ display: "block", marginBottom: "4px" }}>Filter by Tags:</label>
-            <div className="tags-filter-list">
-              {tags.map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleToggleTagFilter(tag.id)}
-                  className={`tag-chip ${selectedTagFilters.includes(tag.id) ? "active" : ""}`}
-                >
-                  {tag.name}
-                </button>
-              ))}
+            <input
+              type="text"
+              placeholder="🔍 Search tags to filter..."
+              value={tagSearchFilter}
+              onChange={(e) => setTagSearchFilter(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+                background: "var(--background)",
+                color: "inherit",
+                fontSize: "0.85rem",
+                marginBottom: "0.5rem",
+              }}
+            />
+            <div className="tags-filter-list" style={{ maxHeight: "120px", overflowY: "auto", padding: "8px", border: "1px solid var(--border)", borderRadius: "6px", background: "rgba(0,0,0,0.15)", width: "100%" }}>
+              {tags
+                .filter((t) =>
+                  t.name.toLowerCase().includes(tagSearchFilter.toLowerCase()) ||
+                  selectedTagFilters.includes(t.id)
+                )
+                .map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleToggleTagFilter(tag.id)}
+                    className={`tag-chip ${selectedTagFilters.includes(tag.id) ? "active" : ""}`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              {tags.length === 0 && (
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                  No tags available.
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1536,22 +1591,56 @@ export default function Page() {
             </div>
 
             {/* Bulk Tags (chips toggle) */}
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxWidth: 300 }}>
-              {tags.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`tag-chip ${bulkTags.includes(t.id) ? "active" : ""}`}
-                  onClick={() =>
-                    setBulkTags((prev) =>
-                      prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                    )
-                  }
-                  style={{ padding: "2px 8px", fontSize: "0.75rem" }}
-                >
-                  {t.name}
-                </button>
-              ))}
+            <div style={{ width: "100%", maxWidth: 300 }}>
+              <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "4px" }}>Bulk Tags:</label>
+              <input
+                type="text"
+                placeholder="🔍 Search tags..."
+                value={tagSearchBulk}
+                onChange={(e) => setTagSearchBulk(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  border: "1px solid var(--border)",
+                  background: "#1a1a1a",
+                  color: "#e0e0e0",
+                  fontSize: "0.75rem",
+                  marginBottom: "0.5rem",
+                }}
+              />
+              <div style={{
+                display: "flex",
+                gap: "4px",
+                flexWrap: "wrap",
+                maxHeight: "100px",
+                overflowY: "auto",
+                padding: "6px",
+                border: "1px solid var(--border)",
+                borderRadius: "4px",
+                background: "rgba(0,0,0,0.15)"
+              }}>
+                {tags
+                  .filter((t) =>
+                    t.name.toLowerCase().includes(tagSearchBulk.toLowerCase()) ||
+                    bulkTags.includes(t.id)
+                  )
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`tag-chip ${bulkTags.includes(t.id) ? "active" : ""}`}
+                      onClick={() =>
+                        setBulkTags((prev) =>
+                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
+                        )
+                      }
+                      style={{ padding: "2px 8px", fontSize: "0.75rem" }}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+              </div>
             </div>
 
             <button type="button" className="btn" onClick={handleApplyBulkUpdate} disabled={loading}>
@@ -1648,6 +1737,22 @@ export default function Page() {
 
             <div className="form-group">
               <label>Tags Selection</label>
+              <input
+                type="text"
+                placeholder="🔍 Search tags..."
+                value={tagSearchEdit}
+                onChange={(e) => setTagSearchEdit(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "rgba(0,0,0,0.2)",
+                  color: "white",
+                  fontSize: "0.85rem",
+                  marginBottom: "0.5rem",
+                }}
+              />
               <div style={{
                 display: "flex",
                 flexWrap: "wrap",
@@ -1659,21 +1764,26 @@ export default function Page() {
                 maxHeight: "100px",
                 overflowY: "auto"
               }}>
-                {tags.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`tag-chip ${editTags.includes(t.id) ? "active" : ""}`}
-                    onClick={() =>
-                      setEditTags((prev) =>
-                        prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                      )
-                    }
-                    style={{ padding: "2px 8px", fontSize: "0.75rem" }}
-                  >
-                    {t.name}
-                  </button>
-                ))}
+                {tags
+                  .filter((t) =>
+                    t.name.toLowerCase().includes(tagSearchEdit.toLowerCase()) ||
+                    editTags.includes(t.id)
+                  )
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`tag-chip ${editTags.includes(t.id) ? "active" : ""}`}
+                      onClick={() =>
+                        setEditTags((prev) =>
+                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
+                        )
+                      }
+                      style={{ padding: "2px 8px", fontSize: "0.75rem" }}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
               </div>
             </div>
 
