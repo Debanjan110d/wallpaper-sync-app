@@ -79,17 +79,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Indexing is already running." }, { status: 400 });
     }
 
+    // Parse request body for reindexAll
+    let reindexAll = false;
+    try {
+      const body = await request.json();
+      if (body && body.reindexAll === true) {
+        reindexAll = true;
+      }
+    } catch (e) {
+      // Body may be empty or not JSON, ignore
+    }
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Fetch wallpapers that are either status='uploaded' or have missing AI metadata (indexed_at is null)
-    const { data: wallpapers, error: fetchErr } = await supabaseAdmin
+    // Fetch wallpapers: if reindexAll is true, fetch all non-deleted wallpapers.
+    // Otherwise, fetch wallpapers that are either status='uploaded' or have missing AI metadata (indexed_at is null)
+    let query = supabaseAdmin
       .from("wallpapers")
       .select("id, file_name, storage_path, status")
-      .neq("status", "deleted")
-      .or("indexed_at.is.null,status.eq.uploaded");
+      .neq("status", "deleted");
+
+    if (!reindexAll) {
+      query = query.or("indexed_at.is.null,status.eq.uploaded");
+    }
+
+    const { data: wallpapers, error: fetchErr } = await query;
 
     if (fetchErr) {
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });
@@ -117,10 +134,16 @@ export async function POST(request: Request) {
 
     // Run batch indexing asynchronously in the background to avoid API timeouts
     (async () => {
-      console.log(`Starting batch AI indexing for ${wallpapersToProcess.length} wallpapers.`);
+      console.log(`Starting batch AI indexing for ${wallpapersToProcess.length} wallpapers. ReindexAll: ${reindexAll}`);
       
       for (let i = 0; i < wallpapersToProcess.length; i++) {
         const wp = wallpapersToProcess[i];
+
+        // Check if run has been aborted
+        if (!getProgress().active) {
+          console.log("[Batch Index] Batch AI indexing run aborted by user request.");
+          break;
+        }
         
         // Update current wallpaper name in progress
         progress.currentWallpaper = wp.file_name || wp.storage_path || `ID: ${wp.id}`;
@@ -130,6 +153,12 @@ export async function POST(request: Request) {
           const { data: fileData, error: downloadErr } = await supabaseAdmin.storage
             .from("wallpapers")
             .download(wp.storage_path);
+
+          // Check abort after network request
+          if (!getProgress().active) {
+            console.log("[Batch Index] Batch AI indexing run aborted during download.");
+            break;
+          }
 
           if (downloadErr || !fileData) {
             console.error(`[Batch Index] Failed to download image ${wp.storage_path}:`, downloadErr?.message);
@@ -145,6 +174,12 @@ export async function POST(request: Request) {
           console.log(`[Batch Index] Processing wallpaper ID ${wp.id} (${wp.file_name})`);
           const res = await processWallpaperAI(wp.id, buffer, mimeType);
 
+          // Check abort after AI processing
+          if (!getProgress().active) {
+            console.log("[Batch Index] Batch AI indexing run aborted during AI processing.");
+            break;
+          }
+
           if (!res.success) {
             console.error(`[Batch Index] AI processing failed for wallpaper ID ${wp.id}:`, res.error);
             progress.failed++;
@@ -153,6 +188,10 @@ export async function POST(request: Request) {
           }
         } catch (err) {
           console.error(`[Batch Index] Error processing wallpaper ID ${wp.id}:`, err);
+          if (!getProgress().active) {
+            console.log("[Batch Index] Batch AI indexing run aborted inside catch block.");
+            break;
+          }
           progress.failed++;
         }
         saveProgress(progress);
@@ -161,11 +200,16 @@ export async function POST(request: Request) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
-      // Mark indexing run as complete
-      progress.active = false;
-      progress.currentWallpaper = "";
-      saveProgress(progress);
-      console.log("[Batch Index] Batch AI indexing run completed.");
+      // Mark indexing run as complete if it wasn't aborted
+      const finalCheck = getProgress();
+      if (finalCheck.active) {
+        progress.active = false;
+        progress.currentWallpaper = "";
+        saveProgress(progress);
+        console.log("[Batch Index] Batch AI indexing run completed.");
+      } else {
+        console.log("[Batch Index] Batch AI indexing run finished in aborted state.");
+      }
     })();
 
     return NextResponse.json({
@@ -173,6 +217,33 @@ export async function POST(request: Request) {
       message: `Batch AI indexing started in the background for ${wallpapersToProcess.length} wallpapers.`,
       processing_count: wallpapersToProcess.length,
     });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const session = cookieStore.get("admin_session");
+
+    const syncToken = (process.env.SYNC_TOKEN || "").trim();
+    const requestToken = (request.headers.get("x-sync-token") || "").trim();
+
+    const isAdminSession = !!session && session.value === "true";
+    const isSyncTokenConfigured = syncToken.length > 0;
+    const isValidSyncToken = isSyncTokenConfigured && requestToken === syncToken;
+
+    if (!isAdminSession && (!isSyncTokenConfigured || !isValidSyncToken)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const progress = getProgress();
+    progress.active = false;
+    progress.currentWallpaper = "";
+    saveProgress(progress);
+
+    return NextResponse.json({ success: true, message: "AI indexing aborted successfully." });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

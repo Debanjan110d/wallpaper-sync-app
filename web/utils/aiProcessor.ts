@@ -66,13 +66,21 @@ export async function processWallpaperAI(
 
     if (colErr) throw new Error(`Failed to fetch collections: ${colErr.message}`);
 
-    const categoryNamesList = (categories || []).map((c) => c.name).join(", ");
-    const collectionDetailsList = (collections || [])
-      .map((col) => {
-        const cat = (categories || []).find((c) => c.id === col.category_id);
-        return `- ${col.name} (Category: ${cat ? cat.name : "None"})`;
-      })
-      .join("\n");
+    // Format categories and their collections hierarchically to ensure the AI mapping is perfect
+    let categoriesAndCollectionsPrompt = "";
+    for (const cat of (categories || [])) {
+      const catCols = (collections || []).filter((col) => col.category_id === cat.id);
+      categoriesAndCollectionsPrompt += `- Category: "${cat.name}"\n`;
+      if (catCols.length > 0) {
+        categoriesAndCollectionsPrompt += `  Associated Collections:\n`;
+        catCols.forEach((col) => {
+          categoriesAndCollectionsPrompt += `  - "${col.name}"\n`;
+        });
+      } else {
+        categoriesAndCollectionsPrompt += `  Associated Collections: None\n`;
+      }
+      categoriesAndCollectionsPrompt += `\n`;
+    }
 
     // 3. Initialize Gemini
     const apiKey = process.env.GEMINI_API_KEY;
@@ -86,17 +94,16 @@ export async function processWallpaperAI(
     // 4. Construct Prompt
     const prompt = `You are an expert wallpaper cataloger. Analyze the provided wallpaper image and generate structured metadata in JSON format.
 
-Predefined Categories:
-${categoryNamesList}
+Below is the list of available categories and their associated collections.
 
-Predefined Collections:
-${collectionDetailsList}
+Available Categories and Collections:
+${categoriesAndCollectionsPrompt}
 
 Return ONLY a JSON object matching this schema:
 {
-  "category": "Choose exactly ONE category from the Predefined Categories list above. Do NOT invent categories.",
-  "collection": "Choose exactly ONE collection from the Predefined Collections list that belongs to the selected category, or null if no appropriate collection exists in the list.",
-  "tags": ["List of up to 15 descriptive tags. Include subject matter, color details, style elements, and mood. Avoid generic tags like 'wallpaper', 'image', 'photo', 'picture', 'desktop'. Ensure no duplicates."],
+  "category": "Choose exactly ONE category name from the list above. Do NOT invent new categories. It must match one of the listed categories exactly.",
+  "collection": "Choose exactly ONE collection name listed UNDER your chosen category above, or null if no appropriate collection is listed under that category or fits the wallpaper. Do NOT choose a collection from a different category.",
+  "tags": ["List of 8 to 15 descriptive tags. CRITICAL: You must identify and include specific characters (e.g. 'Goku', 'Spider-Man', 'Naruto', 'Hatsune Miku') and specific franchise/universe/property names (e.g. 'Dragon Ball', 'Marvel', 'Vocaloid', 'Cyberpunk 2077') if present in the image. You must also identify and include specific objects, vehicles, items, animals, or prominent focal elements (e.g. 'sportscar', 'katana', 'mech', 'cybernetic arm', 'skull', 'dragon', 'floating island') rather than just generic terms. Avoid generic tags like 'wallpaper', 'image', 'photo', 'picture', 'desktop', 'background'. Ensure no duplicates."],
   "style": "Choose the visual style, e.g. 'Realistic', 'Minimal', 'Illustration', '3D Render', 'Anime', 'Pixel Art', 'Cyberpunk', 'Oil Painting', etc.",
   "primary_color": "The dominant color family, e.g. 'Blue', 'Dark', 'Black', 'White', 'Red', etc.",
   "quality": "Estimate quality of visual details: 'HD', 'QHD', 'UHD/4K', or '8K'.",
@@ -129,15 +136,22 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
     let finalCollectionName: string | null = null;
 
     const matchedCategory = (categories || []).find(
-      (c) => c.name.toLowerCase() === (metadata.category || "").toLowerCase()
+      (c) => {
+        const cSlug = c.slug || slugify(c.name);
+        const metaCatSlug = slugify(metadata.category || "");
+        return cSlug === metaCatSlug || c.name.toLowerCase() === (metadata.category || "").toLowerCase();
+      }
     );
 
     if (matchedCategory) {
-      // Find collection inside category
+      // Find collection inside category (support slug/loose matching fallback)
       const matchedCollection = (collections || []).find(
-        (col) =>
-          col.category_id === matchedCategory.id &&
-          col.name.toLowerCase() === (metadata.collection || "").toLowerCase()
+        (col) => {
+          if (col.category_id !== matchedCategory.id) return false;
+          const colSlug = col.slug || slugify(col.name);
+          const metaColSlug = slugify(metadata.collection || "");
+          return colSlug === metaColSlug || col.name.toLowerCase() === (metadata.collection || "").toLowerCase();
+        }
       );
 
       if (matchedCollection) {

@@ -93,12 +93,16 @@ export default function Page() {
     return () => clearInterval(interval);
   }, [indexingProgress?.active]);
 
-  const handleTriggerIndexing = async () => {
+  const handleTriggerIndexing = async (reindexAll = false) => {
     setIndexingLoading(true);
     setIndexingMessage(null);
     try {
       const res = await fetch("/api/wallpapers/batch-index", {
-        method: "POST"
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reindexAll }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -106,6 +110,27 @@ export default function Page() {
         await checkIndexingStatus();
       } else {
         setIndexingMessage(`Error: ${data.error || "Failed to trigger indexing"}`);
+      }
+    } catch (err: any) {
+      setIndexingMessage(`Error: ${err.message || err}`);
+    } finally {
+      setIndexingLoading(false);
+    }
+  };
+
+  const handleCancelIndexing = async () => {
+    setIndexingLoading(true);
+    setIndexingMessage(null);
+    try {
+      const res = await fetch("/api/wallpapers/batch-index", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIndexingMessage("Success: AI indexing run was aborted.");
+        await checkIndexingStatus();
+      } else {
+        setIndexingMessage(`Error: ${data.error || "Failed to abort indexing"}`);
       }
     } catch (err: any) {
       setIndexingMessage(`Error: ${err.message || err}`);
@@ -1103,12 +1128,28 @@ export default function Page() {
                         borderRadius: "4px",
                         cursor: "pointer"
                       }}
-                      disabled={indexingLoading}
-                      onClick={handleTriggerIndexing}
+                      disabled={indexingLoading || indexingProgress?.active}
+                      onClick={() => handleTriggerIndexing(false)}
                     >
-                      {indexingLoading ? "Triggering..." : "⚡ Run AI Indexing"}
+                      {indexingLoading && !indexingProgress?.active ? "Triggering..." : "⚡ Run AI Indexing"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ 
+                      padding: "6px 12px", 
+                      fontSize: "0.85rem", 
+                      background: "rgba(255, 255, 255, 0.05)", 
+                      border: "1px solid var(--border)", 
+                      borderRadius: "4px",
+                      cursor: "pointer"
+                    }}
+                    disabled={indexingLoading || indexingProgress?.active}
+                    onClick={() => handleTriggerIndexing(true)}
+                  >
+                    {indexingLoading && !indexingProgress?.active ? "Triggering..." : "🔄 Re-index All"}
+                  </button>
                 </div>
               );
             })()}
@@ -1164,9 +1205,30 @@ export default function Page() {
                   animation: "spin 1s linear infinite"
                 }}></span>
               </span>
-              <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
-                {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
+                  {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
+                </span>
+                <button
+                  type="button"
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "0.75rem",
+                    background: "rgba(219, 68, 85, 0.2)",
+                    border: "1px solid #db4455",
+                    color: "#ff6b7b",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  disabled={indexingLoading}
+                  onClick={handleCancelIndexing}
+                >
+                  🛑 Stop
+                </button>
+              </div>
             </div>
             
             {/* Progress Track */}
