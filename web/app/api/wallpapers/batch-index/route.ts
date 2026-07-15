@@ -114,14 +114,14 @@ export async function POST(request: Request) {
     );
 
     // Fetch wallpapers: if reindexAll is true, fetch all non-deleted wallpapers.
-    // Otherwise, fetch wallpapers that are either status='uploaded' or have missing AI metadata (indexed_at is null)
+    // Otherwise, fetch wallpapers that are status='uploaded'
     let query = supabaseAdmin
       .from("wallpapers")
       .select("id, file_name, storage_path, status")
       .neq("status", "deleted");
 
     if (!reindexAll) {
-      query = query.or("indexed_at.is.null,status.eq.uploaded");
+      query = query.eq("status", "uploaded");
     }
 
     const { data: wallpapers, error: fetchErr } = await query;

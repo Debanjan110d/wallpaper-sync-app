@@ -83,22 +83,127 @@ export async function processWallpaperAI(
   );
 
   try {
+    // Fetch wallpaper details for status and filename context
+    const { data: wpData, error: wpErr } = await supabaseAdmin
+      .from("wallpapers")
+      .select("status, file_name")
+      .eq("id", wallpaperId)
+      .single();
+
+    if (wpErr || !wpData) {
+      console.warn(`[AI Processor] Wallpaper ID ${wallpaperId} not found in DB.`);
+      return { success: false, error: "Wallpaper not found" };
+    }
+
+    // Prevent concurrent repetitive runs by skipping if already processing
+    if (wpData.status === "pending_ai") {
+      console.log(`[AI Processor] Skipping wallpaper ID ${wallpaperId} because it is already actively processing.`);
+      return { success: true };
+    }
+
     // 1. Update status to 'pending_ai'
     await supabaseAdmin
       .from("wallpapers")
       .update({ status: "pending_ai" })
       .eq("id", wallpaperId);
 
-    // Fetch wallpaper details for filename context
-    const { data: wpData } = await supabaseAdmin
-      .from("wallpapers")
-      .select("file_name")
-      .eq("id", wallpaperId)
-      .single();
     const filename = wpData?.file_name || "wallpaper.jpg";
 
-    const activeProvider = provider || (process.env.VISION_PROVIDER as "gemini" | "imagga") || "imagga";
-    let normalizedMetadata: RawVisionMetadata;
+    let activeProvider = provider || (process.env.VISION_PROVIDER as "gemini" | "imagga") || "imagga";
+    let normalizedMetadata: RawVisionMetadata | null = null;
+
+    if (activeProvider === "gemini") {
+      try {
+        console.log(`[AI Processor] Attempting to process wallpaper ID ${wallpaperId} using Gemini AI...`);
+        // 2. Initialize Gemini
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+          throw new Error("GEMINI_API_KEY is not defined in environment variables");
+        }
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        // Gemini 2.0 Flash is our savior. We force it to output pure JSON so we don't have to write
+        // recursive markdown parsers that will keep us awake at 3 AM.
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          generationConfig: { responseMimeType: "application/json" }
+        });
+
+        // 3. Construct Vision Prompt
+        const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
+1. title: A short, high-quality descriptive title for the image.
+2. description: A clear one-sentence description of the image content.
+3. characters: Names of any specific characters (anime, gaming, pop culture) visible in the image. Return empty array if none.
+4. franchises: Names of the franchise(s) or universes the image belongs to (e.g. "Naruto", "Marvel", "Cyberpunk", "Spider-Man").
+5. tags: A list of 5 to 15 descriptive keywords capturing subjects, environment, mood, and visual elements.
+6. colors: The dominant color families (e.g. "Blue", "Black", "Red", "Neon Pink").
+7. style: Visual style tags, e.g. "Anime", "Digital Art", "Pixel Art", "Realistic", "3D Render", "Illustration".
+8. mood: Emotional tone, e.g. "Dramatic", "Calm", "Mysterious", "Energetic", "Vibrant".
+9. other_attributes: Misc tags (e.g. "Silhouette", "Minimal", "Detailed", "Glowing").
+10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
+
+Return ONLY a valid JSON object matching the following schema. Do NOT output markdown blocks or comments.
+{
+  "title": "string",
+  "description": "string",
+  "characters": ["string"],
+  "franchises": ["string"],
+  "tags": ["string"],
+  "colors": ["string"],
+  "style": ["string"],
+  "mood": ["string"],
+  "other_attributes": ["string"],
+  "confidence": number
+}`;
+
+        const imagePart = {
+          inlineData: {
+            data: imageBuffer.toString("base64"),
+            mimeType,
+          },
+        };
+
+        // 4. Call Vision AI
+        console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
+        const visionResult = await model.generateContent([visionPrompt, imagePart]);
+        const visionText = visionResult.response.text();
+        const cleanVisionJson = cleanJsonResponse(visionText);
+
+        let visionMetadata: RawVisionMetadata;
+        try {
+          visionMetadata = JSON.parse(cleanVisionJson);
+        } catch (e: any) {
+          throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
+        }
+
+        // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
+        // OpenRouter can be a bit temperamental or rate-limited on the free tier.
+        // If it throws a tantrum, we catch it and use the raw Gemini vision metadata as a fallback
+        // rather than crashing the whole indexing pipeline. Work smart, not hard.
+        try {
+          console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
+          const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
+Follow these rules strictly:
+1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
+2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
+3. Strip meaningless tags (e.g., "wallpaper", "background", "image", "pic", "desktop").
+4. Ensure characters and franchises are cleanly capitalized (e.g., "naruto uzumaki" -> "Naruto Uzumaki", "marvel" -> "Marvel").
+5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
+6. Do NOT invent new information. Only clean and normalize the provided input.`;
+
+          const userPrompt = JSON.stringify(visionMetadata, null, 2);
+          const normalizedText = await queryTextAI(systemPrompt, userPrompt);
+          const cleanNormalizedJson = cleanJsonResponse(normalizedText);
+          normalizedMetadata = JSON.parse(cleanNormalizedJson);
+        } catch (e: any) {
+          console.warn("[AI Processor] OpenRouter normalization failed, falling back to raw Vision AI output:", e.message || e);
+          normalizedMetadata = visionMetadata;
+        }
+      } catch (geminiError: any) {
+        console.warn(`[AI Processor] Gemini processing failed: ${geminiError.message || geminiError}. Falling back to Imagga...`);
+        activeProvider = "imagga";
+      }
+    }
 
     if (activeProvider === "imagga") {
       console.log(`[AI Processor] Processing wallpaper ID ${wallpaperId} using Imagga API...`);
@@ -209,93 +314,10 @@ Return ONLY a valid JSON object matching the following schema. Do NOT wrap in ma
       } catch (e: any) {
         throw new Error(`Failed to parse OpenRouter synthesized JSON: ${e.message}. Content was: ${openRouterText}`);
       }
+    }
 
-    } else {
-      console.log(`[AI Processor] Processing wallpaper ID ${wallpaperId} using Gemini AI...`);
-      // 2. Initialize Gemini
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not defined in environment variables");
-      }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-      // Gemini 1.5 Flash is our savior. We force it to output pure JSON so we don't have to write
-      // recursive markdown parsers that will keep us awake at 3 AM.
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
-      // 3. Construct Vision Prompt
-      const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
-1. title: A short, high-quality descriptive title for the image.
-2. description: A clear one-sentence description of the image content.
-3. characters: Names of any specific characters (anime, gaming, pop culture) visible in the image. Return empty array if none.
-4. franchises: Names of the franchise(s) or universes the image belongs to (e.g. "Naruto", "Marvel", "Cyberpunk", "Spider-Man").
-5. tags: A list of 5 to 15 descriptive keywords capturing subjects, environment, mood, and visual elements.
-6. colors: The dominant color families (e.g. "Blue", "Black", "Red", "Neon Pink").
-7. style: Visual style tags, e.g. "Anime", "Digital Art", "Pixel Art", "Realistic", "3D Render", "Illustration".
-8. mood: Emotional tone, e.g. "Dramatic", "Calm", "Mysterious", "Energetic", "Vibrant".
-9. other_attributes: Misc tags (e.g. "Silhouette", "Minimal", "Detailed", "Glowing").
-10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
-
-Return ONLY a valid JSON object matching the following schema. Do NOT output markdown blocks or comments.
-{
-  "title": "string",
-  "description": "string",
-  "characters": ["string"],
-  "franchises": ["string"],
-  "tags": ["string"],
-  "colors": ["string"],
-  "style": ["string"],
-  "mood": ["string"],
-  "other_attributes": ["string"],
-  "confidence": number
-}`;
-
-      const imagePart = {
-        inlineData: {
-          data: imageBuffer.toString("base64"),
-          mimeType,
-        },
-      };
-
-      // 4. Call Vision AI
-      console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
-      const visionResult = await model.generateContent([visionPrompt, imagePart]);
-      const visionText = visionResult.response.text();
-      const cleanVisionJson = cleanJsonResponse(visionText);
-
-      let visionMetadata: RawVisionMetadata;
-      try {
-        visionMetadata = JSON.parse(cleanVisionJson);
-      } catch (e: any) {
-        throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
-      }
-
-      // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
-      // OpenRouter can be a bit temperamental or rate-limited on the free tier.
-      // If it throws a tantrum, we catch it and use the raw Gemini vision metadata as a fallback
-      // rather than crashing the whole indexing pipeline. Work smart, not hard.
-      try {
-        console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
-        const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
-Follow these rules strictly:
-1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
-2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
-3. Strip meaningless tags (e.g., "wallpaper", "background", "image", "pic", "desktop").
-4. Ensure characters and franchises are cleanly capitalized (e.g., "naruto uzumaki" -> "Naruto Uzumaki", "marvel" -> "Marvel").
-5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
-6. Do NOT invent new information. Only clean and normalize the provided input.`;
-
-        const userPrompt = JSON.stringify(visionMetadata, null, 2);
-        const normalizedText = await queryTextAI(systemPrompt, userPrompt);
-        const cleanNormalizedJson = cleanJsonResponse(normalizedText);
-        normalizedMetadata = JSON.parse(cleanNormalizedJson);
-      } catch (e: any) {
-        console.warn("[AI Processor] OpenRouter normalization failed, falling back to raw Vision AI output:", e.message || e);
-        normalizedMetadata = visionMetadata;
-      }
+    if (!normalizedMetadata) {
+      throw new Error("AI analysis did not yield any metadata results.");
     }
 
     // 6. Update Wallpaper Table with rich metadata fields
@@ -378,23 +400,9 @@ Follow these rules strictly:
     }
 
     // 8. Assign Wallpaper to Collections (Phase 4 / 5)
-    console.log(`[AI Processor] Calculating collection assignments for ${wallpaperId}...`);
-    await assignWallpaperToCollections(
-      wallpaperId,
-      {
-        title: normalizedMetadata.title,
-        description: normalizedMetadata.description,
-        characters: normalizedMetadata.characters,
-        franchises: normalizedMetadata.franchises,
-        tags: filteredTags,
-        styles: normalizedMetadata.style,
-        moods: normalizedMetadata.mood,
-        other_attributes: normalizedMetadata.other_attributes,
-        primary_color: normalizedMetadata.colors?.[0] || null,
-        colors: normalizedMetadata.colors
-      },
-      supabaseAdmin
-    );
+    // Disabled automatically during upload/migration to prevent unexpected creation/processing
+    // unless specifically told by clicking the button which triggers assign-collections route.
+    console.log(`[AI Processor] Automatic collection assignment for ${wallpaperId} skipped (will run manually via buttons).`);
 
     return { success: true };
   } catch (error: any) {
@@ -412,6 +420,8 @@ Follow these rules strictly:
 
 /**
  * Recounts the number of wallpapers assigned to each collection.
+ * It also washes away empty collections because empty spaces are only cool in minimalist design,
+ * not in our database.
  */
 export async function recountCollectionWallpapers(supabaseAdmin: any) {
   try {
@@ -431,10 +441,25 @@ export async function recountCollectionWallpapers(supabaseAdmin: any) {
 
     for (const col of collections) {
       const count = countMap[col.id] || 0;
-      await supabaseAdmin
-        .from("collections")
-        .update({ wallpaper_count: count })
-        .eq("id", col.id);
+      if (count === 0) {
+        // Cleaning up empty collections is like washing dishes: annoying but necessary.
+        // First delete keyword links to bypass database foreign key constraints
+        await supabaseAdmin
+          .from("collection_keywords")
+          .delete()
+          .eq("collection_id", col.id);
+
+        // Delete the empty collection
+        await supabaseAdmin
+          .from("collections")
+          .delete()
+          .eq("id", col.id);
+      } else {
+        await supabaseAdmin
+          .from("collections")
+          .update({ wallpaper_count: count })
+          .eq("id", col.id);
+      }
     }
   } catch (e) {
     console.error("Recounting collections failed:", e);

@@ -1436,3 +1436,112 @@ body {
     border-color: var(--accent);
     color: var(--accent);
 }
+
+/* Custom navigation styling for scrollable rows and slider */
+.row-scroll-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.row-scroll {
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.row-scroll.active-dragging {
+    cursor: grabbing;
+    cursor: -webkit-grabbing;
+}
+
+.scroll-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(15, 15, 15, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.row-scroll-wrapper:hover .scroll-nav-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scroll-nav-btn:hover {
+    background: var(--accent, #4f8ef7);
+    border-color: var(--accent, #4f8ef7);
+    color: #ffffff;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 4px 12px rgba(79, 142, 247, 0.4);
+}
+
+.scroll-nav-btn.prev {
+    left: 8px;
+}
+
+.scroll-nav-btn.next {
+    right: 8px;
+}
+
+/* Slider Section custom prev/next button */
+.slider-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(15, 15, 15, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.slider-section:hover .slider-nav-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.slider-nav-btn:hover {
+    background: var(--accent, #4f8ef7);
+    border-color: var(--accent, #4f8ef7);
+    color: #ffffff;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 4px 12px rgba(79, 142, 247, 0.4);
+}
+
+.slider-nav-btn.prev {
+    left: 20px;
+}
+
+.slider-nav-btn.next {
+    right: 20px;
+}

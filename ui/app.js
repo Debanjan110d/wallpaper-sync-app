@@ -126,6 +126,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Attach scroll optimization
         enableSmoothWheelScroll(document.getElementById("dashboardBody"));
 
+        // Attach navigation behaviors to scroll rows and slider
+        initScrollRowsNavigation();
+
         // Load initial update check state
         if (window.api.getUpdateState) {
             const state = await window.api.getUpdateState();
@@ -413,7 +416,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const catName = localMetadata.categories.find(c => c.id === catId)?.name || "Featured";
 
             slide.innerHTML = `
-                <img src="${toFileUrl(img.path)}" class="hero-slide-img" alt="${img.filename}" />
+                <img src="${toFileUrl(img.path)}" class="hero-slide-img" alt="${img.filename}" draggable="false" />
                 <div class="hero-slide-overlay"></div>
                 <div class="hero-slide-content">
                     <span class="hero-slide-tag">${catName}</span>
@@ -446,6 +449,27 @@ document.addEventListener("DOMContentLoaded", async () => {
                 dotsContainer.appendChild(dot);
             });
 
+            // Create previous & next navigation buttons for hero slider
+            const prevBtn = document.createElement("button");
+            prevBtn.className = "slider-nav-btn prev";
+            prevBtn.innerHTML = "&lt;";
+            prevBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const prevIdx = (sliderActiveIndex - 1 + sliderList.length) % sliderList.length;
+                setActiveSlide(prevIdx);
+            });
+
+            const nextBtn = document.createElement("button");
+            nextBtn.className = "slider-nav-btn next";
+            nextBtn.innerHTML = "&gt;";
+            nextBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const nextIdx = (sliderActiveIndex + 1) % sliderList.length;
+                setActiveSlide(nextIdx);
+            });
+
+            container.appendChild(prevBtn);
+            container.appendChild(nextBtn);
             container.appendChild(dotsContainer);
             startHeroSlideshow(sliderList.length);
         }
@@ -512,7 +536,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.className = "horizontal-card";
             card.title = img.filename;
             card.innerHTML = `
-                <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
+                <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
                 <div class="horizontal-card-info">
                     <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
                     <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
@@ -526,6 +550,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.addEventListener("click", () => openDetailDrawer(img));
             container.appendChild(card);
         });
+
+        setTimeout(() => {
+            updateNavButtonsVisibility(
+                document.getElementById("recentlyAddedRow"),
+                document.getElementById("recentlyAddedPrevBtn"),
+                document.getElementById("recentlyAddedNextBtn")
+            );
+        }, 100);
     }
 
     // 3. Random Discoveries Row
@@ -558,7 +590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.className = "horizontal-card";
             card.title = img.filename;
             card.innerHTML = `
-                <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" />
+                <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
                 <div class="horizontal-card-info">
                     <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
                     <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
@@ -572,6 +604,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.addEventListener("click", () => openDetailDrawer(img));
             container.appendChild(card);
         });
+
+        setTimeout(() => {
+            updateNavButtonsVisibility(
+                document.getElementById("randomRow"),
+                document.getElementById("randomPrevBtn"),
+                document.getElementById("randomNextBtn")
+            );
+        }, 100);
     }
 
     // 4. Explore Catalog (All grid)
@@ -1470,6 +1510,150 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         }
         return false;
+    }
+
+    let activeHoveredElement = null;
+
+    function initScrollRowsNavigation() {
+        const recentlyAddedRow = document.getElementById("recentlyAddedRow");
+        const randomRow = document.getElementById("randomRow");
+        const heroSliderSection = document.getElementById("heroSliderSection");
+
+        // Drag scroll logic
+        if (recentlyAddedRow) makeDragScrollable(recentlyAddedRow);
+        if (randomRow) makeDragScrollable(randomRow);
+
+        // Hover tracking
+        const trackHover = (el) => {
+            if (!el) return;
+            el.addEventListener("mouseenter", () => { activeHoveredElement = el; });
+            el.addEventListener("mouseleave", () => { if (activeHoveredElement === el) activeHoveredElement = null; });
+        };
+        trackHover(recentlyAddedRow);
+        trackHover(randomRow);
+        trackHover(heroSliderSection);
+
+        // Static buttons click listeners
+        const wireRowButtons = (row, prevBtn, nextBtn) => {
+            if (!row || !prevBtn || !nextBtn) return;
+            prevBtn.addEventListener("click", () => {
+                row.scrollBy({ left: -300, behavior: "smooth" });
+            });
+            nextBtn.addEventListener("click", () => {
+                row.scrollBy({ left: 300, behavior: "smooth" });
+            });
+        };
+        wireRowButtons(recentlyAddedRow, document.getElementById("recentlyAddedPrevBtn"), document.getElementById("recentlyAddedNextBtn"));
+        wireRowButtons(randomRow, document.getElementById("randomPrevBtn"), document.getElementById("randomNextBtn"));
+
+        // Window resize visibility check
+        window.addEventListener("resize", () => {
+            updateNavButtonsVisibility(
+                document.getElementById("recentlyAddedRow"),
+                document.getElementById("recentlyAddedPrevBtn"),
+                document.getElementById("recentlyAddedNextBtn")
+            );
+            updateNavButtonsVisibility(
+                document.getElementById("randomRow"),
+                document.getElementById("randomPrevBtn"),
+                document.getElementById("randomNextBtn")
+            );
+        });
+
+        // Global Keydown arrow keys listener
+        document.addEventListener("keydown", (e) => {
+            // Do not intercept if a text/editable field is focused
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable)) {
+                return;
+            }
+
+            if (!activeHoveredElement) return;
+
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                // Prevent default scrolling behaviour of browser window
+                e.preventDefault();
+
+                if (activeHoveredElement === heroSliderSection) {
+                    const slides = heroSliderSection.querySelectorAll(".hero-slide");
+                    if (slides.length > 1) {
+                        let nextIdx;
+                        if (e.key === "ArrowLeft") {
+                            nextIdx = (sliderActiveIndex - 1 + slides.length) % slides.length;
+                        } else {
+                            nextIdx = (sliderActiveIndex + 1) % slides.length;
+                        }
+                        setActiveSlide(nextIdx);
+                    }
+                } else {
+                    // It's a row scroll container
+                    const scrollAmount = 300;
+                    if (e.key === "ArrowLeft") {
+                        activeHoveredElement.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+                    } else {
+                        activeHoveredElement.scrollBy({ left: scrollAmount, behavior: "smooth" });
+                    }
+                }
+            }
+        });
+    }
+
+    function makeDragScrollable(container) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+        let dragDetected = false;
+
+        container.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) return; // Left click only
+            isDown = true;
+            dragDetected = false;
+            container.classList.add("active-dragging");
+            startX = e.pageX - container.offsetLeft;
+            scrollLeft = container.scrollLeft;
+        });
+
+        container.addEventListener("mouseleave", () => {
+            isDown = false;
+            container.classList.remove("active-dragging");
+        });
+
+        container.addEventListener("mouseup", () => {
+            isDown = false;
+            container.classList.remove("active-dragging");
+        });
+
+        container.addEventListener("mousemove", (e) => {
+            if (!isDown) return;
+            const x = e.pageX - container.offsetLeft;
+            const walk = (x - startX) * 2;
+            if (Math.abs(x - startX) > 5) {
+                dragDetected = true;
+                container.scrollLeft = scrollLeft - walk;
+                e.preventDefault(); // Prevent text selection/drag ghosting
+            }
+        });
+
+        // Intercept card clicks during active drag-scroll
+        container.addEventListener("click", (e) => {
+            if (dragDetected) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true); // Capture phase!
+    }
+
+    // Dynamic visibility of scroll buttons
+    function updateNavButtonsVisibility(row, prevBtn, nextBtn) {
+        if (!row || !prevBtn || !nextBtn) return;
+        const isScrollable = row.scrollWidth > row.clientWidth;
+        if (!isScrollable) {
+            prevBtn.style.display = "none";
+            nextBtn.style.display = "none";
+        } else {
+            prevBtn.style.display = "";
+            nextBtn.style.display = "";
+        }
     }
 
     // Trigger loading

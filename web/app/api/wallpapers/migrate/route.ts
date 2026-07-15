@@ -118,8 +118,8 @@ export async function POST(request: Request) {
       .neq("status", "deleted");
 
     if (!forceAll) {
-      // Only process unindexed wallpapers
-      query = query.or("indexed_at.is.null,status.eq.uploaded");
+      // Only process uploaded wallpapers
+      query = query.eq("status", "uploaded");
     }
 
     const { data: wallpapers, error: fetchErr } = await query;
