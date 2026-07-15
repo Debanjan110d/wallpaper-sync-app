@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-const progressFilePath = path.join(os.tmpdir(), "indexing_progress.json");
+const progressFilePath = path.join(process.cwd(), "indexing_progress.json");
 
 function getMimeType(storagePath: string): string {
   const pathLower = storagePath.toLowerCase();
@@ -91,12 +91,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Indexing is already running." }, { status: 400 });
     }
 
-    // Parse request body for reindexAll
+    // Parse request body for reindexAll and provider
     let reindexAll = false;
+    let provider: "gemini" | "imagga" | undefined = undefined;
     try {
       const body = await request.json();
-      if (body && body.reindexAll === true) {
-        reindexAll = true;
+      if (body) {
+        if (body.reindexAll === true) {
+          reindexAll = true;
+        }
+        if (body.provider === "gemini" || body.provider === "imagga") {
+          provider = body.provider;
+        }
       }
     } catch (e) {
       // Body may be empty or not JSON, ignore
@@ -183,8 +189,8 @@ export async function POST(request: Request) {
           const buffer = Buffer.from(arrayBuffer);
           const mimeType = getMimeType(wp.storage_path);
 
-          console.log(`[Batch Index] Processing wallpaper ID ${wp.id} (${wp.file_name})`);
-          const res = await processWallpaperAI(wp.id, buffer, mimeType);
+          console.log(`[Batch Index] Processing wallpaper ID ${wp.id} (${wp.file_name}) using ${provider || "default"} provider`);
+          const res = await processWallpaperAI(wp.id, buffer, mimeType, provider);
 
           // Check abort after AI processing
           if (!getProgress().active) {

@@ -42,6 +42,11 @@ export async function POST(request: Request) {
     const collectionRaw = formData.get("collection") || formData.get("username");
     const collection = typeof collectionRaw === "string" ? collectionRaw.trim() : null;
 
+    const providerRaw = formData.get("provider");
+    const provider = (typeof providerRaw === "string" && (providerRaw === "gemini" || providerRaw === "imagga"))
+      ? providerRaw
+      : undefined;
+
     const collectionIdRaw = formData.get("collection_id");
     const collectionId = collectionIdRaw ? Number(collectionIdRaw) : null;
 
@@ -258,7 +263,7 @@ export async function POST(request: Request) {
     }
 
     if (row && row.id) {
-      processWallpaperAI(row.id, buffer, file.type).catch((err) => {
+      processWallpaperAI(row.id, buffer, file.type, provider).catch((err) => {
         console.error("Background AI processing failed:", err);
       });
     }

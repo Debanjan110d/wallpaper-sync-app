@@ -43,7 +43,8 @@ interface RawVisionMetadata {
 export async function processWallpaperAI(
   wallpaperId: string,
   imageBuffer: Buffer,
-  mimeType: string
+  mimeType: string,
+  provider?: "gemini" | "imagga"
 ): Promise<{ success: boolean; error?: string }> {
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,17 +58,140 @@ export async function processWallpaperAI(
       .update({ status: "pending_ai" })
       .eq("id", wallpaperId);
 
-    // 2. Initialize Gemini
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not defined in environment variables");
-    }
+    // Fetch wallpaper details for filename context
+    const { data: wpData } = await supabaseAdmin
+      .from("wallpapers")
+      .select("file_name")
+      .eq("id", wallpaperId)
+      .single();
+    const filename = wpData?.file_name || "wallpaper.jpg";
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    const activeProvider = provider || (process.env.VISION_PROVIDER as "gemini" | "imagga") || "imagga";
+    let normalizedMetadata: RawVisionMetadata;
 
-    // 3. Construct Vision Prompt
-    const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
+    if (activeProvider === "imagga") {
+      console.log(`[AI Processor] Processing wallpaper ID ${wallpaperId} using Imagga API...`);
+
+      const imaggaKey = process.env.IMAGGA_API_KEY;
+      const imaggaSecret = process.env.IMAGGA_API_SECRET;
+      if (!imaggaKey || !imaggaSecret) {
+        throw new Error("IMAGGA_API_KEY or IMAGGA_API_SECRET is not defined in environment variables");
+      }
+
+      const auth = Buffer.from(`${imaggaKey}:${imaggaSecret}`).toString("base64");
+      const authHeader = `Basic ${auth}`;
+
+      // A. Upload image to Imagga v2
+      const formData = new FormData();
+      const uint8Array = new Uint8Array(imageBuffer);
+      const blob = new Blob([uint8Array], { type: mimeType });
+      formData.append("image", blob, filename);
+
+      const uploadRes = await fetch("https://api.imagga.com/v2/uploads", {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+        },
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        throw new Error(`Imagga upload failed: ${uploadRes.statusText}. Response: ${errorText}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      const uploadId = uploadData.result?.upload_id;
+      if (!uploadId) {
+        throw new Error("Imagga upload response did not return an upload_id");
+      }
+
+      // B. Fetch tags from Imagga
+      const tagsRes = await fetch(`https://api.imagga.com/v2/tags?image_upload_id=${uploadId}`, {
+        headers: { Authorization: authHeader },
+      });
+      if (!tagsRes.ok) {
+        throw new Error(`Failed to fetch tags from Imagga: ${tagsRes.statusText}`);
+      }
+      const tagsData = await tagsRes.json();
+      const imaggaTags = (tagsData.result?.tags || [])
+        .slice(0, 15)
+        .map((t: any) => `${t.tag.en} (${Math.round(t.confidence)}%)`);
+
+      // C. Fetch colors from Imagga
+      const colorsRes = await fetch(`https://api.imagga.com/v2/colors?image_upload_id=${uploadId}`, {
+        headers: { Authorization: authHeader },
+      });
+      if (!colorsRes.ok) {
+        throw new Error(`Failed to fetch colors from Imagga: ${colorsRes.statusText}`);
+      }
+      const colorsData = await colorsRes.json();
+      const imageColors = colorsData.result?.colors?.image_colors || [];
+      const imaggaColors = imageColors
+        .slice(0, 5)
+        .map((c: any) => `${c.closest_palette_color} (${Math.round(c.percent)}%)`);
+
+      // D. Synthesize full metadata via OpenRouter (Gemma Model)
+      console.log(`[AI Processor] Calling OpenRouter to synthesize metadata from Imagga tags/colors...`);
+      const systemPrompt = `You are an expert wallpaper describer and metadata normalization AI.
+You are given a filename, a list of visual tags (with confidence percentages), and a list of colors (with percentage coverage) extracted from an image.
+Your job is to generate a rich, clean, schema-conforming JSON metadata structure.
+
+Follow these rules:
+1. title: Generate a short, creative, high-quality title (use the filename and tags for context).
+2. description: Write a clear, engaging one-sentence description of the image.
+3. characters: Extract names of any specific pop culture, anime, or gaming characters visible/implied. Return empty array if none.
+4. franchises: Extract names of the franchise(s) or universes (e.g. "Marvel", "Dragon Ball", "Cyberpunk"). Return empty array if none.
+5. tags: A list of 5 to 15 normalized, lowercase keywords capturing subjects, environment, mood, and style.
+6. colors: The dominant color families (e.g. "Blue", "Black", "Orange").
+7. style: Visual style tags, e.g. "Anime", "Vector", "Digital Art", "Minimalist", "3D Render".
+8. mood: Emotional tone, e.g. "Calm", "Mysterious", "Vibrant", "Dark".
+9. other_attributes: Misc tags (e.g. "Silhouette", "Glowing", "Detailed").
+10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
+
+Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown blocks, do NOT output comments or extra text.
+
+{
+  "title": "string",
+  "description": "string",
+  "characters": ["string"],
+  "franchises": ["string"],
+  "tags": ["string"],
+  "colors": ["string"],
+  "style": ["string"],
+  "mood": ["string"],
+  "other_attributes": ["string"],
+  "confidence": number
+}`;
+
+      const userPrompt = JSON.stringify({
+        filename,
+        imagga_tags: imaggaTags,
+        imagga_colors: imaggaColors
+      }, null, 2);
+
+      const openRouterText = await queryTextAI(systemPrompt, userPrompt);
+      const cleanOpenRouterJson = cleanJsonResponse(openRouterText);
+
+      try {
+        normalizedMetadata = JSON.parse(cleanOpenRouterJson);
+      } catch (e: any) {
+        throw new Error(`Failed to parse OpenRouter synthesized JSON: ${e.message}. Content was: ${openRouterText}`);
+      }
+
+    } else {
+      console.log(`[AI Processor] Processing wallpaper ID ${wallpaperId} using Gemini AI...`);
+      // 2. Initialize Gemini
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not defined in environment variables");
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Corrected model name from gemini-3.5-flash
+
+      // 3. Construct Vision Prompt
+      const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
 1. title: A short, high-quality descriptive title for the image.
 2. description: A clear one-sentence description of the image content.
 3. characters: Names of any specific characters (anime, gaming, pop culture) visible in the image. Return empty array if none.
@@ -93,29 +217,29 @@ Return ONLY a valid JSON object matching the following schema. Do NOT output mar
   "confidence": number
 }`;
 
-    const imagePart = {
-      inlineData: {
-        data: imageBuffer.toString("base64"),
-        mimeType,
-      },
-    };
+      const imagePart = {
+        inlineData: {
+          data: imageBuffer.toString("base64"),
+          mimeType,
+        },
+      };
 
-    // 4. Call Vision AI
-    console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
-    const visionResult = await model.generateContent([visionPrompt, imagePart]);
-    const visionText = visionResult.response.text();
-    const cleanVisionJson = cleanJsonResponse(visionText);
+      // 4. Call Vision AI
+      console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
+      const visionResult = await model.generateContent([visionPrompt, imagePart]);
+      const visionText = visionResult.response.text();
+      const cleanVisionJson = cleanJsonResponse(visionText);
 
-    let visionMetadata: RawVisionMetadata;
-    try {
-      visionMetadata = JSON.parse(cleanVisionJson);
-    } catch (e: any) {
-      throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
-    }
+      let visionMetadata: RawVisionMetadata;
+      try {
+        visionMetadata = JSON.parse(cleanVisionJson);
+      } catch (e: any) {
+        throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
+      }
 
-    // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
-    console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
-    const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
+      // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
+      console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
+      const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
 Follow these rules strictly:
 1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
 2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
@@ -124,16 +248,16 @@ Follow these rules strictly:
 5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
 6. Do NOT invent new information. Only clean and normalize the provided input.`;
 
-    const userPrompt = JSON.stringify(visionMetadata, null, 2);
-    const normalizedText = await queryTextAI(systemPrompt, userPrompt);
-    const cleanNormalizedJson = cleanJsonResponse(normalizedText);
+      const userPrompt = JSON.stringify(visionMetadata, null, 2);
+      const normalizedText = await queryTextAI(systemPrompt, userPrompt);
+      const cleanNormalizedJson = cleanJsonResponse(normalizedText);
 
-    let normalizedMetadata: RawVisionMetadata;
-    try {
-      normalizedMetadata = JSON.parse(cleanNormalizedJson);
-    } catch (e: any) {
-      console.warn("[AI Processor] Failed to parse normalized JSON. Falling back to raw Vision AI output.", e);
-      normalizedMetadata = visionMetadata;
+      try {
+        normalizedMetadata = JSON.parse(cleanNormalizedJson);
+      } catch (e: any) {
+        console.warn("[AI Processor] Failed to parse normalized JSON. Falling back to raw Vision AI output.", e);
+        normalizedMetadata = visionMetadata;
+      }
     }
 
     // 6. Update Wallpaper Table with rich metadata fields

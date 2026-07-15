@@ -80,6 +80,7 @@ export default function Page() {
   const [indexingMessage, setIndexingMessage] = useState<string | null>(null);
   const [indexingProgress, setIndexingProgress] = useState<any>(null);
   const [showProgressCard, setShowProgressCard] = useState(false);
+  const [visionProvider, setVisionProvider] = useState<"gemini" | "imagga">("imagga");
 
   const [migrationLoading, setMigrationLoading] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState<any>(null);
@@ -151,7 +152,7 @@ export default function Page() {
       const res = await fetch("/api/wallpapers/migrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll })
+        body: JSON.stringify({ forceAll, provider: visionProvider })
       });
       const data = await res.json();
       if (res.ok) {
@@ -233,7 +234,7 @@ export default function Page() {
       const res = await fetch("/api/wallpapers/batch-index", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reindexAll }),
+        body: JSON.stringify({ reindexAll, provider: visionProvider }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -566,6 +567,7 @@ export default function Page() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("username", username);
+      formData.append("provider", visionProvider);
 
       if (selectedCollectionForUpload) {
         formData.append("collection_id", selectedCollectionForUpload);
@@ -895,9 +897,30 @@ export default function Page() {
           {/* Phase 1 Migration Card */}
           <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
             <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 1: Library AI Migration</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
               Runs Vision AI & Gemma-4 Normalization across all 432+ wallpapers. Skipped automatically if already analyzed.
             </p>
+            <div style={{ marginBottom: "0.75rem" }}>
+              <select
+                value={visionProvider}
+                onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  fontSize: "0.8rem",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "4px",
+                  color: "inherit",
+                  cursor: "pointer",
+                  height: "32px"
+                }}
+                disabled={migrationLoading || migrationProgress?.active || indexingLoading || indexingProgress?.active}
+              >
+                <option value="imagga">🖼️ Imagga API (100/mo)</option>
+                <option value="gemini">♊ Gemini AI</option>
+              </select>
+            </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 className="btn"
@@ -1194,7 +1217,7 @@ export default function Page() {
         <div className="card" style={{ margin: 0, display: "flex", flexDirection: "column" }}>
           <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>Upload New Wallpapers</h2>
           <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
               <div className="form-group" style={{ flex: "1 1 200px" }}>
                 <label>Admin Username</label>
                 <input
@@ -1203,6 +1226,27 @@ export default function Page() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="form-group" style={{ flex: "1 1 200px" }}>
+                <label>AI Vision Provider</label>
+                <select
+                  value={visionProvider}
+                  onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "6px",
+                    color: "inherit",
+                    cursor: "pointer",
+                    height: "38px"
+                  }}
+                >
+                  <option value="imagga">🖼️ Imagga API (100/mo)</option>
+                  <option value="gemini">♊ Gemini AI</option>
+                </select>
               </div>
 
               <div className="form-group" style={{ flex: "1 1 250px" }}>
@@ -1430,6 +1474,24 @@ export default function Page() {
                   <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                     {galleryImages.length} wallpapers ({unindexedCount} unindexed)
                   </span>
+                  <select
+                    value={visionProvider}
+                    onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: "0.85rem",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "6px",
+                      color: "inherit",
+                      cursor: "pointer",
+                      height: "32px"
+                    }}
+                    disabled={indexingLoading || indexingProgress?.active || migrationLoading || migrationProgress?.active}
+                  >
+                    <option value="imagga">🖼️ Imagga API (100/mo)</option>
+                    <option value="gemini">♊ Gemini AI</option>
+                  </select>
                   {unindexedCount > 0 && (
                     <button
                       type="button"

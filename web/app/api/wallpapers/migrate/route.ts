@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-const progressFilePath = path.join(os.tmpdir(), "migration_progress.json");
+const progressFilePath = path.join(process.cwd(), "migration_progress.json");
 
 function getMimeType(storagePath: string): string {
   const pathLower = storagePath.toLowerCase();
@@ -89,11 +89,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Migration is already running." }, { status: 400 });
     }
 
+    // Parse request body for forceAll and provider
     let forceAll = false;
+    let provider: "gemini" | "imagga" | undefined = undefined;
     try {
       const body = await request.json();
-      if (body && body.forceAll === true) {
-        forceAll = true;
+      if (body) {
+        if (body.forceAll === true) {
+          forceAll = true;
+        }
+        if (body.provider === "gemini" || body.provider === "imagga") {
+          provider = body.provider;
+        }
       }
     } catch (e) {
       // Body may be empty
@@ -175,8 +182,8 @@ export async function POST(request: Request) {
           const buffer = Buffer.from(arrayBuffer);
           const mimeType = getMimeType(wp.storage_path);
 
-          console.log(`[Migration] Processing wallpaper ID ${wp.id} (${wp.file_name})`);
-          const res = await processWallpaperAI(wp.id, buffer, mimeType);
+          console.log(`[Migration] Processing wallpaper ID ${wp.id} (${wp.file_name}) using ${provider || "default"} provider`);
+          const res = await processWallpaperAI(wp.id, buffer, mimeType, provider);
 
           if (!getProgress().active) break;
 
