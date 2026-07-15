@@ -22,6 +22,10 @@ export default function Page() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("");
   const [selectedCollectionFilter, setSelectedCollectionFilter] = useState<string>("");
   const [selectedTagFilters, setSelectedTagFilters] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStyleFilter, setSelectedStyleFilter] = useState("");
+  const [selectedMoodFilter, setSelectedMoodFilter] = useState("");
+  const [selectedColorFilter, setSelectedColorFilter] = useState("");
 
   // Upload Form Metadata
   const [selectedCategoryForUpload, setSelectedCategoryForUpload] = useState<string>("");
@@ -31,10 +35,8 @@ export default function Page() {
   // Inline Creation Fields
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState("");
-  
   const [showNewColInput, setShowNewColInput] = useState(false);
   const [newColName, setNewColName] = useState("");
-
   const [newTagName, setNewTagName] = useState("");
 
   // Tag Search states for different forms
@@ -56,22 +58,55 @@ export default function Page() {
 
   // Individual Wallpaper Edit Modal State
   const [editingWallpaper, setEditingWallpaper] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCharacters, setEditCharacters] = useState("");
+  const [editFranchises, setEditFranchises] = useState("");
+  const [editStyles, setEditStyles] = useState("");
+  const [editMoods, setEditMoods] = useState("");
+  const [editPrimaryColor, setEditPrimaryColor] = useState("");
+  const [editCollectionIds, setEditCollectionIds] = useState<number[]>([]);
   const [editCategoryId, setEditCategoryId] = useState<string>("");
-  const [editCollectionId, setEditCollectionId] = useState<string>("");
   const [editTags, setEditTags] = useState<number[]>([]);
 
-  // AI Indexing Trigger State
+  // Wallpaper Preview Modal State
+  const [previewWallpaper, setPreviewWallpaper] = useState<any | null>(null);
+
+  // Recommendation Engine State
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+
+  // AI Operations States
   const [indexingLoading, setIndexingLoading] = useState(false);
   const [indexingMessage, setIndexingMessage] = useState<string | null>(null);
-  const [indexingProgress, setIndexingProgress] = useState<{
-    active: boolean;
-    total: number;
-    processed: number;
-    failed: number;
-    currentWallpaper: string;
-  } | null>(null);
+  const [indexingProgress, setIndexingProgress] = useState<any>(null);
   const [showProgressCard, setShowProgressCard] = useState(false);
 
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState<any>(null);
+  const [showMigrationCard, setShowMigrationCard] = useState(false);
+
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
+
+  // Check Phase 1 Migration Status
+  const checkMigrationStatus = async () => {
+    try {
+      const res = await fetch("/api/wallpapers/migrate");
+      if (res.ok) {
+        const data = await res.json();
+        setMigrationProgress(data);
+        if (data && data.active) {
+          setShowMigrationCard(true);
+        }
+        return data;
+      }
+    } catch (e) {
+      console.error("Failed to check migration status:", e);
+    }
+    return null;
+  };
+
+  // Check Batch Indexing Status
   const checkIndexingStatus = async () => {
     try {
       const res = await fetch("/api/wallpapers/batch-index");
@@ -91,17 +126,105 @@ export default function Page() {
 
   useEffect(() => {
     checkIndexingStatus();
+    checkMigrationStatus();
 
-    const intervalTime = indexingProgress?.active ? 2000 : 10000;
     const interval = setInterval(async () => {
-      const progress = await checkIndexingStatus();
-      if (progress && !progress.active && indexingProgress?.active) {
+      const idxProgress = await checkIndexingStatus();
+      const migProgress = await checkMigrationStatus();
+
+      if (
+        (idxProgress && !idxProgress.active && indexingProgress?.active) ||
+        (migProgress && !migProgress.active && migrationProgress?.active)
+      ) {
         fetchGallery();
       }
-    }, intervalTime);
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [indexingProgress?.active]);
+  }, [indexingProgress?.active, migrationProgress?.active]);
+
+  // Trigger Phase 1 Migration
+  const handleTriggerMigration = async (forceAll = false) => {
+    setMigrationLoading(true);
+    setDiscoveryMessage(null);
+    try {
+      const res = await fetch("/api/wallpapers/migrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceAll })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDiscoveryMessage(`Success: ${data.message}`);
+        await checkMigrationStatus();
+      } else {
+        setDiscoveryMessage(`Error: ${data.error || "Failed to trigger library migration"}`);
+      }
+    } catch (err: any) {
+      setDiscoveryMessage(`Error: ${err.message || err}`);
+    } finally {
+      setMigrationLoading(false);
+    }
+  };
+
+  const handleCancelMigration = async () => {
+    setMigrationLoading(true);
+    try {
+      const res = await fetch("/api/wallpapers/migrate", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        setDiscoveryMessage("Success: Library migration was aborted.");
+        await checkMigrationStatus();
+      } else {
+        setDiscoveryMessage(`Error: ${data.error || "Failed to abort migration"}`);
+      }
+    } catch (err: any) {
+      setDiscoveryMessage(`Error: ${err.message || err}`);
+    } finally {
+      setMigrationLoading(false);
+    }
+  };
+
+  // Trigger Phase 3 Discovery
+  const handleTriggerDiscovery = async () => {
+    setDiscoveryLoading(true);
+    setDiscoveryMessage(null);
+    try {
+      const res = await fetch("/api/collections/discover", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setDiscoveryMessage(`Success: ${data.message}`);
+        await fetchMetadata();
+        await fetchGallery();
+      } else {
+        setDiscoveryMessage(`Error: ${data.error || "Failed to discover collections"}`);
+      }
+    } catch (err: any) {
+      setDiscoveryMessage(`Error: ${err.message || err}`);
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
+
+  // Trigger manual collection re-assignments
+  const handleReassignCollections = async () => {
+    setDiscoveryLoading(true);
+    setDiscoveryMessage(null);
+    try {
+      const res = await fetch("/api/wallpapers/assign-collections", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setDiscoveryMessage(`Success: ${data.message}`);
+        await fetchGallery();
+      } else {
+        setDiscoveryMessage(`Error: ${data.error || "Failed to assign collections"}`);
+      }
+    } catch (err: any) {
+      setDiscoveryMessage(`Error: ${err.message || err}`);
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
 
   const handleTriggerIndexing = async (reindexAll = false) => {
     setIndexingLoading(true);
@@ -109,9 +232,7 @@ export default function Page() {
     try {
       const res = await fetch("/api/wallpapers/batch-index", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reindexAll }),
       });
       const data = await res.json();
@@ -132,9 +253,7 @@ export default function Page() {
     setIndexingLoading(true);
     setIndexingMessage(null);
     try {
-      const res = await fetch("/api/wallpapers/batch-index", {
-        method: "DELETE",
-      });
+      const res = await fetch("/api/wallpapers/batch-index", { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
         setIndexingMessage("Success: AI indexing run was aborted.");
@@ -171,15 +290,13 @@ export default function Page() {
   const fetchGallery = async () => {
     try {
       let queryStr = "?";
-      if (selectedCategoryFilter) {
-        queryStr += `category=${selectedCategoryFilter}&`;
-      }
-      if (selectedCollectionFilter) {
-        queryStr += `collection=${selectedCollectionFilter}&`;
-      }
-      if (selectedTagFilters.length > 0) {
-        queryStr += `tags=${selectedTagFilters.join(",")}&`;
-      }
+      if (selectedCategoryFilter) queryStr += `category=${selectedCategoryFilter}&`;
+      if (selectedCollectionFilter) queryStr += `collection=${selectedCollectionFilter}&`;
+      if (selectedTagFilters.length > 0) queryStr += `tags=${selectedTagFilters.join(",")}&`;
+      if (searchQuery) queryStr += `q=${encodeURIComponent(searchQuery)}&`;
+      if (selectedStyleFilter) queryStr += `style=${encodeURIComponent(selectedStyleFilter)}&`;
+      if (selectedMoodFilter) queryStr += `mood=${encodeURIComponent(selectedMoodFilter)}&`;
+      if (selectedColorFilter) queryStr += `color=${encodeURIComponent(selectedColorFilter)}&`;
 
       const res = await fetch(`/api/wallpapers${queryStr}`);
       const data = await res.json();
@@ -216,6 +333,118 @@ export default function Page() {
     }
   };
 
+  // RECOMMENDATION ENGINE (Local-Storage & Metadata overlaps)
+  const trackInteraction = (wallpaper: any, type: "view" | "download" | "favorite") => {
+    if (typeof window === "undefined" || !wallpaper) return;
+    
+    const historyRaw = localStorage.getItem("interaction_history");
+    const history = historyRaw
+      ? JSON.parse(historyRaw)
+      : { downloads: [], favorites: [], views: [] };
+
+    const listKey = type === "view" ? "views" : type === "download" ? "downloads" : "favorites";
+    
+    if (!history[listKey].includes(wallpaper.id)) {
+      history[listKey].push(wallpaper.id);
+      localStorage.setItem("interaction_history", JSON.stringify(history));
+    }
+
+    const descriptorsRaw = localStorage.getItem("interaction_descriptors");
+    const descriptors = descriptorsRaw
+      ? JSON.parse(descriptorsRaw)
+      : { tags: {}, franchises: {}, characters: {} };
+
+    const addValues = (arr: string[], map: Record<string, number>, multiplier: number) => {
+      arr.forEach((v) => {
+        const val = v.toLowerCase().trim();
+        map[val] = (map[val] || 0) + multiplier;
+      });
+    };
+
+    const multiplier = type === "favorite" ? 3 : type === "download" ? 2 : 1;
+    if (Array.isArray(wallpaper.characters)) addValues(wallpaper.characters, descriptors.characters, multiplier);
+    if (Array.isArray(wallpaper.franchises)) addValues(wallpaper.franchises, descriptors.franchises, multiplier);
+    if (Array.isArray(wallpaper.tags)) {
+      addValues(wallpaper.tags.map((t: any) => t.name || t), descriptors.tags, multiplier);
+    }
+
+    localStorage.setItem("interaction_descriptors", JSON.stringify(descriptors));
+    computeRecommendations(galleryImages);
+  };
+
+  const computeRecommendations = (wps: any[]) => {
+    if (typeof window === "undefined" || !wps || wps.length === 0) return;
+    
+    const historyRaw = localStorage.getItem("interaction_history");
+    if (!historyRaw) return;
+    const history = JSON.parse(historyRaw);
+    const interactedIds = new Set([
+      ...history.downloads,
+      ...history.favorites,
+      ...history.views
+    ]);
+
+    const descriptorsRaw = localStorage.getItem("interaction_descriptors");
+    if (!descriptorsRaw) return;
+    const descriptors = JSON.parse(descriptorsRaw);
+
+    const scored = wps
+      .filter((wp) => !interactedIds.has(wp.id))
+      .map((wp) => {
+        let score = 0;
+        
+        if (Array.isArray(wp.franchises)) {
+          wp.franchises.forEach((f: string) => {
+            score += (descriptors.franchises[f.toLowerCase().trim()] || 0) * 3;
+          });
+        }
+        if (Array.isArray(wp.characters)) {
+          wp.characters.forEach((c: string) => {
+            score += (descriptors.characters[c.toLowerCase().trim()] || 0) * 2;
+          });
+        }
+        if (Array.isArray(wp.tags)) {
+          wp.tags.forEach((t: any) => {
+            const name = (t.name || t).toLowerCase().trim();
+            score += (descriptors.tags[name] || 0) * 1;
+          });
+        }
+
+        return { ...wp, recommendation_score: score };
+      })
+      .filter((wp) => wp.recommendation_score > 0)
+      .sort((a, b) => b.recommendation_score - a.recommendation_score)
+      .slice(0, 5);
+
+    setRecommendations(scored);
+  };
+
+  const toggleFavoriteLocal = (wallpaper: any) => {
+    if (typeof window === "undefined" || !wallpaper) return;
+    const historyRaw = localStorage.getItem("interaction_history");
+    const history = historyRaw
+      ? JSON.parse(historyRaw)
+      : { downloads: [], favorites: [], views: [] };
+
+    const index = history.favorites.indexOf(wallpaper.id);
+    if (index > -1) {
+      history.favorites.splice(index, 1);
+      localStorage.setItem("interaction_history", JSON.stringify(history));
+      computeRecommendations(galleryImages);
+    } else {
+      trackInteraction(wallpaper, "favorite");
+    }
+    fetchGallery();
+  };
+
+  const isFavorited = (id: string) => {
+    if (typeof window === "undefined") return false;
+    const historyRaw = localStorage.getItem("interaction_history");
+    if (!historyRaw) return false;
+    const history = JSON.parse(historyRaw);
+    return history.favorites?.includes(id);
+  };
+
   useEffect(() => {
     fetchMetadata();
     fetchReviews();
@@ -224,11 +453,24 @@ export default function Page() {
 
   useEffect(() => {
     fetchGallery();
-    // Reset selected image IDs when filters change
     setSelectedImageIds([]);
-  }, [selectedCategoryFilter, selectedCollectionFilter, selectedTagFilters]);
+  }, [
+    selectedCategoryFilter,
+    selectedCollectionFilter,
+    selectedTagFilters,
+    searchQuery,
+    selectedStyleFilter,
+    selectedMoodFilter,
+    selectedColorFilter
+  ]);
 
-  // Setup auto-slide timer for recently added wallpapers (top 5 newer wallpapers)
+  useEffect(() => {
+    if (galleryImages.length > 0) {
+      computeRecommendations(galleryImages);
+    }
+  }, [galleryImages]);
+
+  // Setup auto-slide timer
   useEffect(() => {
     const isReduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (isReduced || sliderPaused || galleryImages.length === 0) {
@@ -251,8 +493,7 @@ export default function Page() {
       const img = new Image();
       img.onload = () => {
         const ratio = img.width / img.height;
-        // Accept roughly landscape ratios (1.5 to 2.5)
-        if (ratio >= 1.4 && ratio <= 2.6) {
+        if (ratio >= 0.5 && ratio <= 3.0) {
           resolve(true);
         } else {
           resolve(false);
@@ -273,7 +514,7 @@ export default function Page() {
       if (isValid) {
         validFiles.push(file);
       } else {
-        newMessages.push(`❌ ${file.name} ignored: Invalid aspect ratio. Only landscape wallpapers are allowed.`);
+        newMessages.push(`❌ ${file.name} ignored: Extreme aspect ratio. Please upload a desktop wallpaper styled image.`);
       }
     }
     setFiles((prev) => [...prev, ...validFiles]);
@@ -357,7 +598,6 @@ export default function Page() {
     setFiles((prev) => prev.filter((_, index) => !successfulUploads.includes(index)));
     setLoading(false);
     
-    // Clear upload metadata state
     setSelectedCategoryForUpload("");
     setSelectedCollectionForUpload("");
     setSelectedTagsForUpload([]);
@@ -385,7 +625,6 @@ export default function Page() {
     }
   };
 
-  // Inline Category Creator
   const handleCreateCategory = async () => {
     if (!newCatName.trim()) return;
     try {
@@ -408,7 +647,6 @@ export default function Page() {
     }
   };
 
-  // Inline Collection Creator
   const handleCreateCollection = async () => {
     if (!newColName.trim() || !selectedCategoryForUpload) {
       alert("Please enter a collection name and ensure a category is selected.");
@@ -437,7 +675,6 @@ export default function Page() {
     }
   };
 
-  // Inline Tag Creator
   const handleCreateTag = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTagName.trim()) return;
@@ -451,7 +688,6 @@ export default function Page() {
       if (res.ok) {
         setNewTagName("");
         await fetchMetadata();
-        // Automatically check the newly created tag for upload selection
         setSelectedTagsForUpload((prev) => [...prev, data.tag.id]);
       } else {
         alert("Failed to create tag: " + data.error);
@@ -461,21 +697,18 @@ export default function Page() {
     }
   };
 
-  // Toggle tag selected for filtering
   const handleToggleTagFilter = (tagId: number) => {
     setSelectedTagFilters((prev) =>
       prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     );
   };
 
-  // Toggle tag selected for upload
   const handleToggleTagUpload = (tagId: number) => {
     setSelectedTagsForUpload((prev) =>
       prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     );
   };
 
-  // Image Selection for Bulk Edit
   const handleSelectImage = (id: string) => {
     setSelectedImageIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
@@ -490,28 +723,43 @@ export default function Page() {
     }
   };
 
-  // Handle start editing individual wallpaper
   const handleStartEdit = (img: any) => {
+    trackInteraction(img, "view");
     setEditingWallpaper(img);
-    setEditCategoryId(img.collection_details?.category_id ? String(img.collection_details.category_id) : "");
-    setEditCollectionId(img.collection_id ? String(img.collection_id) : "");
+    setEditTitle(img.title || "");
+    setEditDescription(img.description || "");
+    setEditCharacters(Array.isArray(img.characters) ? img.characters.join(", ") : "");
+    setEditFranchises(Array.isArray(img.franchises) ? img.franchises.join(", ") : "");
+    setEditStyles(Array.isArray(img.styles) ? img.styles.join(", ") : img.style || "");
+    setEditMoods(Array.isArray(img.moods) ? img.moods.join(", ") : "");
+    setEditPrimaryColor(img.primary_color || "");
     setEditTags(img.tags ? img.tags.map((t: any) => t.id) : []);
+
+    const colIds = Array.isArray(img.collections)
+      ? img.collections.map((c: any) => c.id)
+      : img.collection_id
+        ? [Number(img.collection_id)]
+        : [];
+    setEditCollectionIds(colIds);
+    setEditCategoryId(img.collection_details?.category_id ? String(img.collection_details.category_id) : "");
   };
 
-  // Handle save editing individual wallpaper
   const handleSaveEdit = async () => {
     if (!editingWallpaper) return;
     setLoading(true);
     try {
-      const itemUpdate: any = { id: editingWallpaper.id };
-      if (editCollectionId) {
-        itemUpdate.collection_id = Number(editCollectionId);
-      } else if (editCategoryId) {
-        itemUpdate.category_id = Number(editCategoryId);
-      } else {
-        itemUpdate.collection_id = null; // Clear collection/category
-      }
-      itemUpdate.tags = editTags; // Override tags
+      const itemUpdate: any = {
+        id: editingWallpaper.id,
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        characters: editCharacters.split(",").map((s) => s.trim()).filter(Boolean),
+        franchises: editFranchises.split(",").map((s) => s.trim()).filter(Boolean),
+        styles: editStyles.split(",").map((s) => s.trim()).filter(Boolean),
+        moods: editMoods.split(",").map((s) => s.trim()).filter(Boolean),
+        primary_color: editPrimaryColor.trim(),
+        collection_ids: editCollectionIds,
+        tags: editTags
+      };
 
       const res = await fetch("/api/wallpapers/bulk-update", {
         method: "POST",
@@ -519,7 +767,6 @@ export default function Page() {
         body: JSON.stringify({ items: [itemUpdate] }),
       });
       if (res.ok) {
-        alert("Wallpaper metadata updated successfully!");
         setEditingWallpaper(null);
         fetchGallery();
       } else {
@@ -533,7 +780,6 @@ export default function Page() {
     }
   };
 
-  // Apply Bulk Updates
   const handleApplyBulkUpdate = async () => {
     if (selectedImageIds.length === 0) return;
     if (!bulkCategoryId && !bulkCollectionId && bulkTags.length === 0) {
@@ -546,9 +792,7 @@ export default function Page() {
       const items = selectedImageIds.map((id) => {
         const itemUpdate: any = { id };
         if (bulkCollectionId) {
-          itemUpdate.collection_id = Number(bulkCollectionId);
-        } else if (bulkCategoryId) {
-          itemUpdate.category_id = Number(bulkCategoryId);
+          itemUpdate.collection_ids = [Number(bulkCollectionId)];
         }
         if (bulkTags.length > 0) {
           itemUpdate.tags = bulkTags;
@@ -580,71 +824,197 @@ export default function Page() {
     }
   };
 
-  // Filter collections by upload category
-  const filteredUploadCollections = collections.filter(
-    (col) => col.category_id === Number(selectedCategoryForUpload)
-  );
+  const toggleCollectionEditCheckbox = (colId: number) => {
+    setEditCollectionIds((prev) =>
+      prev.includes(colId) ? prev.filter((id) => id !== colId) : [...prev, colId]
+    );
+  };
 
-  // Filter collections by filter category
-  const filteredFilterCollections = collections.filter(
-    (col) => !selectedCategoryFilter || col.category_id === Number(selectedCategoryFilter)
-  );
+  const filteredUploadCollections = collections;
+  const filteredFilterCollections = collections;
+  const filteredBulkCollections = collections;
 
-  // Filter collections by bulk category
-  const filteredBulkCollections = collections.filter(
-    (col) => !bulkCategoryId || col.category_id === Number(bulkCategoryId)
-  );
-
-  // Filter collections by edit category
-  const filteredEditCollections = collections.filter(
-    (col) => !editCategoryId || col.category_id === Number(editCategoryId)
-  );
-
-  // Images for Auto-Slider (newest 5 verified wallpapers)
   const sliderImages = galleryImages.slice(0, 5);
 
   return (
-    <div className="container">
+    <div className="container" style={{ paddingBottom: "100px" }}>
       {/* Brand Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div
             style={{
-              width: 42,
-              height: 42,
+              width: 44,
+              height: 44,
               borderRadius: "50%",
-              background: "var(--primary)",
+              background: "linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "white",
               fontWeight: "bold",
+              boxShadow: "0 0 15px rgba(26,115,232,0.4)"
             }}
           >
             {(username?.trim()?.[0] ?? "A").toUpperCase()}
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.8rem" }}>{username}'s Dashboard</h1>
+            <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              Wallpaper Sync Administration Portal
+              Wallpaper Sync Administration Portal • v4.0 AI Architecture
             </p>
           </div>
         </div>
         <Link href="/docs" style={{
-          padding: "6px 16px",
-          background: "var(--surface)",
+          padding: "8px 18px",
+          background: "rgba(255,255,255,0.05)",
           border: "1px solid var(--border)",
-          borderRadius: "6px",
+          borderRadius: "8px",
           color: "var(--foreground)",
           textDecoration: "none",
           fontSize: "0.9rem",
-          fontWeight: 500
+          fontWeight: 500,
+          backdropFilter: "blur(10px)",
+          transition: "background 0.2s"
         }}>
           Documentation
         </Link>
       </div>
 
-      {/* Visual System Architecture Mindmap (Collapsible) */}
+      {/* Dynamic System Action Center (Phase 1, 3, 4 Operations) */}
+      <div className="card" style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%)", borderColor: "rgba(255,255,255,0.05)" }}>
+        <h3 style={{ margin: "0 0 1rem 0", display: "flex", alignItems: "center", gap: "8px" }}>
+          ⚙️ <span>AI Smart Core Operations Center</span>
+        </h3>
+        
+        <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
+          Manage your AI operations cleanly. You can run one-time migrations to describe existing items (Vision AI + Gemma-4 normalization), discover global stable collections from the database, or trigger a manual layout evaluation.
+        </p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
+          
+          {/* Phase 1 Migration Card */}
+          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
+            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 1: Library AI Migration</h4>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+              Runs Vision AI & Gemma-4 Normalization across all 432+ wallpapers. Skipped automatically if already analyzed.
+            </p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                className="btn"
+                style={{ padding: "6px 12px", fontSize: "0.8rem", flex: 1 }}
+                disabled={migrationLoading || migrationProgress?.active}
+                onClick={() => handleTriggerMigration(false)}
+              >
+                Start Migration
+              </button>
+              <button
+                className="btn-secondary"
+                style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                disabled={migrationLoading || migrationProgress?.active}
+                onClick={() => handleTriggerMigration(true)}
+              >
+                Force All
+              </button>
+            </div>
+          </div>
+
+          {/* Phase 3 Collection Discovery Card */}
+          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
+            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 3: Collection Discovery</h4>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+              Send metadata database to Gemma-4. Discovers 20-40 stable collections, keyword profiles, and synonyms.
+            </p>
+            <button
+              className="btn"
+              style={{ padding: "6px 12px", fontSize: "0.8rem", width: "100%" }}
+              disabled={discoveryLoading}
+              onClick={handleTriggerDiscovery}
+            >
+              {discoveryLoading ? "Discovering..." : "Discover AI Collections"}
+            </button>
+          </div>
+
+          {/* Phase 4 Engine Manual Assignment Card */}
+          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
+            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 4: Run Keyword Assignment</h4>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+              Evaluate all wallpapers against collection keyword profiles. Calculates scores and assigns junction rows.
+            </p>
+            <button
+              className="btn-secondary"
+              style={{ padding: "6px 12px", fontSize: "0.8rem", width: "100%" }}
+              disabled={discoveryLoading}
+              onClick={handleReassignCollections}
+            >
+              Recalculate Matches
+            </button>
+          </div>
+
+        </div>
+
+        {discoveryMessage && (
+          <div style={{
+            marginTop: "1rem",
+            padding: "10px 14px",
+            background: "rgba(26, 115, 232, 0.1)",
+            border: "1px solid var(--primary)",
+            borderRadius: "6px",
+            fontSize: "0.85rem",
+            color: "var(--foreground)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
+            <span>{discoveryMessage}</span>
+            <button style={{ background: "none", border: "none", color: "white", cursor: "pointer" }} onClick={() => setDiscoveryMessage(null)}>✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* Migration Progress Card */}
+      {migrationProgress && showMigrationCard && (
+        <div style={{
+          background: "rgba(255, 255, 255, 0.03)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "1rem",
+          marginBottom: "1.5rem",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+              🚀 Phase 1 Library Migration: {migrationProgress.active ? "Running" : "Finished"}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
+                {Math.round(((migrationProgress.processed + migrationProgress.failed) / (migrationProgress.total || 1)) * 100)}% ({migrationProgress.processed + migrationProgress.failed} / {migrationProgress.total})
+              </span>
+              {migrationProgress.active && (
+                <button
+                  type="button"
+                  style={{ padding: "4px 8px", fontSize: "0.75rem", background: "rgba(219,68,85,0.2)", border: "1px solid #db4455", color: "#ff6b7b", borderRadius: 4, cursor: "pointer" }}
+                  onClick={handleCancelMigration}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+          </div>
+          <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: "0.5rem" }}>
+            <div style={{
+              width: `${((migrationProgress.processed + migrationProgress.failed) / (migrationProgress.total || 1)) * 100}%`,
+              height: "100%",
+              background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)"
+            }}></div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+            <span>Processed: {migrationProgress.processed} • Failed: {migrationProgress.failed}</span>
+            {migrationProgress.active && <span>Analyzing: <i>{migrationProgress.currentWallpaper}</i></span>}
+          </div>
+        </div>
+      )}
+
+      {/* Visual System Architecture Map (Collapsible) */}
       <div className="card" style={{ marginBottom: "2rem", padding: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowMindmap(!showMindmap)}>
           <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
@@ -658,82 +1028,42 @@ export default function Page() {
         {showMindmap && (
           <div className="mindmap-container" style={{ marginTop: "1.5rem" }}>
             <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-              How the application structures data for synchronization between the dashboard and Electron desktop clients. 
-              💡 <strong>Corrections Guide:</strong> If you make a mistake assigning a category, collection, or tag to a wallpaper, you can click the <strong>Edit</strong> button directly on its card in the gallery, or select multiple wallpapers and use the <strong>Bulk Edit Bar</strong> at the bottom of the page to re-assign them in one go.
+              How the application structures data for synchronization. Under v4, wallpapers map to collections dynamically inside a junction table rather than hardcoded attributes.
             </p>
             
             <div className="mindmap-flex" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", gap: "2rem", position: "relative" }}>
-              {/* Branch 1: The Core Hierarchy */}
               <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
-                <h4 style={{ margin: "0 0 1rem 0", color: "var(--primary)", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>1. Core Data Hierarchy (1-to-Many)</h4>
-                
+                <h4 style={{ margin: "0 0 1rem 0", color: "var(--primary)", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>1. Core Data Hierarchy</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}>
-                  {/* Category Node */}
-                  <div style={{ background: "rgba(26, 115, 232, 0.15)", border: "1px solid var(--primary)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center", position: "relative" }}>
+                  <div style={{ background: "rgba(26, 115, 232, 0.15)", border: "1px solid var(--primary)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center" }}>
                     <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--primary)", fontWeight: "bold" }}>Level 1: Category</div>
                     <strong style={{ fontSize: "0.95rem" }}>Anime / Game Art</strong>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Broad thematic genres</div>
                   </div>
-
                   <div style={{ color: "var(--text-muted)", fontSize: "1.2rem" }}>⬇</div>
-
-                  {/* Collection Node */}
                   <div style={{ background: "rgba(255, 159, 10, 0.12)", border: "1px solid var(--accent)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center" }}>
                     <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--accent)", fontWeight: "bold" }}>Level 2: Collection</div>
                     <strong style={{ fontSize: "0.95rem" }}>Naruto / Cyberpunk</strong>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Specific nested albums</div>
                   </div>
-
                   <div style={{ color: "var(--text-muted)", fontSize: "1.2rem" }}>⬇</div>
-
-                  {/* Wallpaper Node */}
                   <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px 14px", width: "80%", textAlign: "center" }}>
                     <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--foreground)", opacity: 0.6, fontWeight: "bold" }}>Level 3: Wallpaper</div>
-                    <strong style={{ fontSize: "0.95rem" }}>naruto_rasengan.jpg</strong>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>Actual image file payload</div>
+                    <strong style={{ fontSize: "0.95rem" }}>naruto_rain.jpg</strong>
                   </div>
                 </div>
               </div>
-
-              {/* Branch 2: Many-to-Many Labels */}
               <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
                 <h4 style={{ margin: "0 0 1rem 0", color: "#e8eaed", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>2. Tag Labeling (Many-to-Many)</h4>
-                
                 <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", height: "100%", justifyContent: "center" }}>
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
-                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#4K</span>
-                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Dark</span>
-                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Minimal</span>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Anime</span>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Rain</span>
+                    <span style={{ padding: "6px 12px", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold" }}>#Blue</span>
                   </div>
-
                   <div style={{ textAlign: "center" }}>
                     <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "10px 0" }}>🔗 Associated directly to</div>
                     <strong style={{ fontSize: "0.95rem", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: "6px", display: "inline-block" }}>
                       Any Wallpaper
                     </strong>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px" }}>
-                      Allows cross-category filtering regardless of the folder/collection hierarchy.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Branch 3: Offline Sync Engine */}
-              <div className="mindmap-branch" style={{ flex: "1 1 300px", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
-                <h4 style={{ margin: "0 0 1rem 0", color: "#34a853", borderBottom: "1px dashed var(--border)", paddingBottom: "4px" }}>3. Offline-First Syncing Engine</h4>
-                
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", fontSize: "0.85rem", lineHeight: 1.5 }}>
-                  <div style={{ padding: "8px 12px", background: "rgba(52, 168, 83, 0.12)", border: "1px solid #34a853", borderRadius: "6px" }}>
-                    <strong>1. Local Actions (Offline)</strong><br />
-                    Creating categories/collections or assigning tags saves to a local JSON cache immediately.
-                  </div>
-                  <div style={{ padding: "8px 12px", background: "rgba(52, 168, 83, 0.08)", border: "1px solid rgba(52, 168, 83, 0.3)", borderRadius: "6px" }}>
-                    <strong>2. Synchronization Queue</strong><br />
-                    Pending modifications are pushed into a local `sync_queue` in priority order (categories ➔ collections ➔ tags ➔ wallpaper relationships).
-                  </div>
-                  <div style={{ padding: "8px 12px", background: "rgba(26, 115, 232, 0.08)", border: "1px solid rgba(26, 115, 232, 0.3)", borderRadius: "6px" }}>
-                    <strong>3. DB Sync (Online)</strong><br />
-                    When connection is established, the client flushes queue objects to Supabase APIs and updates local IDs to match server database primary keys.
                   </div>
                 </div>
               </div>
@@ -742,9 +1072,38 @@ export default function Page() {
         )}
       </div>
 
-      
+      {/* Smart Recommendations Section */}
+      {recommendations.length > 0 && (
+        <section className="card" style={{ borderColor: "rgba(26,115,232,0.2)", background: "rgba(26,115,232,0.01)" }}>
+          <h3 style={{ margin: "0 0 1rem 0", display: "flex", alignItems: "center", gap: "8px" }}>
+            ✨ <span>Recommended For You</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: "normal", color: "var(--primary)", background: "rgba(26,115,232,0.1)", padding: "2px 8px", borderRadius: 10 }}>Personalized</span>
+          </h3>
+          <div className="recommendations-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1rem" }}>
+            {recommendations.map((img) => (
+              <div
+                key={img.id}
+                className="gallery-item"
+                style={{ cursor: "pointer", border: "1px solid rgba(255,255,255,0.05)" }}
+                onClick={() => {
+                  setPreviewWallpaper(img);
+                  trackInteraction(img, "view");
+                }}
+              >
+                <img src={img.url} className="img-preview" style={{ height: "110px" }} alt={img.title || img.name} />
+                <div className="item-info" style={{ padding: "8px" }}>
+                  <div className="item-name" style={{ fontSize: "0.8rem", fontWeight: 600 }}>{img.title || img.name}</div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                    Match Confidence: {Math.round(img.confidence * 100)}%
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Accessible Auto-Slider for recently added wallpapers */}
+      {/* Accessible Auto-Slider */}
       {sliderImages.length > 0 && (
         <section
           className="slider-container"
@@ -765,15 +1124,15 @@ export default function Page() {
               aria-roledescription="slide"
               aria-label={`${idx + 1} of ${sliderImages.length}`}
             >
-              <img src={img.url} className="slide-img" alt={img.file_name || "Featured Wallpaper"} />
+              <img src={img.url} className="slide-img" alt={img.title || img.file_name || "Featured Wallpaper"} />
               <div className="slide-overlay"></div>
               <div className="slide-content">
                 <div className="badge badge-category" style={{ marginBottom: "0.5rem" }}>
                   {img.collection_details?.category_name || "Uncategorized"}
                 </div>
-                <h3 className="slide-title">{img.file_name}</h3>
-                <p className="slide-desc">
-                  Collection: {img.collection_details?.name || "None"} • Hash: {img.hash?.slice(0, 8)}...
+                <h3 className="slide-title">{img.title || img.file_name}</h3>
+                <p className="slide-desc" style={{ fontSize: "0.85rem" }}>
+                  Collection: {img.collection_details?.name || "None"} • Character: {img.characters?.[0] || "None"}
                 </p>
               </div>
             </div>
@@ -799,7 +1158,6 @@ export default function Page() {
             ▶
           </button>
 
-          {/* Bottom Dot controls & Pause button */}
           <div className="slider-controls">
             <div className="slider-dots" role="tablist" aria-label="Slides Selector">
               {sliderImages.map((_, idx) => (
@@ -825,7 +1183,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* Main Top Grid Section: Upload controls and Application Releases side-by-side */}
+      {/* Main Top Grid Section */}
       <div className="grid-two-columns" style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
@@ -847,50 +1205,6 @@ export default function Page() {
                 />
               </div>
 
-              {/* Category selection */}
-              <div className="form-group" style={{ flex: "1 1 250px" }}>
-                <label style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Category</span>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
-                    onClick={() => setShowNewCatInput((prev) => !prev)}
-                  >
-                    {showNewCatInput ? "Cancel" : "+ New"}
-                  </button>
-                </label>
-                {showNewCatInput ? (
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    <input
-                      type="text"
-                      placeholder="New category name"
-                      value={newCatName}
-                      onChange={(e) => setNewCatName(e.target.value)}
-                    />
-                    <button type="button" className="btn" onClick={handleCreateCategory}>
-                      Create
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value={selectedCategoryForUpload}
-                    onChange={(e) => {
-                      setSelectedCategoryForUpload(e.target.value);
-                      setSelectedCollectionForUpload("");
-                    }}
-                  >
-                    <option value="">-- Select Category --</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Collection selection (filtered by Category) */}
               <div className="form-group" style={{ flex: "1 1 250px" }}>
                 <label style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>Collection (Series)</span>
@@ -898,7 +1212,6 @@ export default function Page() {
                     type="button"
                     className="btn-secondary"
                     style={{ padding: "0 6px", fontSize: "0.75rem", borderRadius: 4 }}
-                    disabled={!selectedCategoryForUpload}
                     onClick={() => setShowNewColInput((prev) => !prev)}
                   >
                     {showNewColInput ? "Cancel" : "+ New"}
@@ -920,11 +1233,8 @@ export default function Page() {
                   <select
                     value={selectedCollectionForUpload}
                     onChange={(e) => setSelectedCollectionForUpload(e.target.value)}
-                    disabled={!selectedCategoryForUpload}
                   >
-                    <option value="">
-                      {selectedCategoryForUpload ? "-- Select Collection --" : "Select Category First"}
-                    </option>
+                    <option value="">-- Select Collection --</option>
                     {filteredUploadCollections.map((col) => (
                       <option key={col.id} value={col.id}>
                         {col.name}
@@ -932,15 +1242,9 @@ export default function Page() {
                     ))}
                   </select>
                 )}
-                {selectedCategoryForUpload && !selectedCollectionForUpload && (
-                  <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                    💡 Leave empty to assign to the default collection for "{categories.find(c => String(c.id) === selectedCategoryForUpload)?.name}".
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Tags Selection & Tag Creator */}
             <div className="form-group">
               <label>Tags Selection</label>
               <input
@@ -988,13 +1292,7 @@ export default function Page() {
                       {tag.name}
                     </button>
                   ))}
-                {tags.length === 0 && (
-                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                    No tags created yet.
-                  </span>
-                )}
               </div>
-              {/* Inline tag creator */}
               <div style={{ display: "flex", gap: "6px", maxWidth: 400 }}>
                 <input
                   type="text"
@@ -1014,7 +1312,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Drag and Drop Zone */}
             <div className="form-group">
               <label>Wallpaper Images</label>
               <div
@@ -1024,7 +1321,7 @@ export default function Page() {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <p>Drag & Drop landscape images here or click to browse</p>
+                <p>Drag & Drop image files here or click to browse</p>
                 <input
                   type="file"
                   accept="image/*"
@@ -1036,7 +1333,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Selected File list */}
             {files.length > 0 && (
               <div className="file-list">
                 <h4 style={{ margin: 0 }}>Selected Files ({files.length}):</h4>
@@ -1115,28 +1411,13 @@ export default function Page() {
                 </div>
               );
             })}
-            {releases.length === 0 && (
-              <div style={{ textAlign: "center", padding: "3rem 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                Checking GitHub releases...
-              </div>
-            )}
           </div>
         </div>
       </div>
 
       {/* Gallery Filter & Grid Card */}
       <div className="card">
-        {/* Header and counter */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1rem",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
           <h2 style={{ margin: 0 }}>Manage Collection</h2>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
             {(() => {
@@ -1153,35 +1434,21 @@ export default function Page() {
                     <button
                       type="button"
                       className="btn"
-                      style={{ 
-                        padding: "6px 12px", 
-                        fontSize: "0.85rem", 
-                        background: "var(--primary)", 
-                        border: "none", 
-                        borderRadius: "4px",
-                        cursor: "pointer"
-                      }}
+                      style={{ padding: "6px 12px", fontSize: "0.85rem" }}
                       disabled={indexingLoading || indexingProgress?.active}
                       onClick={() => handleTriggerIndexing(false)}
                     >
-                      {indexingLoading && !indexingProgress?.active ? "Triggering..." : "⚡ Run AI Indexing"}
+                      {indexingLoading ? "Triggering..." : "⚡ Run AI Indexing"}
                     </button>
                   )}
                   <button
                     type="button"
                     className="btn"
-                    style={{ 
-                      padding: "6px 12px", 
-                      fontSize: "0.85rem", 
-                      background: "rgba(255, 255, 255, 0.05)", 
-                      border: "1px solid var(--border)", 
-                      borderRadius: "4px",
-                      cursor: "pointer"
-                    }}
+                    style={{ padding: "6px 12px", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.05)", border: "1px solid var(--border)", color: "inherit" }}
                     disabled={indexingLoading || indexingProgress?.active}
                     onClick={() => handleTriggerIndexing(true)}
                   >
-                    {indexingLoading && !indexingProgress?.active ? "Triggering..." : "🔄 Re-index All"}
+                    🔄 Re-index All
                   </button>
                 </div>
               );
@@ -1190,305 +1457,285 @@ export default function Page() {
         </div>
 
         {indexingMessage && (
-          <div
-            style={{
-              padding: "10px 14px",
-              background: indexingMessage.startsWith("Error") ? "rgba(219, 68, 85, 0.15)" : "rgba(52, 168, 83, 0.15)",
-              border: indexingMessage.startsWith("Error") ? "1px solid #db4455" : "1px solid #34a853",
-              borderRadius: "6px",
-              fontSize: "0.9rem",
-              marginBottom: "1rem",
-              color: "var(--foreground)",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}
-          >
+          <div style={{
+            padding: "10px 14px",
+            background: "rgba(52, 168, 83, 0.15)",
+            border: "1px solid #34a853",
+            borderRadius: "6px",
+            fontSize: "0.9rem",
+            marginBottom: "1rem",
+            color: "var(--foreground)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
             <span>{indexingMessage}</span>
-            <button
-              type="button"
-              onClick={() => setIndexingMessage(null)}
-              style={{ background: "none", border: "none", color: "var(--foreground)", cursor: "pointer", fontSize: "1rem" }}
-            >
-              ✕
-            </button>
+            <button onClick={() => setIndexingMessage(null)} style={{ background: "none", border: "none", color: "var(--foreground)", cursor: "pointer" }}>✕</button>
           </div>
         )}
 
         {indexingProgress && showProgressCard && (
-          <div
-            style={{
-              background: "rgba(255, 255, 255, 0.03)",
-              border: "1px solid var(--border)",
-              borderRadius: "8px",
-              padding: "1rem",
-              marginBottom: "1.5rem",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            }}
-          >
+          <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border)", borderRadius: "8px", padding: "1rem", marginBottom: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <span style={{ fontWeight: 600, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>
-                  {indexingProgress.active
-                    ? "⚡ AI Indexing Progress"
-                    : (indexingProgress.processed + indexingProgress.failed >= indexingProgress.total)
-                      ? "✅ AI Indexing Completed"
-                      : "🛑 AI Indexing Stopped"
-                  }
-                </span>
-                {indexingProgress.active && (
-                  <span className="spinner" style={{
-                    width: "12px",
-                    height: "12px",
-                    border: "2px solid rgba(255,255,255,0.2)",
-                    borderTopColor: "var(--primary)",
-                    borderRadius: "50%",
-                    animation: "spin 1s linear infinite"
-                  }}></span>
-                )}
-              </span>
+              <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>⚡ AI Indexing Progress</span>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
                   {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
                 </span>
-                {indexingProgress.active ? (
-                  <button
-                    type="button"
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: "0.75rem",
-                      background: "rgba(219, 68, 85, 0.2)",
-                      border: "1px solid #db4455",
-                      color: "#ff6b7b",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    disabled={indexingLoading}
-                    onClick={handleCancelIndexing}
-                  >
-                    🛑 Stop
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: "0.75rem",
-                      background: "rgba(255, 255, 255, 0.1)",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                      color: "#fff",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => setShowProgressCard(false)}
-                  >
-                    Dismiss
+                {indexingProgress.active && (
+                  <button type="button" style={{ padding: "4px 8px", fontSize: "0.75rem", background: "rgba(219,68,85,0.2)", border: "1px solid #db4455", color: "#ff6b7b", borderRadius: 4, cursor: "pointer" }} onClick={handleCancelIndexing}>
+                    Stop
                   </button>
                 )}
               </div>
             </div>
-            
-            {/* Progress Track */}
-            <div style={{
-              width: "100%",
-              height: "8px",
-              background: "rgba(255,255,255,0.1)",
-              borderRadius: "4px",
-              overflow: "hidden",
-              marginBottom: "0.5rem",
-              position: "relative"
-            }}>
-              <div style={{
-                width: `${((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)",
-                borderRadius: "4px",
-                transition: "width 0.4s ease-out"
-              }}></div>
+            <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: "0.5rem" }}>
+              <div style={{ width: `${((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100}%`, height: "100%", background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)" }}></div>
             </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)", flexWrap: "wrap", gap: "0.5rem" }}>
-              <span>
-                Processed: <strong style={{ color: "#34a853" }}>{indexingProgress.processed}</strong> • Failed: <strong style={{ color: "#db4455" }}>{indexingProgress.failed}</strong>
-              </span>
-              {indexingProgress.active && indexingProgress.currentWallpaper && (
-                <span style={{ maxWidth: "60%", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                  Analyzing: <i>{indexingProgress.currentWallpaper}</i>
-                </span>
-              )}
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              <span>Processed: {indexingProgress.processed} • Failed: {indexingProgress.failed}</span>
+              {indexingProgress.active && <span>Analyzing: <i>{indexingProgress.currentWallpaper}</i></span>}
             </div>
-            <style dangerouslySetInnerHTML={{__html: `
-              @keyframes spin {
-                to { transform: rotate(360deg); }
-              }
-            `}} />
           </div>
         )}
 
-        {/* Dynamic Filter Controls */}
-        <div className="filter-bar">
-          <div className="filter-group">
-            <label>Category:</label>
-            <select
-              value={selectedCategoryFilter}
-              onChange={(e) => {
-                setSelectedCategoryFilter(e.target.value);
-                setSelectedCollectionFilter(""); // Reset collection filter
+        {/* Live Search and Filter Bar */}
+        <div style={{ marginBottom: "1.5rem", display: "flex", gap: "10px" }}>
+          <input
+            type="text"
+            placeholder="🔍 Live Search: Search title, description, characters, franchise, tags, style, mood, colors, etc. (AND matched, normalized)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "10px 14px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+              background: "var(--background)",
+              color: "inherit",
+              fontSize: "0.95rem",
+              boxShadow: "inset 0 1px 4px rgba(0,0,0,0.15)",
+              outline: "none"
+            }}
+          />
+          {(searchQuery || selectedCategoryFilter || selectedCollectionFilter || selectedStyleFilter || selectedMoodFilter || selectedColorFilter || selectedTagFilters.length > 0) && (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ padding: "0 18px", borderRadius: "8px", fontSize: "0.95rem", whiteSpace: "nowrap" }}
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategoryFilter("");
+                setSelectedCollectionFilter("");
+                setSelectedStyleFilter("");
+                setSelectedMoodFilter("");
+                setSelectedColorFilter("");
+                setSelectedTagFilters([]);
               }}
             >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              Clear All Filters
+            </button>
+          )}
+        </div>
 
-          <div className="filter-group">
-            <label>Collection:</label>
-            <select
-              value={selectedCollectionFilter}
-              onChange={(e) => setSelectedCollectionFilter(e.target.value)}
-            >
+        {/* Dynamic Filter Controls Panel */}
+        <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.5rem" }}>
+
+          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Collection</label>
+            <select value={selectedCollectionFilter} onChange={(e) => setSelectedCollectionFilter(e.target.value)}>
               <option value="">All Collections</option>
-              {filteredFilterCollections.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.name}
-                </option>
-              ))}
+              {filteredFilterCollections.map((col) => (<option key={col.id} value={col.id}>{col.name}</option>))}
             </select>
           </div>
 
-          <div className="filter-group" style={{ width: "100%" }}>
-            <label style={{ display: "block", marginBottom: "4px" }}>Filter by Tags:</label>
-            <input
-              type="text"
-              placeholder="🔍 Search tags to filter..."
-              value={tagSearchFilter}
-              onChange={(e) => setTagSearchFilter(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 10px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                background: "var(--background)",
-                color: "inherit",
-                fontSize: "0.85rem",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <div className="tags-filter-list" style={{ maxHeight: "120px", overflowY: "auto", padding: "8px", border: "1px solid var(--border)", borderRadius: "6px", background: "rgba(0,0,0,0.15)", width: "100%" }}>
-              {tags
-                .filter((t) =>
-                  t.name.toLowerCase().includes(tagSearchFilter.toLowerCase()) ||
-                  selectedTagFilters.includes(t.id)
-                )
-                .map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => handleToggleTagFilter(tag.id)}
-                    className={`tag-chip ${selectedTagFilters.includes(tag.id) ? "active" : ""}`}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
-              {tags.length === 0 && (
-                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                  No tags available.
-                </span>
-              )}
-            </div>
+          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Style</label>
+            <select value={selectedStyleFilter} onChange={(e) => setSelectedStyleFilter(e.target.value)}>
+              <option value="">All Styles</option>
+              <option value="Realistic">Realistic</option>
+              <option value="Minimal">Minimal</option>
+              <option value="Illustration">Illustration</option>
+              <option value="3D Render">3D Render</option>
+              <option value="Anime">Anime</option>
+              <option value="Pixel Art">Pixel Art</option>
+              <option value="Cyberpunk">Cyberpunk</option>
+              <option value="Vector">Vector</option>
+            </select>
+          </div>
+
+          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Mood</label>
+            <select value={selectedMoodFilter} onChange={(e) => setSelectedMoodFilter(e.target.value)}>
+              <option value="">All Moods</option>
+              <option value="Dramatic">Dramatic</option>
+              <option value="Calm">Calm</option>
+              <option value="Mysterious">Mysterious</option>
+              <option value="Energetic">Energetic</option>
+              <option value="Dark">Dark</option>
+              <option value="Vibrant">Vibrant</option>
+            </select>
+          </div>
+
+          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Colors</label>
+            <select value={selectedColorFilter} onChange={(e) => setSelectedColorFilter(e.target.value)}>
+              <option value="">All Colors</option>
+              <option value="Blue">Blue</option>
+              <option value="Black">Black</option>
+              <option value="Red">Red</option>
+              <option value="White">White</option>
+              <option value="Green">Green</option>
+              <option value="Yellow">Yellow</option>
+              <option value="Orange">Orange</option>
+              <option value="Purple">Purple</option>
+              <option value="Dark">Dark</option>
+            </select>
           </div>
         </div>
 
-        {/* Gallery selection controls */}
+        <div className="form-group" style={{ width: "100%", marginBottom: "1.5rem" }}>
+          <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "bold" }}>Filter by Tag Labels</label>
+          <input
+            type="text"
+            placeholder="🔍 Search tags to filter..."
+            value={tagSearchFilter}
+            onChange={(e) => setTagSearchFilter(e.target.value)}
+            style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border)", background: "var(--background)", color: "inherit", fontSize: "0.85rem", marginBottom: "0.5rem" }}
+          />
+          <div className="tags-filter-list" style={{ maxHeight: "100px", overflowY: "auto", padding: "8px", border: "1px solid var(--border)", borderRadius: "6px", background: "rgba(0,0,0,0.15)", width: "100%" }}>
+            {tags
+              .filter((t) => t.name.toLowerCase().includes(tagSearchFilter.toLowerCase()) || selectedTagFilters.includes(t.id))
+              .map((tag) => (
+                <button key={tag.id} type="button" onClick={() => handleToggleTagFilter(tag.id)} className={`tag-chip ${selectedTagFilters.includes(tag.id) ? "active" : ""}`}>
+                  {tag.name}
+                </button>
+              ))}
+          </div>
+        </div>
+
         {galleryImages.length > 0 && (
-          <div style={{ marginBottom: "1rem" }}>
-            <button type="button" className="btn-secondary" onClick={handleSelectAllImages}>
-              {selectedImageIds.length === galleryImages.length
-                ? "Deselect All"
-                : `Select All for Bulk Edit (${selectedImageIds.length})`}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <button type="button" className="btn-secondary" onClick={handleSelectAllImages} style={{ padding: "6px 14px", borderRadius: 6, fontSize: "0.85rem" }}>
+              {selectedImageIds.length === galleryImages.length ? "Deselect All" : `Select All for Bulk Edit (${selectedImageIds.length})`}
             </button>
           </div>
         )}
 
         {/* Wallpaper Image Grid */}
-        <div className="grid">
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "1.5rem" }}>
           {galleryImages.map((img) => {
             const isSelected = selectedImageIds.includes(img.id);
+            const fav = isFavorited(img.id);
+            
             return (
-              <div key={img.id} className={`gallery-item ${isSelected ? "selected" : ""}`}>
+              <div key={img.id} className={`gallery-item ${isSelected ? "selected" : ""}`} style={{ display: "flex", flexDirection: "column", height: "100%" }}>
                 {/* Selection Checkbox */}
-                <div className="select-overlay">
+                <div className="select-overlay" style={{ display: "flex", justifyContent: "space-between", width: "calc(100% - 16px)", pointerEvents: "none" }}>
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => handleSelectImage(img.id)}
                     className="select-checkbox"
+                    style={{ pointerEvents: "auto" }}
                   />
+                  
+                  {/* Favorite button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavoriteLocal(img);
+                    }}
+                    style={{
+                      background: "rgba(0,0,0,0.65)",
+                      border: "none",
+                      color: fav ? "#ff3b30" : "#ffffff",
+                      fontSize: "1rem",
+                      cursor: "pointer",
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      pointerEvents: "auto"
+                    }}
+                  >
+                    {fav ? "❤️" : "♡"}
+                  </button>
                 </div>
 
-                <img src={img.url} className="img-preview" alt={img.name} />
+                <img
+                  src={img.url}
+                  className="img-preview"
+                  alt={img.title || img.name}
+                  style={{ height: "160px", objectFit: "cover", cursor: "zoom-in" }}
+                  onClick={() => {
+                    setPreviewWallpaper(img);
+                    trackInteraction(img, "view");
+                  }}
+                />
 
-                <div className="item-info">
-                  <div className="item-name" title={img.name}>
-                    {img.file_name || img.name}
+                <div className="item-info" style={{ padding: "12px", display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div className="item-name" title={img.title || img.file_name || img.name} style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                    {img.title || img.file_name || img.name}
                   </div>
-                  <div className="item-meta">
-                    <span className="badge badge-category">
-                      {img.collection_details?.category_name || "No Category"}
-                    </span>
-                    <span className="badge">
-                      {img.collection_details?.name || "No Collection"}
-                    </span>
-                    {img.tags &&
-                      img.tags.map((t: any) => (
-                        <span key={t.id} className="badge">
-                          #{t.name}
-                        </span>
-                      ))}
+                  
+                  {img.description && (
+                    <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "4px 0 8px 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {img.description}
+                    </p>
+                  )}
+
+                  <div className="item-meta" style={{ marginTop: "auto", display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                    
+                    {img.collections && img.collections.map((c: any) => (
+                      <span key={c.id} className="badge" style={{ background: "rgba(255, 159, 10, 0.1)", color: "#ffb340", borderColor: "rgba(255, 159, 10, 0.2)", fontSize: "0.65rem" }}>
+                        {c.name}
+                      </span>
+                    ))}
+
+                    {img.characters && img.characters.slice(0, 2).map((c: string, idx: number) => (
+                      <span key={idx} className="badge" style={{ background: "rgba(52, 168, 83, 0.1)", color: "#5cd37e", borderColor: "rgba(52, 168, 83, 0.2)", fontSize: "0.65rem" }}>
+                        👤 {c}
+                      </span>
+                    ))}
+
+                    {img.franchises && img.franchises.slice(0, 1).map((f: string, idx: number) => (
+                      <span key={idx} className="badge" style={{ background: "rgba(26, 115, 232, 0.1)", color: "#8ab4f8", borderColor: "rgba(26, 115, 232, 0.2)", fontSize: "0.65rem" }}>
+                        🎬 {f}
+                      </span>
+                    ))}
                   </div>
 
                   {/* Individual actions */}
-                  <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+                  <div style={{ display: "flex", gap: "6px", marginTop: "12px" }}>
                     <button
                       onClick={() => handleStartEdit(img)}
                       className="btn-secondary"
-                      style={{
-                        flex: 1,
-                        border: "1px solid var(--border)",
-                        borderRadius: 4,
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                        fontWeight: "bold",
-                        fontSize: "0.75rem",
-                        color: "var(--foreground)",
-                        background: "rgba(255,255,255,0.05)",
-                      }}
+                      style={{ flex: 1, padding: "5px 10px", fontSize: "0.8rem", cursor: "pointer", borderRadius: "6px" }}
                     >
                       Edit
                     </button>
+                    
+                    <a
+                      href={img.url}
+                      download={img.file_name}
+                      onClick={() => trackInteraction(img, "download")}
+                      className="btn-secondary"
+                      style={{ padding: "5px 10px", fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", borderRadius: "6px" }}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Download wallpaper"
+                    >
+                      📥
+                    </a>
+
                     <button
                       onClick={() => deleteImage(img.name)}
                       className="btn-danger"
-                      style={{
-                        flex: 1,
-                        border: "none",
-                        borderRadius: 4,
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                        fontWeight: "bold",
-                        fontSize: "0.75rem",
-                        color: "white",
-                      }}
+                      style={{ flex: 1, padding: "5px 10px", fontSize: "0.8rem", cursor: "pointer", borderRadius: "6px", color: "white", border: "none" }}
                     >
                       Delete
                     </button>
@@ -1507,341 +1754,173 @@ export default function Page() {
         )}
       </div>
 
-      {/* Analytics & User Reviews Section */}
+      {/* Analytics Section */}
       <div className="card" style={{ marginTop: "2rem" }}>
         <h2 style={{ margin: 0, marginBottom: "1rem" }}>User Reviews & Analytics</h2>
-        
-        <div style={{
-          display: "flex",
-          gap: "2rem",
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          padding: "1.5rem",
-          marginBottom: "1.5rem"
-        }}>
+        <div style={{ display: "flex", gap: "2rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 8, padding: "1.5rem", marginBottom: "1.5rem" }}>
           <div>
             <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Average Rating</div>
             <div style={{ fontSize: "2.5rem", fontWeight: "bold", color: "var(--accent)", marginTop: "0.25rem" }}>
-              {reviews.length > 0
-                ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
-                : "0.0"}
+              {reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : "0.0"}
               <span style={{ fontSize: "1.5rem", color: "var(--text-muted)" }}> / 5</span>
             </div>
           </div>
           <div>
             <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Total Reviews</div>
-            <div style={{ fontSize: "2.5rem", fontWeight: "bold", marginTop: "0.25rem" }}>
-              {reviews.length}
-            </div>
+            <div style={{ fontSize: "2.5rem", fontWeight: "bold", marginTop: "0.25rem" }}>{reviews.length}</div>
           </div>
         </div>
-
-        <div style={{
-          maxHeight: "350px",
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-          paddingRight: "6px"
-        }}>
+        <div style={{ maxHeight: "350px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "6px" }}>
           {reviews.map((r) => (
-            <div key={r.id} style={{
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "12px 16px"
-            }}>
+            <div key={r.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <strong style={{ fontSize: "0.95rem" }}>{r.reviewer_name}</strong>
-                <span style={{ color: "#ff9f0a", fontWeight: "bold", fontSize: "0.9rem" }}>
-                  {"★".repeat(r.rating) + "☆".repeat(5 - r.rating)}
-                </span>
+                <span style={{ color: "#ff9f0a", fontWeight: "bold", fontSize: "0.9rem" }}>{"★".repeat(r.rating) + "☆".repeat(5 - r.rating)}</span>
               </div>
-              {r.comment ? (
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "rgba(255,255,255,0.85)" }}>{r.comment}</p>
-              ) : (
-                <em style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>No comment provided</em>
-              )}
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px", textAlign: "right" }}>
-                {new Date(r.created_at).toLocaleDateString()}
-              </div>
+              <p style={{ margin: 0, fontSize: "0.9rem" }}>{r.comment || <em>No comment</em>}</p>
             </div>
           ))}
-
-          {reviews.length === 0 && (
-            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-              No user reviews submitted yet. Feedback requested in desktop client.
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Floating Bulk Edit action bar (appears when items are selected) */}
+      {/* Floating Bulk Edit action bar */}
       {selectedImageIds.length > 0 && (
         <div className="bulk-actions-bar">
-          <div>
-            <strong style={{ fontSize: "1.1rem" }}>
-              {selectedImageIds.length} item(s) selected
-            </strong>
-          </div>
+          <div><strong style={{ fontSize: "1.1rem" }}>{selectedImageIds.length} item(s) selected</strong></div>
           <div className="bulk-actions-controls">
-            {/* Assign Category */}
             <div>
-              <select
-                value={bulkCategoryId}
-                onChange={(e) => {
-                  setBulkCategoryId(e.target.value);
-                  setBulkCollectionId("");
-                }}
-                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}
-              >
-                <option value="">-- Assign Category --</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
+              <select value={bulkCollectionId} onChange={(e) => setBulkCollectionId(e.target.value)} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}>
+                <option value="">-- Assign Collection --</option>
+                {filteredBulkCollections.map((col) => (<option key={col.id} value={col.id}>{col.name}</option>))}
               </select>
             </div>
+            <button type="button" className="btn" onClick={handleApplyBulkUpdate} disabled={loading}>Apply Changes</button>
+            <button type="button" className="btn-secondary" onClick={() => { setSelectedImageIds([]); setBulkCategoryId(""); setBulkCollectionId(""); setBulkTags([]); }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
-            {/* Assign collection */}
-            <div>
-              <select
-                value={bulkCollectionId}
-                onChange={(e) => setBulkCollectionId(e.target.value)}
-                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}
-                disabled={!bulkCategoryId}
-              >
-                <option value="">
-                  {bulkCategoryId ? "-- Assign Collection --" : "Select Category First"}
-                </option>
-                {filteredBulkCollections.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Bulk Tags (chips toggle) */}
-            <div style={{ width: "100%", maxWidth: 300 }}>
-              <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "4px" }}>Bulk Tags:</label>
-              <input
-                type="text"
-                placeholder="🔍 Search tags..."
-                value={tagSearchBulk}
-                onChange={(e) => setTagSearchBulk(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "4px 8px",
-                  borderRadius: "4px",
-                  border: "1px solid var(--border)",
-                  background: "#1a1a1a",
-                  color: "#e0e0e0",
-                  fontSize: "0.75rem",
-                  marginBottom: "0.5rem",
-                }}
-              />
-              <div style={{
-                display: "flex",
-                gap: "4px",
-                flexWrap: "wrap",
-                maxHeight: "100px",
-                overflowY: "auto",
-                padding: "6px",
-                border: "1px solid var(--border)",
-                borderRadius: "4px",
-                background: "rgba(0,0,0,0.15)"
-              }}>
-                {tags
-                  .filter((t) =>
-                    t.name.toLowerCase().includes(tagSearchBulk.toLowerCase()) ||
-                    bulkTags.includes(t.id)
-                  )
-                  .map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className={`tag-chip ${bulkTags.includes(t.id) ? "active" : ""}`}
-                      onClick={() =>
-                        setBulkTags((prev) =>
-                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                        )
-                      }
-                      style={{ padding: "2px 8px", fontSize: "0.75rem" }}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            <button type="button" className="btn" onClick={handleApplyBulkUpdate} disabled={loading}>
-              Apply Changes
-            </button>
+      {/* Full Resolution Wallpaper Preview Modal */}
+      {previewWallpaper && (
+        <div
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}
+          onClick={() => setPreviewWallpaper(null)}
+        >
+          <div
+            style={{ width: "90%", maxWidth: "1000px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "1.5rem", position: "relative" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setSelectedImageIds([]);
-                setBulkCategoryId("");
-                setBulkCollectionId("");
-                setBulkTags([]);
-              }}
+              onClick={() => setPreviewWallpaper(null)}
+              style={{ position: "absolute", top: "1rem", right: "1rem", background: "rgba(0,0,0,0.6)", color: "white", border: "none", fontSize: "1.2rem", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
             >
-              Cancel
+              ✕
             </button>
+            <img src={previewWallpaper.url} style={{ width: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 8 }} alt={previewWallpaper.title || previewWallpaper.name} />
+            <div style={{ marginTop: "1rem" }}>
+              <h3 style={{ margin: "0 0 0.5rem 0" }}>{previewWallpaper.title || previewWallpaper.file_name}</h3>
+              <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-muted)" }}>{previewWallpaper.description || "No description available."}</p>
+            </div>
           </div>
         </div>
       )}
 
       {/* Individual Wallpaper Edit Modal */}
       {editingWallpaper && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000,
-        }}>
-          <div className="card" style={{
-            width: "100%",
-            maxWidth: "500px",
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "12px",
-            padding: "1.5rem 2rem",
-            boxShadow: "var(--shadow)",
-            position: "relative",
-            margin: 0
-          }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card" style={{ width: "100%", maxWidth: "600px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "1.5rem 2rem", position: "relative", margin: 0, maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Edit Wallpaper Metadata</h3>
             
-            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.5rem", wordBreak: "break-all" }}>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem", wordBreak: "break-all" }}>
               File: {editingWallpaper.file_name || editingWallpaper.name}
             </p>
 
             <div className="form-group">
-              <label>Category</label>
-              <select
-                value={editCategoryId}
-                onChange={(e) => {
-                  setEditCategoryId(e.target.value);
-                  setEditCollectionId(""); // Clear collection on category change
-                }}
-              >
-                <option value="">-- No Category --</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <label>Title</label>
+              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
             </div>
 
             <div className="form-group">
-              <label>Collection (Series)</label>
-              <select
-                value={editCollectionId}
-                onChange={(e) => setEditCollectionId(e.target.value)}
-                disabled={!editCategoryId}
-              >
-                <option value="">
-                  {editCategoryId ? "-- No Collection (Assign Default) --" : "Select Category First"}
-                </option>
-                {filteredEditCollections.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
-              </select>
-              {editCategoryId && !editCollectionId && (
-                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                  💡 Will assign to the default collection for "{categories.find(c => String(c.id) === editCategoryId)?.name}".
-                </p>
-              )}
+              <label>Description</label>
+              <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} style={{ resize: "vertical" }} />
             </div>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <div className="form-group">
+                <label>Characters (Comma-separated)</label>
+                <input type="text" value={editCharacters} onChange={(e) => setEditCharacters(e.target.value)} placeholder="e.g. Naruto Uzumaki, Sasuke" />
+              </div>
+              <div className="form-group">
+                <label>Franchises (Comma-separated)</label>
+                <input type="text" value={editFranchises} onChange={(e) => setEditFranchises(e.target.value)} placeholder="e.g. Naruto, Shonen Jump" />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <div className="form-group">
+                <label>Styles (Comma-separated)</label>
+                <input type="text" value={editStyles} onChange={(e) => setEditStyles(e.target.value)} placeholder="e.g. Anime, Digital Art" />
+              </div>
+              <div className="form-group">
+                <label>Moods (Comma-separated)</label>
+                <input type="text" value={editMoods} onChange={(e) => setEditMoods(e.target.value)} placeholder="e.g. Dramatic, Mysterious" />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Dominant Color</label>
+              <input type="text" value={editPrimaryColor} onChange={(e) => setEditPrimaryColor(e.target.value)} placeholder="e.g. Blue" />
+            </div>
+
+            {/* Many-to-many Collection selection checkboxes */}
+            <div className="form-group">
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "8px" }}>Assigned Collections (Multi-Select)</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px", maxHeight: "120px", overflowY: "auto", border: "1px solid var(--border)", padding: "10px", borderRadius: "6px", background: "rgba(0,0,0,0.1)" }}>
+                {collections.map((col) => (
+                  <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", cursor: "pointer" }}>
+                    <input type="checkbox" checked={editCollectionIds.includes(col.id)} onChange={() => toggleCollectionEditCheckbox(col.id)} style={{ width: 14, height: 14 }} />
+                    <span>{col.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Tags checkboxes */}
             <div className="form-group">
               <label>Tags Selection</label>
-              <input
-                type="text"
-                placeholder="🔍 Search tags..."
-                value={tagSearchEdit}
-                onChange={(e) => setTagSearchEdit(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border)",
-                  background: "rgba(0,0,0,0.2)",
-                  color: "white",
-                  fontSize: "0.85rem",
-                  marginBottom: "0.5rem",
-                }}
-              />
-              <div style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "6px",
-                padding: "8px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                background: "rgba(0,0,0,0.15)",
-                maxHeight: "100px",
-                overflowY: "auto"
-              }}>
+              <input type="text" placeholder="🔍 Search tags..." value={tagSearchEdit} onChange={(e) => setTagSearchEdit(e.target.value)} style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border)", background: "rgba(0,0,0,0.2)", color: "white", fontSize: "0.85rem", marginBottom: "0.5rem" }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "8px", border: "1px solid var(--border)", borderRadius: 6, background: "rgba(0,0,0,0.15)", maxHeight: "100px", overflowY: "auto" }}>
                 {tags
-                  .filter((t) =>
-                    t.name.toLowerCase().includes(tagSearchEdit.toLowerCase()) ||
-                    editTags.includes(t.id)
-                  )
+                  .filter((t) => t.name.toLowerCase().includes(tagSearchEdit.toLowerCase()) || editTags.includes(t.id))
                   .map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className={`tag-chip ${editTags.includes(t.id) ? "active" : ""}`}
-                      onClick={() =>
-                        setEditTags((prev) =>
-                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                        )
-                      }
-                      style={{ padding: "2px 8px", fontSize: "0.75rem" }}
-                    >
+                    <button key={t.id} type="button" className={`tag-chip ${editTags.includes(t.id) ? "active" : ""}`} onClick={() => setEditTags((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])} style={{ padding: "2px 8px", fontSize: "0.75rem" }}>
                       {t.name}
                     </button>
                   ))}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "2rem" }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setEditingWallpaper(null)}
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={handleSaveEdit}
-                disabled={loading}
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button type="button" className="btn-secondary" onClick={() => setEditingWallpaper(null)} disabled={loading}>Cancel</button>
+              <button type="button" className="btn" onClick={handleSaveEdit} disabled={loading}>{loading ? "Saving..." : "Save Changes"}</button>
             </div>
           </div>
         </div>
       )}
+      <style dangerouslySetInnerHTML={{__html: `
+        .tags-filter-list::-webkit-scrollbar,
+        .recommendations-grid::-webkit-scrollbar,
+        .release-notes-box::-webkit-scrollbar {
+          width: 5px;
+          height: 5px;
+        }
+        .tags-filter-list::-webkit-scrollbar-thumb,
+        .recommendations-grid::-webkit-scrollbar-thumb,
+        .release-notes-box::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.15);
+          border-radius: 4px;
+        }
+      `}} />
     </div>
   );
 }

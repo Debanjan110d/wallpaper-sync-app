@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
+import { queryTextAI } from "./openrouter";
 
 // Helper to slugify tags
-function slugify(text: string) {
+export function slugify(text: string) {
   return text
     .toString()
     .toLowerCase()
@@ -14,7 +15,7 @@ function slugify(text: string) {
     .replace(/-+$/, "");
 }
 
-// Clean response from Gemini in case it wraps it in markdown blocks
+// Clean response from Gemini/LLM in case it wraps it in markdown blocks
 function cleanJsonResponse(text: string): string {
   let cleaned = text.trim();
   if (cleaned.startsWith("```")) {
@@ -26,13 +27,16 @@ function cleanJsonResponse(text: string): string {
   return cleaned.trim();
 }
 
-interface GeminiMetadataResponse {
-  category: string;
-  collection: string | null;
+interface RawVisionMetadata {
+  title: string;
+  description: string;
+  characters: string[];
+  franchises: string[];
   tags: string[];
-  style: string;
-  primary_color: string;
-  quality: string;
+  colors: string[];
+  style: string[];
+  mood: string[];
+  other_attributes: string[];
   confidence: number;
 }
 
@@ -53,36 +57,7 @@ export async function processWallpaperAI(
       .update({ status: "pending_ai" })
       .eq("id", wallpaperId);
 
-    // 2. Fetch predefined categories and collections
-    const { data: categories, error: catErr } = await supabaseAdmin
-      .from("categories")
-      .select("id, name, slug");
-    
-    if (catErr) throw new Error(`Failed to fetch categories: ${catErr.message}`);
-
-    const { data: collections, error: colErr } = await supabaseAdmin
-      .from("collections")
-      .select("id, name, slug, category_id");
-
-    if (colErr) throw new Error(`Failed to fetch collections: ${colErr.message}`);
-
-    // Format categories and their collections hierarchically to ensure the AI mapping is perfect
-    let categoriesAndCollectionsPrompt = "";
-    for (const cat of (categories || [])) {
-      const catCols = (collections || []).filter((col) => col.category_id === cat.id);
-      categoriesAndCollectionsPrompt += `- Category: "${cat.name}"\n`;
-      if (catCols.length > 0) {
-        categoriesAndCollectionsPrompt += `  Associated Collections:\n`;
-        catCols.forEach((col) => {
-          categoriesAndCollectionsPrompt += `  - "${col.name}"\n`;
-        });
-      } else {
-        categoriesAndCollectionsPrompt += `  Associated Collections: None\n`;
-      }
-      categoriesAndCollectionsPrompt += `\n`;
-    }
-
-    // 3. Initialize Gemini
+    // 2. Initialize Gemini
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not defined in environment variables");
@@ -91,43 +66,32 @@ export async function processWallpaperAI(
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
-    // 4. Construct Prompt
-    const prompt = `You are an expert wallpaper cataloger. You have deep knowledge of pop culture, anime, games, art styles, and movies.
-Analyze the provided wallpaper image and generate structured metadata in JSON format.
+    // 3. Construct Vision Prompt
+    const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
+1. title: A short, high-quality descriptive title for the image.
+2. description: A clear one-sentence description of the image content.
+3. characters: Names of any specific characters (anime, gaming, pop culture) visible in the image. Return empty array if none.
+4. franchises: Names of the franchise(s) or universes the image belongs to (e.g. "Naruto", "Marvel", "Cyberpunk", "Spider-Man").
+5. tags: A list of 5 to 15 descriptive keywords capturing subjects, environment, mood, and visual elements.
+6. colors: The dominant color families (e.g. "Blue", "Black", "Red", "Neon Pink").
+7. style: Visual style tags, e.g. "Anime", "Digital Art", "Pixel Art", "Realistic", "3D Render", "Illustration".
+8. mood: Emotional tone, e.g. "Dramatic", "Calm", "Mysterious", "Energetic", "Vibrant".
+9. other_attributes: Misc tags (e.g. "Silhouette", "Minimal", "Detailed", "Glowing").
+10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
 
-Below is the list of available categories and their associated collections.
-
-Available Categories and Collections:
-${categoriesAndCollectionsPrompt}
-
-Rules for Category and Collection Mapping:
-1. Prioritize mapping to the existing Categories and Collections listed above.
-2. Carefully inspect the main subject(s), characters, vehicles, brands, franchise logo, or overall themes.
-3. BE EXTREMELY PRECISE in character and franchise identification. Do NOT misclassify characters. For example, if you see Gojo Satoru, Kakashi, or Tanjiro, do not default to "Black Clover" or other generic categories unless they are actually from that specific series.
-4. If a wallpaper is from a specific game, anime, movie, or series:
-   - Identify the franchise. If the franchise matches one of the collections under "Gaming" or "Anime" or "Marvel" or "DC" or "TV Shows" (e.g. "Jujutsu Kaisen", "Minecraft", "Avengers", "Batman", "Stranger Things"), you MUST set the "category" to the corresponding parent category (e.g. "Anime", "Gaming", "Marvel", etc.) and the "collection" to that franchise name exactly.
-5. If the wallpaper belongs to a category (e.g. "Nature") but there is no specific collection matching the image subject, map it to one of the general collections (like "Mountains", "Forests", "Sunset", "Ocean") or set "collection" to null.
-6. If the wallpaper is definitely of a category/franchise not in the list, you can suggest a new category name and/or a new collection name.
-
-Rules for Tag Extraction:
-1. Extract 5 to 12 highly relevant, lowercase keywords (tags) describing the image details, main characters, visual elements, and mood.
-2. Include the character names if present (e.g. "gojo satoru", "asta", "spiderman").
-3. Include the franchise name (e.g. "jujutsu kaisen", "marvel", "demon slayer").
-4. Include visual style descriptors (e.g. "neon lights", "cyberpunk", "minimalist", "silhouette").
-5. Do NOT include generic words like "wallpaper", "image", "photo", "picture", "desktop", "background".
-
-Return ONLY a JSON object matching this schema:
+Return ONLY a valid JSON object matching the following schema. Do NOT output markdown blocks or comments.
 {
-  "category": "The selected category name (must match one from the list above, or be a new suitable one if none fit)",
-  "collection": "The selected collection name (must match one of the associated collections under the category, or be a new suitable franchise/topic name, or null)",
-  "tags": ["tag1", "tag2", "tag3", "tag4", ...],
-  "style": "Choose the visual style, e.g. 'Realistic', 'Minimal', 'Illustration', '3D Render', 'Anime', 'Pixel Art', 'Cyberpunk', 'Oil Painting', etc.",
-  "primary_color": "The dominant color family, e.g. 'Blue', 'Dark', 'Black', 'White', 'Red', etc.",
-  "quality": "Estimate quality of visual details: 'HD', 'QHD', 'UHD/4K', or '8K'.",
-  "confidence": 0.0 to 1.0 representing your confidence in this categorization and mapping
-}
-
-Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text. Output valid JSON only.`;
+  "title": "string",
+  "description": "string",
+  "characters": ["string"],
+  "franchises": ["string"],
+  "tags": ["string"],
+  "colors": ["string"],
+  "style": ["string"],
+  "mood": ["string"],
+  "other_attributes": ["string"],
+  "confidence": number
+}`;
 
     const imagePart = {
       inlineData: {
@@ -136,156 +100,96 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
       },
     };
 
-    // 5. Call Gemini API
-    const result = await model.generateContent([prompt, imagePart]);
-    const responseText = result.response.text();
-    const cleanJson = cleanJsonResponse(responseText);
+    // 4. Call Vision AI
+    console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
+    const visionResult = await model.generateContent([visionPrompt, imagePart]);
+    const visionText = visionResult.response.text();
+    const cleanVisionJson = cleanJsonResponse(visionText);
 
-    let metadata: GeminiMetadataResponse;
+    let visionMetadata: RawVisionMetadata;
     try {
-      metadata = JSON.parse(cleanJson);
-    } catch (parseError: any) {
-      throw new Error(`Failed to parse JSON response from Gemini: ${parseError.message}. Response was: ${responseText}`);
+      visionMetadata = JSON.parse(cleanVisionJson);
+    } catch (e: any) {
+      throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
     }
 
-    // 6. Map Category
-    let finalCollectionId: number | null = null;
-    let finalCollectionName: string | null = null;
+    // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
+    console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
+    const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
+Follow these rules strictly:
+1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
+2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
+3. Strip meaningless tags (e.g., "wallpaper", "background", "image", "pic", "desktop").
+4. Ensure characters and franchises are cleanly capitalized (e.g., "naruto uzumaki" -> "Naruto Uzumaki", "marvel" -> "Marvel").
+5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
+6. Do NOT invent new information. Only clean and normalize the provided input.`;
 
-    let matchedCategory = (categories || []).find(
-      (c) => {
-        const cSlug = c.slug || slugify(c.name);
-        const metaCatSlug = slugify(metadata.category || "");
-        return cSlug === metaCatSlug || c.name.toLowerCase() === (metadata.category || "").toLowerCase();
-      }
-    );
+    const userPrompt = JSON.stringify(visionMetadata, null, 2);
+    const normalizedText = await queryTextAI(systemPrompt, userPrompt);
+    const cleanNormalizedJson = cleanJsonResponse(normalizedText);
 
-    // If no existing category matched and AI suggested a new one, create it dynamically
-    if (!matchedCategory && metadata.category && metadata.category.trim()) {
-      const catName = metadata.category.trim();
-      const catSlug = slugify(catName);
-      const { data: newCat, error: newCatErr } = await supabaseAdmin
-        .from("categories")
-        .insert([{ name: catName, slug: catSlug }])
-        .select()
-        .single();
-
-      if (!newCatErr && newCat) {
-        matchedCategory = newCat;
-        console.log(`[AI Processor] Created new category: ${catName}`);
-      } else if (newCatErr) {
-        console.error(`[AI Processor] Failed to create new category:`, newCatErr.message);
-      }
+    let normalizedMetadata: RawVisionMetadata;
+    try {
+      normalizedMetadata = JSON.parse(cleanNormalizedJson);
+    } catch (e: any) {
+      console.warn("[AI Processor] Failed to parse normalized JSON. Falling back to raw Vision AI output.", e);
+      normalizedMetadata = visionMetadata;
     }
 
-    if (matchedCategory) {
-      // Find collection inside category (support slug/loose matching fallback)
-      let matchedCollection = (collections || []).find(
-        (col) => {
-          if (col.category_id !== matchedCategory.id) return false;
-          const colSlug = col.slug || slugify(col.name);
-          const metaColSlug = slugify(metadata.collection || "");
-          return colSlug === metaColSlug || col.name.toLowerCase() === (metadata.collection || "").toLowerCase();
-        }
-      );
-
-      // If no existing collection matched and AI suggested one, create it dynamically under the category
-      if (!matchedCollection && metadata.collection && metadata.collection.trim()) {
-        const colName = metadata.collection.trim();
-        const colSlug = slugify(colName);
-        const { data: newCol, error: newColErr } = await supabaseAdmin
-          .from("collections")
-          .insert([{ name: colName, category_id: matchedCategory.id, slug: colSlug }])
-          .select()
-          .single();
-
-        if (!newColErr && newCol) {
-          matchedCollection = newCol;
-          console.log(`[AI Processor] Created new collection: ${colName} under category ${matchedCategory.name}`);
-        } else if (newColErr) {
-          console.error(`[AI Processor] Failed to create new collection:`, newColErr.message);
-        }
-      }
-
-      if (matchedCollection) {
-        finalCollectionId = matchedCollection.id;
-        finalCollectionName = matchedCollection.name;
-      } else {
-        // Fallback to default or first collection in this category
-        const defaultCol = (collections || []).find(
-          (col) =>
-            col.category_id === matchedCategory.id &&
-            ["default", "general", "uncategorized"].includes(col.name.toLowerCase())
-        );
-        let fallbackCol = defaultCol || (collections || []).find((col) => col.category_id === matchedCategory.id);
-
-        if (!fallbackCol) {
-          // Create a "Default" collection for this category if none exists at all
-          const { data: newCol, error: newColErr } = await supabaseAdmin
-            .from("collections")
-            .insert([{ name: "Default", category_id: matchedCategory.id, slug: "default" }])
-            .select()
-            .single();
-
-          if (!newColErr && newCol) {
-            fallbackCol = newCol;
-            console.log(`[AI Processor] Created fallback Default collection under category ${matchedCategory.name}`);
-          }
-        }
-
-        if (fallbackCol) {
-          finalCollectionId = fallbackCol.id;
-          finalCollectionName = fallbackCol.name;
-        }
-      }
-    }
-
-    // 7. Update Wallpaper Attributes
+    // 6. Update Wallpaper Table with rich metadata fields
     const updatePayload = {
-      style: metadata.style || null,
-      primary_color: metadata.primary_color || null,
-      quality: metadata.quality || null,
-      confidence: typeof metadata.confidence === "number" ? metadata.confidence : 1.0,
+      title: normalizedMetadata.title || null,
+      description: normalizedMetadata.description || null,
+      characters: Array.isArray(normalizedMetadata.characters) ? normalizedMetadata.characters : [],
+      franchises: Array.isArray(normalizedMetadata.franchises) ? normalizedMetadata.franchises : [],
+      styles: Array.isArray(normalizedMetadata.style) ? normalizedMetadata.style : [],
+      moods: Array.isArray(normalizedMetadata.mood) ? normalizedMetadata.mood : [],
+      other_attributes: Array.isArray(normalizedMetadata.other_attributes) ? normalizedMetadata.other_attributes : [],
+      confidence: typeof normalizedMetadata.confidence === "number" ? normalizedMetadata.confidence : 1.0,
       indexed_at: new Date().toISOString(),
-      collection_id: finalCollectionId,
-      collection: finalCollectionName,
-      status: "indexed", // Ready for Admin approval
+      status: "indexed" // Moderation queue
     };
 
+    console.log(`[AI Processor] Updating DB record for ${wallpaperId}...`);
     const { error: updateErr } = await supabaseAdmin
       .from("wallpapers")
       .update(updatePayload)
       .eq("id", wallpaperId);
 
     if (updateErr) {
-      throw new Error(`Failed to update wallpaper attributes: ${updateErr.message}`);
+      throw new Error(`Failed to update wallpaper: ${updateErr.message}`);
     }
 
-    // 8. Process Tags
-    const tagsToProcess = Array.isArray(metadata.tags)
-      ? metadata.tags.map((t) => t.trim()).filter((t) => t.length > 0)
+    // 7. Process & Link Tags
+    const tagsToProcess = Array.isArray(normalizedMetadata.tags)
+      ? normalizedMetadata.tags.map((t) => t.trim()).filter((t) => t.length > 0)
       : [];
 
-    // Filter out generic tags
     const excludedWords = ["wallpaper", "image", "photo", "picture", "desktop", "background"];
     const filteredTags = tagsToProcess.filter(
       (t) => !excludedWords.includes(t.toLowerCase())
     );
 
+    // Clear existing tags to prevent duplicates during re-runs
+    await supabaseAdmin
+      .from("wallpaper_tags")
+      .delete()
+      .eq("wallpaper_id", wallpaperId);
+
     for (const tagName of filteredTags) {
       const tagSlug = slugify(tagName);
       if (!tagSlug) continue;
 
-      // Find or insert tag
       let tagId: number | null = null;
 
-      const { data: existingTag, error: tagCheckErr } = await supabaseAdmin
+      // Find or insert tag
+      const { data: existingTag } = await supabaseAdmin
         .from("tags")
         .select("id")
         .eq("slug", tagSlug)
         .maybeSingle();
 
-      if (!tagCheckErr && existingTag) {
+      if (existingTag) {
         tagId = existingTag.id;
       } else {
         const { data: newTag, error: tagInsertErr } = await supabaseAdmin
@@ -296,8 +200,8 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
 
         if (!tagInsertErr && newTag) {
           tagId = newTag.id;
-        } else if (tagInsertErr) {
-          // Retry to find in case of concurrent insert race condition
+        } else {
+          // Retry find in case of database concurrency race
           const { data: retryTag } = await supabaseAdmin
             .from("tags")
             .select("id")
@@ -309,16 +213,33 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
         }
       }
 
-      // Link tag to wallpaper
       if (tagId) {
         await supabaseAdmin
           .from("wallpaper_tags")
           .insert([{ wallpaper_id: wallpaperId, tag_id: tagId }])
-          // ON CONFLICT DO NOTHING (ignore if already linked)
           .select()
           .maybeSingle();
       }
     }
+
+    // 8. Assign Wallpaper to Collections (Phase 4 / 5)
+    console.log(`[AI Processor] Calculating collection assignments for ${wallpaperId}...`);
+    await assignWallpaperToCollections(
+      wallpaperId,
+      {
+        title: normalizedMetadata.title,
+        description: normalizedMetadata.description,
+        characters: normalizedMetadata.characters,
+        franchises: normalizedMetadata.franchises,
+        tags: filteredTags,
+        styles: normalizedMetadata.style,
+        moods: normalizedMetadata.mood,
+        other_attributes: normalizedMetadata.other_attributes,
+        primary_color: normalizedMetadata.colors?.[0] || null,
+        colors: normalizedMetadata.colors
+      },
+      supabaseAdmin
+    );
 
     return { success: true };
   } catch (error: any) {
@@ -331,5 +252,209 @@ Do NOT output any markdown blocks (like \`\`\`json), explanation, or extra text.
       .eq("id", wallpaperId);
 
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Recounts the number of wallpapers assigned to each collection.
+ */
+export async function recountCollectionWallpapers(supabaseAdmin: any) {
+  try {
+    const { data: counts, error: countErr } = await supabaseAdmin
+      .from("wallpaper_collections")
+      .select("collection_id");
+
+    if (countErr || !counts) return;
+
+    const countMap: Record<number, number> = {};
+    counts.forEach((row: any) => {
+      countMap[row.collection_id] = (countMap[row.collection_id] || 0) + 1;
+    });
+
+    const { data: collections } = await supabaseAdmin.from("collections").select("id");
+    if (!collections) return;
+
+    for (const col of collections) {
+      const count = countMap[col.id] || 0;
+      await supabaseAdmin
+        .from("collections")
+        .update({ wallpaper_count: count })
+        .eq("id", col.id);
+    }
+  } catch (e) {
+    console.error("Recounting collections failed:", e);
+  }
+}
+
+/**
+ * Evaluates a wallpaper against all discovered collection keyword profiles
+ * and stores matches in the wallpaper_collections table.
+ */
+export async function assignWallpaperToCollections(
+  wallpaperId: string,
+  metadata: {
+    title?: string | null;
+    description?: string | null;
+    characters?: string[];
+    franchises?: string[];
+    tags?: string[];
+    styles?: string[];
+    moods?: string[];
+    other_attributes?: string[];
+    primary_color?: string | null;
+    colors?: string[];
+  },
+  supabaseAdmin: any
+) {
+  try {
+    // 1. Fetch all collections
+    const { data: collections, error: colsErr } = await supabaseAdmin
+      .from("collections")
+      .select("id, name, slug");
+    if (colsErr || !collections) {
+      console.error("[Assign] Failed to fetch collections:", colsErr);
+      return;
+    }
+
+    // 2. Fetch all keyword profiles (kewords column)
+    const { data: keywords, error: kwErr } = await supabaseAdmin
+      .from("collection_keywords")
+      .select("collection_id, kewords, weight");
+    if (kwErr || !keywords) {
+      console.error("[Assign] Failed to fetch collection keywords:", kwErr);
+      return;
+    }
+
+    // 3. Clear existing assignments
+    await supabaseAdmin
+      .from("wallpaper_collections")
+      .delete()
+      .eq("wallpaper_id", wallpaperId);
+
+    // 4. Gather terms for scoring
+    const wallpaperTerms = new Set<string>();
+
+    if (metadata.tags) {
+      metadata.tags.forEach(t => wallpaperTerms.add(t.toLowerCase().trim()));
+    }
+    if (metadata.characters) {
+      metadata.characters.forEach(c => {
+        const lower = c.toLowerCase().trim();
+        wallpaperTerms.add(lower);
+        lower.split(/\s+/).forEach(w => wallpaperTerms.add(w));
+      });
+    }
+    if (metadata.franchises) {
+      metadata.franchises.forEach(f => {
+        const lower = f.toLowerCase().trim();
+        wallpaperTerms.add(lower);
+        lower.split(/\s+/).forEach(w => wallpaperTerms.add(w));
+      });
+    }
+    if (metadata.styles) {
+      metadata.styles.forEach(s => wallpaperTerms.add(s.toLowerCase().trim()));
+    }
+    if (metadata.moods) {
+      metadata.moods.forEach(m => wallpaperTerms.add(m.toLowerCase().trim()));
+    }
+    if (metadata.other_attributes) {
+      metadata.other_attributes.forEach(a => wallpaperTerms.add(a.toLowerCase().trim()));
+    }
+    if (metadata.colors) {
+      metadata.colors.forEach(c => wallpaperTerms.add(c.toLowerCase().trim()));
+    }
+    if (metadata.primary_color) {
+      wallpaperTerms.add(metadata.primary_color.toLowerCase().trim());
+    }
+
+    const cleanWord = (w: string) => w.toLowerCase().replace(/[^\w]/g, "");
+    if (metadata.title) {
+      metadata.title.split(/\s+/).map(cleanWord).filter(Boolean).forEach(w => wallpaperTerms.add(w));
+    }
+    if (metadata.description) {
+      metadata.description.split(/\s+/).map(cleanWord).filter(Boolean).forEach(w => wallpaperTerms.add(w));
+    }
+
+    // 5. Score collections
+    const assignments: any[] = [];
+    for (const col of collections) {
+      const colKeywords = keywords.filter((k: any) => k.collection_id === col.id);
+      if (colKeywords.length === 0) continue;
+
+      let score = 0;
+
+      for (const kwEntry of colKeywords) {
+        const kw = kwEntry.kewords.toLowerCase().trim();
+        const weight = Number(kwEntry.weight) || 1.0;
+
+        if (wallpaperTerms.has(kw)) {
+          score += weight;
+        } else {
+          // Substring checks
+          for (const term of wallpaperTerms) {
+            if (term.includes(kw) || kw.includes(term)) {
+              score += weight * 0.5;
+              break;
+            }
+          }
+        }
+      }
+
+      // Convert score to a scaled 0-100 percentage.
+      // Match if score >= 0.8 (e.g. at least one solid keyword matched)
+      // Percentage maps score 2.0+ to 100%, score 0.8 to 40%
+      const percentage = Math.min(100, Math.round((score / 2.0) * 100));
+
+      if (score >= 0.8) {
+        assignments.push({
+          wallpaper_id: wallpaperId,
+          collection_id: col.id,
+          match_score: percentage,
+          assigned_by: "keyword_engine"
+        });
+      }
+    }
+
+    // 6. Save collection links in many-to-many junction
+    if (assignments.length > 0) {
+      const { error: insErr } = await supabaseAdmin
+        .from("wallpaper_collections")
+        .insert(assignments);
+
+      if (insErr) {
+        console.error(`[Assign] Failed to insert assignments for ${wallpaperId}:`, insErr);
+      }
+
+      // 7. Backward compatibility: update collection_id & collection columns on wallpapers
+      // with the highest scoring collection.
+      const highestMatch = assignments.reduce((prev, current) => {
+        return (prev.match_score > current.match_score) ? prev : current;
+      });
+
+      const matchedCol = collections.find((c: any) => c.id === highestMatch.collection_id);
+      if (matchedCol) {
+        await supabaseAdmin
+          .from("wallpapers")
+          .update({
+            collection_id: matchedCol.id,
+            collection: matchedCol.name
+          })
+          .eq("id", wallpaperId);
+      }
+    } else {
+      // Clear columns if no collections match
+      await supabaseAdmin
+        .from("wallpapers")
+        .update({
+          collection_id: null,
+          collection: null
+        })
+        .eq("id", wallpaperId);
+    }
+
+    // 8. Recount counts for all collections
+    await recountCollectionWallpapers(supabaseAdmin);
+  } catch (err) {
+    console.error(`[Assign] Error assigning collection to wallpaper ${wallpaperId}:`, err);
   }
 }

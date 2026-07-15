@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { recountCollectionWallpapers } from "@/utils/aiProcessor";
 
 export async function POST(request: Request) {
   try {
@@ -40,7 +41,20 @@ export async function POST(request: Request) {
     let failed = 0;
 
     for (const item of items) {
-      const { id, collection_id, category_id, tags } = item;
+      const {
+        id,
+        collection_id,
+        tags,
+        title,
+        description,
+        characters,
+        franchises,
+        styles,
+        moods,
+        primary_color,
+        collection_ids // Multiple collections list
+      } = item;
+
       if (!id) {
         results.push({ status: "failed", error: "Missing wallpaper ID" });
         failed++;
@@ -48,77 +62,28 @@ export async function POST(request: Request) {
       }
 
       try {
-        let finalCollectionId = collection_id;
-
-        if (category_id !== undefined && category_id !== null && !finalCollectionId) {
-          // Resolve category_id to a collection_id
-          const { data: categoryData, error: catErr } = await supabase
-            .from("categories")
-            .select("name")
-            .eq("id", category_id)
-            .single();
-            
-          if (!catErr && categoryData) {
-            const { data: existingCols, error: colsErr } = await supabase
-              .from("collections")
-              .select("id, name")
-              .eq("category_id", category_id);
-              
-            if (!colsErr && existingCols) {
-              const matchByName = existingCols.find(
-                (c) => c.name.toLowerCase() === categoryData.name.toLowerCase()
-              );
-              const matchByDefault = existingCols.find(
-                (c) => ["general", "default", "uncategorized"].includes(c.name.toLowerCase())
-              );
-              const matchedCol = matchByName || matchByDefault || existingCols[0];
-              if (matchedCol) {
-                finalCollectionId = matchedCol.id;
-              }
-            }
-            
-            if (!finalCollectionId) {
-              const slug = categoryData.name
-                .toLowerCase()
-                .trim()
-                .replace(/\s+/g, "-")
-                .replace(/[^\w\-]+/g, "")
-                .replace(/\-\-+/g, "-")
-                .replace(/^-+/, "")
-                .replace(/-+$/, "");
-                
-              const { data: newCol, error: newColErr } = await supabase
-                .from("collections")
-                .insert([
-                  {
-                    name: categoryData.name,
-                    category_id: category_id,
-                    slug,
-                  }
-                ])
-                .select()
-                .single();
-                
-              if (!newColErr && newCol) {
-                finalCollectionId = newCol.id;
-              }
-            }
-          }
-        }
-
-        // Update wallpapers table columns (e.g. collection_id)
         const updateData: any = {};
-        if (finalCollectionId !== undefined) {
-          updateData.collection_id = finalCollectionId;
 
-          // Keep 'collection' text column in sync
-          if (finalCollectionId === null) {
+        // 1. Resolve direct update columns
+        if (title !== undefined) updateData.title = title;
+        if (description !== undefined) updateData.description = description;
+        if (characters !== undefined) updateData.characters = Array.isArray(characters) ? characters : [];
+        if (franchises !== undefined) updateData.franchises = Array.isArray(franchises) ? franchises : [];
+        if (styles !== undefined) updateData.styles = Array.isArray(styles) ? styles : [];
+        if (moods !== undefined) updateData.moods = Array.isArray(moods) ? moods : [];
+        if (primary_color !== undefined) updateData.primary_color = primary_color;
+        
+        let resolvedCollectionId = collection_id;
+
+        if (resolvedCollectionId !== undefined) {
+          updateData.collection_id = resolvedCollectionId;
+          if (resolvedCollectionId === null) {
             updateData.collection = null;
           } else {
             const { data: colData } = await supabase
               .from("collections")
               .select("name")
-              .eq("id", finalCollectionId)
+              .eq("id", resolvedCollectionId)
               .single();
             if (colData) {
               updateData.collection = colData.name;
@@ -126,28 +91,83 @@ export async function POST(request: Request) {
           }
         }
 
+        // Apply wallpaper table update
         if (Object.keys(updateData).length > 0) {
           const { error: updateErr } = await supabase
             .from("wallpapers")
             .update(updateData)
             .eq("id", id);
           if (updateErr) {
-            throw new Error(`Failed to update collection: ${updateErr.message}`);
+            throw new Error(`Failed to update fields: ${updateErr.message}`);
           }
         }
 
-        // Update tag relationships if tags array is provided
+        // 2. Many-to-many collection links
+        if (collection_ids !== undefined && Array.isArray(collection_ids)) {
+          // Clear current assignments
+          const { error: delColErr } = await supabase
+            .from("wallpaper_collections")
+            .delete()
+            .eq("wallpaper_id", id);
+
+          if (delColErr) {
+            throw new Error(`Failed to clear collections: ${delColErr.message}`);
+          }
+
+          if (collection_ids.length > 0) {
+            const insertRows = collection_ids.map((colId: any) => ({
+              wallpaper_id: id,
+              collection_id: Number(colId),
+              match_score: 100,
+              assigned_by: "manual"
+            }));
+
+            const { error: insColErr } = await supabase
+              .from("wallpaper_collections")
+              .insert(insertRows);
+
+            if (insColErr) {
+              throw new Error(`Failed to assign collections: ${insColErr.message}`);
+            }
+
+            // Keep wallpapers.collection_id backward-compatible with the first collection
+            const primaryColId = Number(collection_ids[0]);
+            const { data: colData } = await supabase
+              .from("collections")
+              .select("name")
+              .eq("id", primaryColId)
+              .single();
+
+            await supabase
+              .from("wallpapers")
+              .update({
+                collection_id: primaryColId,
+                collection: colData ? colData.name : null
+              })
+              .eq("id", id);
+          } else {
+            // Clear backward compatible columns
+            await supabase
+              .from("wallpapers")
+              .update({
+                collection_id: null,
+                collection: null
+              })
+              .eq("id", id);
+          }
+        }
+
+        // 3. Update tags
         if (tags !== undefined && Array.isArray(tags)) {
-          // Clear current tags
           const { error: deleteErr } = await supabase
             .from("wallpaper_tags")
             .delete()
             .eq("wallpaper_id", id);
+
           if (deleteErr) {
-            throw new Error(`Failed to clear existing tags: ${deleteErr.message}`);
+            throw new Error(`Failed to clear tags: ${deleteErr.message}`);
           }
 
-          // Insert new tags
           if (tags.length > 0) {
             const insertRows = tags.map((tagId: any) => ({
               wallpaper_id: id,
@@ -157,8 +177,9 @@ export async function POST(request: Request) {
             const { error: insertErr } = await supabase
               .from("wallpaper_tags")
               .insert(insertRows);
+
             if (insertErr) {
-              throw new Error(`Failed to insert new tags: ${insertErr.message}`);
+              throw new Error(`Failed to save tags: ${insertErr.message}`);
             }
           }
         }
@@ -170,6 +191,9 @@ export async function POST(request: Request) {
         failed++;
       }
     }
+
+    // Recount wallpaper_count for modified collections
+    await recountCollectionWallpapers(supabase);
 
     return NextResponse.json({
       summary: {

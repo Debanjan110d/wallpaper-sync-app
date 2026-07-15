@@ -8,23 +8,16 @@ type DbWallpaper = {
   storage_path: string | null;
   hash: string | null;
   status: string | null;
-  collection: string | null;
   created_at: string | null;
-  collection_id: number | null;
-  style?: string | null;
-  primary_color?: string | null;
-  quality?: string | null;
   confidence?: number | null;
   indexed_at?: string | null;
-  collections: {
-    id: number;
-    name: string;
-    category_id: number | null;
-    categories: {
-      id: number;
-      name: string;
-    } | null;
-  } | null;
+  title?: string | null;
+  description?: string | null;
+  characters?: string[] | null;
+  franchises?: string[] | null;
+  styles?: string[] | null;
+  moods?: string[] | null;
+  other_attributes?: string[] | null;
   wallpaper_tags: {
     tag_id: number;
     tags: {
@@ -32,7 +25,24 @@ type DbWallpaper = {
       name: string;
     } | null;
   }[] | null;
+  wallpaper_collections?: {
+    collection_id: number;
+    collections: {
+      id: number;
+      name: string;
+      category_id: number | null;
+    } | null;
+  }[] | null;
 };
+
+function normalizeSearchQuery(query: string): string[] {
+  return query
+    .toLowerCase()
+    .replace(/[\-_\s]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((w, i, arr) => w.length > 0 && arr.indexOf(w) === i);
+}
 
 export async function GET(request: Request) {
   try {
@@ -72,8 +82,11 @@ export async function GET(request: Request) {
     const categoryId = url.searchParams.get("category");
     const collectionId = url.searchParams.get("collection");
     const tagIds = url.searchParams.get("tags");
+    const q = url.searchParams.get("q");
 
-    // Gather matched wallpaper IDs first if filters are specified
+    const style = url.searchParams.get("style");
+    const mood = url.searchParams.get("mood");
+
     let filteredWpIds: string[] | null = null;
     let noMatch = false;
 
@@ -91,34 +104,35 @@ export async function GET(request: Request) {
       if (colIds.length === 0) {
         noMatch = true;
       } else {
-        const { data: wps, error: wpsErr } = await supabase
-          .from("wallpapers")
-          .select("id")
+        const { data: wcLinks, error: wcErr } = await supabase
+          .from("wallpaper_collections")
+          .select("wallpaper_id")
           .in("collection_id", colIds);
 
-        if (wpsErr) {
-          return NextResponse.json({ error: wpsErr.message }, { status: 500 });
+        if (wcErr) {
+          return NextResponse.json({ error: wcErr.message }, { status: 500 });
         }
 
-        filteredWpIds = (wps || []).map((w) => w.id);
+        filteredWpIds = (wcLinks || []).map((l) => l.wallpaper_id);
       }
     }
 
     if (collectionId && !noMatch) {
-      const { data: wps, error: wpsErr } = await supabase
-        .from("wallpapers")
-        .select("id")
+      const { data: wcLinks, error: wcErr } = await supabase
+        .from("wallpaper_collections")
+        .select("wallpaper_id")
         .eq("collection_id", Number(collectionId));
 
-      if (wpsErr) {
-        return NextResponse.json({ error: wpsErr.message }, { status: 500 });
+      if (wcErr) {
+        return NextResponse.json({ error: wcErr.message }, { status: 500 });
       }
 
-      const colWpIds = (wps || []).map((w) => w.id);
+      const matchedIds = (wcLinks || []).map((l) => l.wallpaper_id);
+
       if (filteredWpIds === null) {
-        filteredWpIds = colWpIds;
+        filteredWpIds = matchedIds;
       } else {
-        filteredWpIds = filteredWpIds.filter((id) => colWpIds.includes(id));
+        filteredWpIds = filteredWpIds.filter((id) => matchedIds.includes(id));
       }
       if (filteredWpIds.length === 0) {
         noMatch = true;
@@ -162,64 +176,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // Low-resource mode: only return count + newest created_at (no signed URLs).
-    if (countOnly) {
-      let countQuery = supabase
-        .from("wallpapers")
-        .select("created_at", { count: "exact", head: true });
-
-      if (isAdminSession) {
-        countQuery = countQuery.neq("status", "deleted");
-      } else {
-        countQuery = countQuery.eq("status", "published");
-      }
-
-      if (filteredWpIds !== null) {
-        countQuery = countQuery.in("id", filteredWpIds);
-      }
-
-      if (hasValidSince) {
-        countQuery = countQuery.gt("created_at", since!.toISOString());
-      }
-
-      const { count, error: countErr } = await countQuery;
-      if (countErr) {
-        return NextResponse.json({ error: countErr.message }, { status: 500 });
-      }
-
-      let maxQuery = supabase
-        .from("wallpapers")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      if (isAdminSession) {
-        maxQuery = maxQuery.neq("status", "deleted");
-      } else {
-        maxQuery = maxQuery.eq("status", "published");
-      }
-
-      if (filteredWpIds !== null) {
-        maxQuery = maxQuery.in("id", filteredWpIds);
-      }
-
-      if (hasValidSince) {
-        maxQuery = maxQuery.gt("created_at", since!.toISOString());
-      }
-
-      const { data: maxRow, error: maxErr } = await maxQuery.maybeSingle();
-      if (maxErr) {
-        return NextResponse.json({ error: maxErr.message }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        wallpapers: [],
-        count: count || 0,
-        max_created_at: maxRow?.created_at || null,
-        since: hasValidSince ? since!.toISOString() : null,
-      });
-    }
-
+    // Retrieve wallpapers based on schema-conforming fields
     let query = supabase
       .from("wallpapers")
       .select(`
@@ -228,37 +185,36 @@ export async function GET(request: Request) {
         storage_path,
         hash,
         status,
-        collection,
         created_at,
-        style,
-        primary_color,
-        quality,
         confidence,
         indexed_at,
-        collections (
-          id,
-          name,
-          category_id,
-          categories (
-            id,
-            name
-          )
-        ),
+        title,
+        description,
+        characters,
+        franchises,
+        styles,
+        moods,
+        other_attributes,
         wallpaper_tags (
           tag_id,
           tags (
             id,
             name
           )
+        ),
+        wallpaper_collections (
+          collection_id,
+          collections (
+            id,
+            name,
+            category_id
+          )
         )
       `)
       .order("created_at", { ascending: false });
 
-    if (isAdminSession) {
-      query = query.neq("status", "deleted");
-    } else {
-      query = query.eq("status", "published");
-    }
+    // Show all non-deleted wallpapers (uploaded + indexed) on the dashboard
+    query = query.neq("status", "deleted");
 
     if (filteredWpIds !== null) {
       query = query.in("id", filteredWpIds);
@@ -274,8 +230,65 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 
+    let filteredRows = (rows as unknown as DbWallpaper[]) || [];
+
+    // Filter in JS
+    if (style) {
+      filteredRows = filteredRows.filter(r => 
+        (r.styles || []).some((s: string) => s.toLowerCase() === style.toLowerCase())
+      );
+    }
+    if (mood) {
+      filteredRows = filteredRows.filter(r => 
+        (r.moods || []).some((m: string) => m.toLowerCase() === mood.toLowerCase())
+      );
+    }
+
+    // Apply search keyword matching
+    if (q && q.trim()) {
+      const searchTerms = normalizeSearchQuery(q);
+      if (searchTerms.length > 0) {
+        filteredRows = filteredRows.filter((row) => {
+          const searchableTexts: string[] = [];
+          if (row.title) searchableTexts.push(row.title);
+          if (row.description) searchableTexts.push(row.description);
+          if (row.file_name) searchableTexts.push(row.file_name);
+          
+          if (Array.isArray(row.characters)) searchableTexts.push(...row.characters);
+          if (Array.isArray(row.franchises)) searchableTexts.push(...row.franchises);
+          if (Array.isArray(row.styles)) searchableTexts.push(...row.styles);
+          if (Array.isArray(row.moods)) searchableTexts.push(...row.moods);
+          if (Array.isArray(row.other_attributes)) searchableTexts.push(...row.other_attributes);
+          
+          if (row.wallpaper_tags) {
+            row.wallpaper_tags.forEach((wt: any) => {
+              if (wt.tags?.name) searchableTexts.push(wt.tags.name);
+            });
+          }
+          if (row.wallpaper_collections) {
+            row.wallpaper_collections.forEach((wc: any) => {
+              if (wc.collections?.name) searchableTexts.push(wc.collections.name);
+            });
+          }
+
+          const unifiedText = searchableTexts.join(" ").toLowerCase();
+          return searchTerms.every(term => unifiedText.includes(term));
+        });
+      }
+    }
+
+    if (countOnly) {
+      const maxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : null;
+      return NextResponse.json({
+        wallpapers: [],
+        count: filteredRows.length,
+        max_created_at: maxCreatedAt,
+        since: hasValidSince ? since!.toISOString() : null,
+      });
+    }
+
     const wallpapers = await Promise.all(
-      (rows as unknown as DbWallpaper[])
+      filteredRows
         .filter((row) => !!row.storage_path)
         .map(async (row) => {
           const storagePath = String(row.storage_path);
@@ -283,23 +296,29 @@ export async function GET(request: Request) {
             .from("wallpapers")
             .createSignedUrl(storagePath, 60 * 60);
 
-          // Format nested collections structure
-          const collectionDetails = row.collections
+          const wc = Array.isArray(row.wallpaper_collections) && row.wallpaper_collections.length > 0
+            ? row.wallpaper_collections[0]
+            : null;
+
+          const collectionDetails = wc && wc.collections
             ? {
-                id: row.collections.id,
-                name: row.collections.name,
-                category_id: row.collections.category_id,
-                category_name: row.collections.categories
-                  ? row.collections.categories.name
-                  : null,
+                id: wc.collections.id,
+                name: wc.collections.name,
+                category_id: wc.collections.category_id,
+                category_name: null // Categories table does not exist
               }
             : null;
 
-          // Format nested tags structure
           const tags = Array.isArray(row.wallpaper_tags)
             ? row.wallpaper_tags
                 .map((wt) => wt.tags)
                 .filter((t): t is { id: number; name: string } => !!t)
+            : [];
+
+          const multiCollections = Array.isArray(row.wallpaper_collections)
+            ? row.wallpaper_collections
+                .map((wc) => wc.collections)
+                .filter((c): c is { id: number; name: string; category_id: number | null } => !!c)
             : [];
 
           return {
@@ -308,25 +327,29 @@ export async function GET(request: Request) {
             storage_path: storagePath,
             hash: row.hash,
             status: row.status,
-            collection: row.collection,
+            collection: wc?.collections?.name || null,
             created_at: row.created_at,
-            collection_id: row.collection_id,
+            collection_id: wc?.collections?.id || null,
             collection_details: collectionDetails,
-            tags: tags,
-            style: row.style || null,
-            primary_color: row.primary_color || null,
-            quality: row.quality || null,
+            tags,
+            collections: multiCollections,
+            style: row.styles?.[0] || null,
             confidence: row.confidence || null,
             indexed_at: row.indexed_at || null,
-            // Back-compat for existing clients (Electron/downloader + dashboard UI)
+            title: row.title || null,
+            description: row.description || null,
+            characters: row.characters || [],
+            franchises: row.franchises || [],
+            styles: row.styles || [],
+            moods: row.moods || [],
+            other_attributes: row.other_attributes || [],
             name: storagePath.split("/").pop() || storagePath,
             url: urlError ? null : (urlData?.signedUrl || null),
           };
         })
     );
 
-    const maxCreatedAt =
-      rows && rows.length > 0 ? (rows[0] as unknown as DbWallpaper).created_at : null;
+    const maxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : null;
 
     return NextResponse.json({
       wallpapers,
@@ -395,6 +418,16 @@ export async function DELETE(request: Request) {
     }
 
     if (rowIdToUpdate) {
+      await supabaseAdmin
+        .from("wallpaper_tags")
+        .delete()
+        .eq("wallpaper_id", rowIdToUpdate);
+
+      await supabaseAdmin
+        .from("wallpaper_collections")
+        .delete()
+        .eq("wallpaper_id", rowIdToUpdate);
+
       const { error: updateErr } = await supabaseAdmin
         .from("wallpapers")
         .update({ status: "deleted" })
@@ -409,4 +442,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

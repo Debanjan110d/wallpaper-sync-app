@@ -65,14 +65,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, category_id, cover_image, description } = await request.json();
+    const { name, cover_image, description } = await request.json();
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
-
-    if (!category_id) {
-      return NextResponse.json({ error: "category_id is required" }, { status: 400 });
     }
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -94,7 +90,6 @@ export async function POST(request: Request) {
       .insert([
         {
           name: name.trim(),
-          category_id,
           slug,
           cover_image: cover_image || null,
           description: description || null,
