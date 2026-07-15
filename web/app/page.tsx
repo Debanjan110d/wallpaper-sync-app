@@ -1754,9 +1754,20 @@ export default function Page() {
                     
                     {img.collections && img.collections.map((c: any) => (
                       <span key={c.id} className="badge" style={{ background: "rgba(255, 159, 10, 0.1)", color: "#ffb340", borderColor: "rgba(255, 159, 10, 0.2)", fontSize: "0.65rem" }}>
-                        {c.name}
+                        📁 {c.name}
                       </span>
                     ))}
+
+                    {img.tags && img.tags.slice(0, 3).map((t: any) => (
+                      <span key={t.id} className="badge" style={{ background: "rgba(163, 114, 253, 0.1)", color: "#b98cff", borderColor: "rgba(163, 114, 253, 0.2)", fontSize: "0.65rem" }}>
+                        🏷️ {t.name}
+                      </span>
+                    ))}
+                    {img.tags && img.tags.length > 3 && (
+                      <span className="badge" style={{ background: "rgba(255, 255, 255, 0.05)", color: "var(--text-muted)", borderColor: "rgba(255, 255, 255, 0.1)", fontSize: "0.65rem" }} title={img.tags.slice(3).map((t: any) => t.name).join(", ")}>
+                        +{img.tags.length - 3}
+                      </span>
+                    )}
 
                     {img.characters && img.characters.slice(0, 2).map((c: string, idx: number) => (
                       <span key={idx} className="badge" style={{ background: "rgba(52, 168, 83, 0.1)", color: "#5cd37e", borderColor: "rgba(52, 168, 83, 0.2)", fontSize: "0.65rem" }}>

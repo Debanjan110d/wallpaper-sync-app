@@ -15,16 +15,47 @@ export function slugify(text: string) {
     .replace(/-+$/, "");
 }
 
-// Clean response from Gemini/LLM in case it wraps it in markdown blocks
+// Clean response from Gemini/LLM in case it wraps it in markdown blocks.
+// Regex is our friend here because LLMs love to throw random newlines and formatting at us.
 function cleanJsonResponse(text: string): string {
   let cleaned = text.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```[a-zA-Z]*\n/, "");
-  }
-  if (cleaned.endsWith("```")) {
-    cleaned = cleaned.replace(/\n```$/, "");
-  }
+  // Strip opening markdown tags e.g. ```json or ```
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "");
+  // Strip closing markdown tags e.g. ```
+  cleaned = cleaned.replace(/\s*```$/, "");
   return cleaned.trim();
+}
+
+// Who needs double-cleaning anyway? Actually, we do, because LLMs are like toddlers who ignore rules.
+// This function scrubs away generic trash like "wallpaper", "4k", etc., and ensures tags don't overlap.
+export function cleanAndNormalizeTagsLocal(tags: any): string[] {
+  if (!tags) return [];
+  const rawTags = Array.isArray(tags) ? tags : String(tags).split(",");
+  
+  const excludedWords = new Set([
+    "wallpaper", "wallpapers", "image", "images", "photo", "photos", 
+    "picture", "pictures", "desktop", "background", "backgrounds", 
+    "art", "illustration", "vector", "drawing", "pic", "pics", 
+    "hd", "4k", "screen", "screensaver"
+  ]);
+
+  const seenSlugs = new Set<string>();
+  const cleaned: string[] = [];
+
+  for (const tag of rawTags) {
+    if (!tag) continue;
+    const trimmed = String(tag).trim().toLowerCase();
+    if (!trimmed || excludedWords.has(trimmed)) continue;
+
+    // Generate slug to detect near-duplicates (e.g., "spider-man" vs "spiderman")
+    const slug = slugify(trimmed);
+    if (!slug || seenSlugs.has(slug)) continue;
+
+    seenSlugs.add(slug);
+    cleaned.push(trimmed);
+  }
+
+  return cleaned;
 }
 
 interface RawVisionMetadata {
@@ -188,7 +219,12 @@ Return ONLY a valid JSON object matching the following schema. Do NOT wrap in ma
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Corrected model name from gemini-3.5-flash
+      // Gemini 1.5 Flash is our savior. We force it to output pure JSON so we don't have to write
+      // recursive markdown parsers that will keep us awake at 3 AM.
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+      });
 
       // 3. Construct Vision Prompt
       const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
@@ -238,8 +274,12 @@ Return ONLY a valid JSON object matching the following schema. Do NOT output mar
       }
 
       // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
-      console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
-      const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
+      // OpenRouter can be a bit temperamental or rate-limited on the free tier.
+      // If it throws a tantrum, we catch it and use the raw Gemini vision metadata as a fallback
+      // rather than crashing the whole indexing pipeline. Work smart, not hard.
+      try {
+        console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
+        const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
 Follow these rules strictly:
 1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
 2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
@@ -248,14 +288,12 @@ Follow these rules strictly:
 5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
 6. Do NOT invent new information. Only clean and normalize the provided input.`;
 
-      const userPrompt = JSON.stringify(visionMetadata, null, 2);
-      const normalizedText = await queryTextAI(systemPrompt, userPrompt);
-      const cleanNormalizedJson = cleanJsonResponse(normalizedText);
-
-      try {
+        const userPrompt = JSON.stringify(visionMetadata, null, 2);
+        const normalizedText = await queryTextAI(systemPrompt, userPrompt);
+        const cleanNormalizedJson = cleanJsonResponse(normalizedText);
         normalizedMetadata = JSON.parse(cleanNormalizedJson);
       } catch (e: any) {
-        console.warn("[AI Processor] Failed to parse normalized JSON. Falling back to raw Vision AI output.", e);
+        console.warn("[AI Processor] OpenRouter normalization failed, falling back to raw Vision AI output:", e.message || e);
         normalizedMetadata = visionMetadata;
       }
     }
@@ -284,15 +322,8 @@ Follow these rules strictly:
       throw new Error(`Failed to update wallpaper: ${updateErr.message}`);
     }
 
-    // 7. Process & Link Tags
-    const tagsToProcess = Array.isArray(normalizedMetadata.tags)
-      ? normalizedMetadata.tags.map((t) => t.trim()).filter((t) => t.length > 0)
-      : [];
-
-    const excludedWords = ["wallpaper", "image", "photo", "picture", "desktop", "background"];
-    const filteredTags = tagsToProcess.filter(
-      (t) => !excludedWords.includes(t.toLowerCase())
-    );
+    // 7. Process & Link Tags - Clean and deduplicate tags locally as a fail-safe
+    const filteredTags = cleanAndNormalizeTagsLocal(normalizedMetadata.tags);
 
     // Clear existing tags to prevent duplicates during re-runs
     await supabaseAdmin

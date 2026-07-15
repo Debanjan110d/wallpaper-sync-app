@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-const progressFilePath = path.join(process.cwd(), "migration_progress.json");
+const progressFilePath = path.join(os.tmpdir(), "migration_progress.json");
 
 function getMimeType(storagePath: string): string {
   const pathLower = storagePath.toLowerCase();
