@@ -83,337 +83,22 @@ export async function processWallpaperAI(
   );
 
   try {
-    // Fetch wallpaper details for status and filename context
-    const { data: wpData, error: wpErr } = await supabaseAdmin
-      .from("wallpapers")
-      .select("status, file_name")
-      .eq("id", wallpaperId)
-      .single();
-
-    if (wpErr || !wpData) {
-      console.warn(`[AI Processor] Wallpaper ID ${wallpaperId} not found in DB.`);
-      return { success: false, error: "Wallpaper not found" };
-    }
-
-    // Prevent concurrent repetitive runs by skipping if already processing
-    if (wpData.status === "pending_ai") {
-      console.log(`[AI Processor] Skipping wallpaper ID ${wallpaperId} because it is already actively processing.`);
-      return { success: true };
-    }
-
-    // 1. Update status to 'pending_ai'
-    await supabaseAdmin
-      .from("wallpapers")
-      .update({ status: "pending_ai" })
-      .eq("id", wallpaperId);
-
-    const filename = wpData?.file_name || "wallpaper.jpg";
-
-    let activeProvider = provider || (process.env.VISION_PROVIDER as "gemini" | "imagga") || "imagga";
-    let normalizedMetadata: RawVisionMetadata | null = null;
-
-    if (activeProvider === "gemini") {
-      try {
-        console.log(`[AI Processor] Attempting to process wallpaper ID ${wallpaperId} using Gemini AI...`);
-        // 2. Initialize Gemini
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-          throw new Error("GEMINI_API_KEY is not defined in environment variables");
-        }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // Gemini 2.0 Flash is our savior. We force it to output pure JSON so we don't have to write
-        // recursive markdown parsers that will keep us awake at 3 AM.
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.0-flash",
-          generationConfig: { responseMimeType: "application/json" }
-        });
-
-        // 3. Construct Vision Prompt
-        const visionPrompt = `You are an expert wallpaper describer. Analyze the image and extract the following descriptors:
-1. title: A short, high-quality descriptive title for the image.
-2. description: A clear one-sentence description of the image content.
-3. characters: Names of any specific characters (anime, gaming, pop culture) visible in the image. Return empty array if none.
-4. franchises: Names of the franchise(s) or universes the image belongs to (e.g. "Naruto", "Marvel", "Cyberpunk", "Spider-Man").
-5. tags: A list of 5 to 15 descriptive keywords capturing subjects, environment, mood, and visual elements.
-6. colors: The dominant color families (e.g. "Blue", "Black", "Red", "Neon Pink").
-7. style: Visual style tags, e.g. "Anime", "Digital Art", "Pixel Art", "Realistic", "3D Render", "Illustration".
-8. mood: Emotional tone, e.g. "Dramatic", "Calm", "Mysterious", "Energetic", "Vibrant".
-9. other_attributes: Misc tags (e.g. "Silhouette", "Minimal", "Detailed", "Glowing").
-10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
-
-Return ONLY a valid JSON object matching the following schema. Do NOT output markdown blocks or comments.
-{
-  "title": "string",
-  "description": "string",
-  "characters": ["string"],
-  "franchises": ["string"],
-  "tags": ["string"],
-  "colors": ["string"],
-  "style": ["string"],
-  "mood": ["string"],
-  "other_attributes": ["string"],
-  "confidence": number
-}`;
-
-        const imagePart = {
-          inlineData: {
-            data: imageBuffer.toString("base64"),
-            mimeType,
-          },
-        };
-
-        // 4. Call Vision AI
-        console.log(`[AI Processor] Calling Vision AI for ${wallpaperId}...`);
-        const visionResult = await model.generateContent([visionPrompt, imagePart]);
-        const visionText = visionResult.response.text();
-        const cleanVisionJson = cleanJsonResponse(visionText);
-
-        let visionMetadata: RawVisionMetadata;
-        try {
-          visionMetadata = JSON.parse(cleanVisionJson);
-        } catch (e: any) {
-          throw new Error(`Failed to parse Vision AI JSON: ${e.message}. Content was: ${visionText}`);
-        }
-
-        // 5. Call Gemma-4 via OpenRouter for Phase 2 Normalization
-        // OpenRouter can be a bit temperamental or rate-limited on the free tier.
-        // If it throws a tantrum, we catch it and use the raw Gemini vision metadata as a fallback
-        // rather than crashing the whole indexing pipeline. Work smart, not hard.
-        try {
-          console.log(`[AI Processor] Calling Gemma-4 via OpenRouter to normalize metadata...`);
-          const systemPrompt = `You are a metadata normalization AI. Your job is to clean, deduplicate, and normalize the metadata extracted from a wallpaper.
-Follow these rules strictly:
-1. Deduplicate tags, characters, franchises, colors, style, mood, and other_attributes (case-insensitive).
-2. Clean tags: convert all tags to lowercase. Normalize spelling (e.g., "Naruto", "naruto", "NARUTO" -> "naruto"). Merge similar or identical words (e.g. "rainy", "rain" -> "rain"; "spiderman", "spider-man" -> "spider-man").
-3. Strip meaningless tags (e.g., "wallpaper", "background", "image", "pic", "desktop").
-4. Ensure characters and franchises are cleanly capitalized (e.g., "naruto uzumaki" -> "Naruto Uzumaki", "marvel" -> "Marvel").
-5. Return the exact same JSON format with cleaned, deduplicated, and normalized values.
-6. Do NOT invent new information. Only clean and normalize the provided input.`;
-
-          const userPrompt = JSON.stringify(visionMetadata, null, 2);
-          const normalizedText = await queryTextAI(systemPrompt, userPrompt);
-          const cleanNormalizedJson = cleanJsonResponse(normalizedText);
-          normalizedMetadata = JSON.parse(cleanNormalizedJson);
-        } catch (e: any) {
-          console.warn("[AI Processor] OpenRouter normalization failed, falling back to raw Vision AI output:", e.message || e);
-          normalizedMetadata = visionMetadata;
-        }
-      } catch (geminiError: any) {
-        console.warn(`[AI Processor] Gemini processing failed: ${geminiError.message || geminiError}. Falling back to Imagga...`);
-        activeProvider = "imagga";
-      }
-    }
-
-    if (activeProvider === "imagga") {
-      console.log(`[AI Processor] Processing wallpaper ID ${wallpaperId} using Imagga API...`);
-
-      const imaggaKey = process.env.IMAGGA_API_KEY;
-      const imaggaSecret = process.env.IMAGGA_API_SECRET;
-      if (!imaggaKey || !imaggaSecret) {
-        throw new Error("IMAGGA_API_KEY or IMAGGA_API_SECRET is not defined in environment variables");
-      }
-
-      const auth = Buffer.from(`${imaggaKey}:${imaggaSecret}`).toString("base64");
-      const authHeader = `Basic ${auth}`;
-
-      // A. Upload image to Imagga v2
-      const formData = new FormData();
-      const uint8Array = new Uint8Array(imageBuffer);
-      const blob = new Blob([uint8Array], { type: mimeType });
-      formData.append("image", blob, filename);
-
-      const uploadRes = await fetch("https://api.imagga.com/v2/uploads", {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-        },
-        body: formData,
-      });
-
-      if (!uploadRes.ok) {
-        const errorText = await uploadRes.text();
-        throw new Error(`Imagga upload failed: ${uploadRes.statusText}. Response: ${errorText}`);
-      }
-
-      const uploadData = await uploadRes.json();
-      const uploadId = uploadData.result?.upload_id;
-      if (!uploadId) {
-        throw new Error("Imagga upload response did not return an upload_id");
-      }
-
-      // B. Fetch tags from Imagga
-      const tagsRes = await fetch(`https://api.imagga.com/v2/tags?image_upload_id=${uploadId}`, {
-        headers: { Authorization: authHeader },
-      });
-      if (!tagsRes.ok) {
-        throw new Error(`Failed to fetch tags from Imagga: ${tagsRes.statusText}`);
-      }
-      const tagsData = await tagsRes.json();
-      const imaggaTags = (tagsData.result?.tags || [])
-        .slice(0, 15)
-        .map((t: any) => `${t.tag.en} (${Math.round(t.confidence)}%)`);
-
-      // C. Fetch colors from Imagga
-      const colorsRes = await fetch(`https://api.imagga.com/v2/colors?image_upload_id=${uploadId}`, {
-        headers: { Authorization: authHeader },
-      });
-      if (!colorsRes.ok) {
-        throw new Error(`Failed to fetch colors from Imagga: ${colorsRes.statusText}`);
-      }
-      const colorsData = await colorsRes.json();
-      const imageColors = colorsData.result?.colors?.image_colors || [];
-      const imaggaColors = imageColors
-        .slice(0, 5)
-        .map((c: any) => `${c.closest_palette_color} (${Math.round(c.percent)}%)`);
-
-      // D. Synthesize full metadata via OpenRouter (Gemma Model)
-      console.log(`[AI Processor] Calling OpenRouter to synthesize metadata from Imagga tags/colors...`);
-      const systemPrompt = `You are an expert wallpaper describer and metadata normalization AI.
-You are given a filename, a list of visual tags (with confidence percentages), and a list of colors (with percentage coverage) extracted from an image.
-Your job is to generate a rich, clean, schema-conforming JSON metadata structure.
-
-Follow these rules:
-1. title: Generate a short, creative, high-quality title (use the filename and tags for context).
-2. description: Write a clear, engaging one-sentence description of the image.
-3. characters: Extract names of any specific pop culture, anime, or gaming characters visible/implied. Return empty array if none.
-4. franchises: Extract names of the franchise(s) or universes (e.g. "Marvel", "Dragon Ball", "Cyberpunk"). Return empty array if none.
-5. tags: A list of 5 to 15 normalized, lowercase keywords capturing subjects, environment, mood, and style.
-6. colors: The dominant color families (e.g. "Blue", "Black", "Orange").
-7. style: Visual style tags, e.g. "Anime", "Vector", "Digital Art", "Minimalist", "3D Render".
-8. mood: Emotional tone, e.g. "Calm", "Mysterious", "Vibrant", "Dark".
-9. other_attributes: Misc tags (e.g. "Silhouette", "Glowing", "Detailed").
-10. confidence: A score from 0.0 to 1.0 representing your confidence in this analysis.
-
-Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown blocks, do NOT output comments or extra text.
-
-{
-  "title": "string",
-  "description": "string",
-  "characters": ["string"],
-  "franchises": ["string"],
-  "tags": ["string"],
-  "colors": ["string"],
-  "style": ["string"],
-  "mood": ["string"],
-  "other_attributes": ["string"],
-  "confidence": number
-}`;
-
-      const userPrompt = JSON.stringify({
-        filename,
-        imagga_tags: imaggaTags,
-        imagga_colors: imaggaColors
-      }, null, 2);
-
-      const openRouterText = await queryTextAI(systemPrompt, userPrompt);
-      const cleanOpenRouterJson = cleanJsonResponse(openRouterText);
-
-      try {
-        normalizedMetadata = JSON.parse(cleanOpenRouterJson);
-      } catch (e: any) {
-        throw new Error(`Failed to parse OpenRouter synthesized JSON: ${e.message}. Content was: ${openRouterText}`);
-      }
-    }
-
-    if (!normalizedMetadata) {
-      throw new Error("AI analysis did not yield any metadata results.");
-    }
-
-    // 6. Update Wallpaper Table with rich metadata fields
-    const updatePayload = {
-      title: normalizedMetadata.title || null,
-      description: normalizedMetadata.description || null,
-      characters: Array.isArray(normalizedMetadata.characters) ? normalizedMetadata.characters : [],
-      franchises: Array.isArray(normalizedMetadata.franchises) ? normalizedMetadata.franchises : [],
-      styles: Array.isArray(normalizedMetadata.style) ? normalizedMetadata.style : [],
-      moods: Array.isArray(normalizedMetadata.mood) ? normalizedMetadata.mood : [],
-      other_attributes: Array.isArray(normalizedMetadata.other_attributes) ? normalizedMetadata.other_attributes : [],
-      confidence: typeof normalizedMetadata.confidence === "number" ? normalizedMetadata.confidence : 1.0,
-      indexed_at: new Date().toISOString(),
-      status: "indexed" // Moderation queue
-    };
-
-    console.log(`[AI Processor] Updating DB record for ${wallpaperId}...`);
+    console.log(`[AI Processor] Direct indexing (manual mode) for wallpaper ID ${wallpaperId}...`);
     const { error: updateErr } = await supabaseAdmin
       .from("wallpapers")
-      .update(updatePayload)
+      .update({
+        status: "indexed",
+        indexed_at: new Date().toISOString()
+      })
       .eq("id", wallpaperId);
 
     if (updateErr) {
       throw new Error(`Failed to update wallpaper: ${updateErr.message}`);
     }
 
-    // 7. Process & Link Tags - Clean and deduplicate tags locally as a fail-safe
-    const filteredTags = cleanAndNormalizeTagsLocal(normalizedMetadata.tags);
-
-    // Clear existing tags to prevent duplicates during re-runs
-    await supabaseAdmin
-      .from("wallpaper_tags")
-      .delete()
-      .eq("wallpaper_id", wallpaperId);
-
-    for (const tagName of filteredTags) {
-      const tagSlug = slugify(tagName);
-      if (!tagSlug) continue;
-
-      let tagId: number | null = null;
-
-      // Find or insert tag
-      const { data: existingTag } = await supabaseAdmin
-        .from("tags")
-        .select("id")
-        .eq("slug", tagSlug)
-        .maybeSingle();
-
-      if (existingTag) {
-        tagId = existingTag.id;
-      } else {
-        const { data: newTag, error: tagInsertErr } = await supabaseAdmin
-          .from("tags")
-          .insert([{ name: tagName, slug: tagSlug }])
-          .select("id")
-          .maybeSingle();
-
-        if (!tagInsertErr && newTag) {
-          tagId = newTag.id;
-        } else {
-          // Retry find in case of database concurrency race
-          const { data: retryTag } = await supabaseAdmin
-            .from("tags")
-            .select("id")
-            .eq("slug", tagSlug)
-            .maybeSingle();
-          if (retryTag) {
-            tagId = retryTag.id;
-          }
-        }
-      }
-
-      if (tagId) {
-        await supabaseAdmin
-          .from("wallpaper_tags")
-          .insert([{ wallpaper_id: wallpaperId, tag_id: tagId }])
-          .select()
-          .maybeSingle();
-      }
-    }
-
-    // 8. Assign Wallpaper to Collections (Phase 4 / 5)
-    // Disabled automatically during upload/migration to prevent unexpected creation/processing
-    // unless specifically told by clicking the button which triggers assign-collections route.
-    console.log(`[AI Processor] Automatic collection assignment for ${wallpaperId} skipped (will run manually via buttons).`);
-
     return { success: true };
   } catch (error: any) {
-    console.error(`AI Processor Error for wallpaper ${wallpaperId}:`, error);
-
-    // Reset status back to 'uploaded' on error so it can be retried
-    await supabaseAdmin
-      .from("wallpapers")
-      .update({ status: "uploaded" })
-      .eq("id", wallpaperId);
-
+    console.error(`Error indexing wallpaper ${wallpaperId}:`, error);
     return { success: false, error: error.message };
   }
 }
@@ -605,7 +290,7 @@ export async function assignWallpaperToCollections(
         console.error(`[Assign] Failed to insert assignments for ${wallpaperId}:`, insErr);
       }
 
-      // 7. Backward compatibility: update collection_id & collection columns on wallpapers
+      // 7. Backward compatibility: update collection_id on wallpapers
       // with the highest scoring collection.
       const highestMatch = assignments.reduce((prev, current) => {
         return (prev.match_score > current.match_score) ? prev : current;
@@ -616,8 +301,7 @@ export async function assignWallpaperToCollections(
         await supabaseAdmin
           .from("wallpapers")
           .update({
-            collection_id: matchedCol.id,
-            collection: matchedCol.name
+            collection_id: matchedCol.id
           })
           .eq("id", wallpaperId);
       }
@@ -626,8 +310,7 @@ export async function assignWallpaperToCollections(
       await supabaseAdmin
         .from("wallpapers")
         .update({
-          collection_id: null,
-          collection: null
+          collection_id: null
         })
         .eq("id", wallpaperId);
     }

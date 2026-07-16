@@ -77,18 +77,6 @@ export async function POST(request: Request) {
 
         if (resolvedCollectionId !== undefined) {
           updateData.collection_id = resolvedCollectionId;
-          if (resolvedCollectionId === null) {
-            updateData.collection = null;
-          } else {
-            const { data: colData } = await supabase
-              .from("collections")
-              .select("name")
-              .eq("id", resolvedCollectionId)
-              .single();
-            if (colData) {
-              updateData.collection = colData.name;
-            }
-          }
         }
 
         // Apply wallpaper table update
@@ -132,17 +120,11 @@ export async function POST(request: Request) {
 
             // Keep wallpapers.collection_id backward-compatible with the first collection
             const primaryColId = Number(collection_ids[0]);
-            const { data: colData } = await supabase
-              .from("collections")
-              .select("name")
-              .eq("id", primaryColId)
-              .single();
 
             await supabase
               .from("wallpapers")
               .update({
-                collection_id: primaryColId,
-                collection: colData ? colData.name : null
+                collection_id: primaryColId
               })
               .eq("id", id);
           } else {
@@ -150,8 +132,7 @@ export async function POST(request: Request) {
             await supabase
               .from("wallpapers")
               .update({
-                collection_id: null,
-                collection: null
+                collection_id: null
               })
               .eq("id", id);
           }

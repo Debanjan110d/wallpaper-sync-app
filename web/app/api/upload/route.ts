@@ -220,12 +220,12 @@ export async function POST(request: Request) {
           file_name: file.name,
           storage_path: storagePath,
           hash,
-          status: "uploaded",
-          collection: finalCollectionName || null,
+          status: "indexed",
+          indexed_at: new Date().toISOString(),
           collection_id: finalCollectionId || null,
         },
       ])
-      .select("id, file_name, storage_path, hash, status, collection, collection_id, created_at")
+      .select("id, file_name, storage_path, hash, status, collection_id, created_at")
       .single();
 
     const dbError = insertError as DbError | null;
@@ -262,10 +262,19 @@ export async function POST(request: Request) {
       }
     }
 
-    if (row && row.id) {
-      processWallpaperAI(row.id, buffer, file.type, provider).catch((err) => {
-        console.error("Background AI processing failed:", err);
-      });
+    if (row && finalCollectionId) {
+      const { error: colLinkErr } = await supabaseAdmin
+        .from("wallpaper_collections")
+        .insert([{
+          wallpaper_id: row.id,
+          collection_id: finalCollectionId,
+          match_score: 100,
+          assigned_by: "manual_upload"
+        }]);
+
+      if (colLinkErr) {
+        console.error("Failed to link wallpaper to collection on upload:", colLinkErr.message);
+      }
     }
 
     return NextResponse.json({ success: true, data: { upload: uploadData, row } });

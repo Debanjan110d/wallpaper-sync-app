@@ -128,19 +128,24 @@ export default function Page() {
   useEffect(() => {
     checkIndexingStatus();
     checkMigrationStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!indexingProgress?.active && !migrationProgress?.active) {
+      return;
+    }
 
     const interval = setInterval(async () => {
       const idxProgress = await checkIndexingStatus();
       const migProgress = await checkMigrationStatus();
 
       if (
-        (idxProgress && !idxProgress.active && indexingProgress?.active) ||
-        (migProgress && !migProgress.active && migrationProgress?.active)
+        (idxProgress && !idxProgress.active) ||
+        (migProgress && !migProgress.active)
       ) {
         fetchGallery();
       }
     }, 5000);
-
     return () => clearInterval(interval);
   }, [indexingProgress?.active, migrationProgress?.active]);
 
@@ -896,31 +901,10 @@ export default function Page() {
           
           {/* Phase 1 Migration Card */}
           <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
-            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 1: Library AI Migration</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-              Runs Vision AI & Gemma-4 Normalization across all 432+ wallpapers. Skipped automatically if already analyzed.
+            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 1: Library Status Alignment</h4>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+              Aligns database status and marks all wallpapers as indexed to enable collection discovery and manual tagging.
             </p>
-            <div style={{ marginBottom: "0.75rem" }}>
-              <select
-                value={visionProvider}
-                onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
-                style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  fontSize: "0.8rem",
-                  background: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "4px",
-                  color: "inherit",
-                  cursor: "pointer",
-                  height: "32px"
-                }}
-                disabled={migrationLoading || migrationProgress?.active || indexingLoading || indexingProgress?.active}
-              >
-                <option value="imagga">🖼️ Imagga API (100/mo)</option>
-                <option value="gemini">♊ Gemini AI</option>
-              </select>
-            </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 className="btn"
@@ -928,7 +912,7 @@ export default function Page() {
                 disabled={migrationLoading || migrationProgress?.active}
                 onClick={() => handleTriggerMigration(false)}
               >
-                Start Migration
+                Start Alignment
               </button>
               <button
                 className="btn-secondary"
@@ -1228,26 +1212,7 @@ export default function Page() {
                 />
               </div>
 
-              <div className="form-group" style={{ flex: "1 1 200px" }}>
-                <label>AI Vision Provider</label>
-                <select
-                  value={visionProvider}
-                  onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "inherit",
-                    cursor: "pointer",
-                    height: "38px"
-                  }}
-                >
-                  <option value="imagga">🖼️ Imagga API (100/mo)</option>
-                  <option value="gemini">♊ Gemini AI</option>
-                </select>
-              </div>
+
 
               <div className="form-group" style={{ flex: "1 1 250px" }}>
                 <label style={{ display: "flex", justifyContent: "space-between" }}>
@@ -1474,24 +1439,6 @@ export default function Page() {
                   <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                     {galleryImages.length} wallpapers ({unindexedCount} unindexed)
                   </span>
-                  <select
-                    value={visionProvider}
-                    onChange={(e) => setVisionProvider(e.target.value as "gemini" | "imagga")}
-                    style={{
-                      padding: "6px 10px",
-                      fontSize: "0.85rem",
-                      background: "rgba(255, 255, 255, 0.05)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "6px",
-                      color: "inherit",
-                      cursor: "pointer",
-                      height: "32px"
-                    }}
-                    disabled={indexingLoading || indexingProgress?.active || migrationLoading || migrationProgress?.active}
-                  >
-                    <option value="imagga">🖼️ Imagga API (100/mo)</option>
-                    <option value="gemini">♊ Gemini AI</option>
-                  </select>
                   {unindexedCount > 0 && (
                     <button
                       type="button"
@@ -1500,7 +1447,7 @@ export default function Page() {
                       disabled={indexingLoading || indexingProgress?.active}
                       onClick={() => handleTriggerIndexing(false)}
                     >
-                      {indexingLoading ? "Triggering..." : "⚡ Run AI Indexing"}
+                      {indexingLoading ? "Triggering..." : "⚡ Align Status"}
                     </button>
                   )}
                   <button
