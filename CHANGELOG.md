@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.4.1 (v3.4.1) — 2026-07-16
+## 3.5.0 (v3.5.0) — 2026-07-16
 
 ### Desktop Client Enhancements
 - **Horizontal Row Auto-Scrolling:** Added smooth, hover-pausable auto-scrolling to the "Recently Added" and "Random Discoveries" rows, making the home discovery dashboard feel more dynamic and alive. Auto-scroll pauses automatically on drag or mouse hover, and gently ping-pongs directions at borders.
