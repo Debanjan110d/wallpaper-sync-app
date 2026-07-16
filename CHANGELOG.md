@@ -1,6 +1,12 @@
 # Changelog
 
-## 3.5.0 (v3.5.0) — 2026-07-16
+## 3.5.0 (v3.5.0) — 2026-07-17
+
+### Desktop Client Enhancements
+- **UI Modularization (ES Modules):** Cleaned up and restructured the `ui` directory, refactoring the 1700+ line `app.js` file into independent modules (`utils.js`, `slider.js`, `gallery.js`, `drawer.js`, `player.js`, `modal.js`) coordinated by a centralized state store (`store.js`).
+- **Smart App Control & Antivirus Bypass:** Enabled ASAR packaging and created a local PowerShell signing utility (`scripts/create-self-signed-cert.ps1`) to sign builds and bypass Windows Smart App Control (SAC) and Defender blocks on development/test environments.
+
+## 3.4.1 (v3.4.1) — 2026-07-16
 
 ### Desktop Client Enhancements
 - **Horizontal Row Auto-Scrolling:** Added smooth, hover-pausable auto-scrolling to the "Recently Added" and "Random Discoveries" rows, making the home discovery dashboard feel more dynamic and alive. Auto-scroll pauses automatically on drag or mouse hover, and gently ping-pongs directions at borders.
