@@ -45,6 +45,9 @@ export default function Page() {
   const [tagSearchBulk, setTagSearchBulk] = useState("");
   const [tagSearchEdit, setTagSearchEdit] = useState("");
 
+  // Upload Progress State
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; currentFileName: string } | null>(null);
+
   // Auto-Slider Banner State
   const [sliderIndex, setSliderIndex] = useState(0);
   const [sliderPaused, setSliderPaused] = useState(false);
@@ -366,12 +369,14 @@ export default function Page() {
 
     setLoading(true);
     setMessages([]);
+    setUploadProgress({ current: 0, total: files.length, currentFileName: files[0].name });
 
     const newMessages: string[] = [];
     const successfulUploads: number[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      setUploadProgress({ current: i + 1, total: files.length, currentFileName: file.name });
       const formData = new FormData();
       formData.append("file", file);
       formData.append("username", username);
@@ -403,6 +408,7 @@ export default function Page() {
       }
     }
 
+    setUploadProgress(null);
     setMessages(newMessages);
     setFiles((prev) => prev.filter((_, index) => !successfulUploads.includes(index)));
     setLoading(false);
@@ -1025,6 +1031,36 @@ export default function Page() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {uploadProgress && (
+              <div style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid var(--border)",
+                borderRadius: "8px",
+                padding: "1rem",
+                marginBottom: "1rem",
+                marginTop: "1rem",
+                width: "100%"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>📤 Uploading Wallpapers...</span>
+                  <span style={{ fontSize: "0.85rem", fontWeight: "bold", color: "var(--primary)" }}>
+                    {Math.round((uploadProgress.current / uploadProgress.total) * 100)}% ({uploadProgress.current} / {uploadProgress.total})
+                  </span>
+                </div>
+                <div style={{ width: "100%", height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: 3, overflow: "hidden", marginBottom: "0.5rem" }}>
+                  <div style={{
+                    width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)",
+                    transition: "width 0.3s ease"
+                  }}></div>
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                  Processing: <i>{uploadProgress.currentFileName}</i>
+                </div>
               </div>
             )}
 
