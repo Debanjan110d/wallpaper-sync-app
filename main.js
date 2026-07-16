@@ -925,7 +925,6 @@ function checkForUpdates({ userInitiated }) {
     }
   }
 }
-
 if (gotSingleInstanceLock) app.whenReady().then(async () => {
   await migrateUserDataIfNeeded();
   settings = loadSettings();
@@ -947,6 +946,10 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
   }
 
   startSlideshow();
+});
+
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
 });
 
 ipcMain.handle("updater:get-state", () => {

@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   getSettings: () => ipcRenderer.invoke("get-settings"),
   toggleSlideshow: (state) => ipcRenderer.invoke("toggle-slideshow", state),
   toggleRandom: (state) => ipcRenderer.invoke("toggle-random", state),

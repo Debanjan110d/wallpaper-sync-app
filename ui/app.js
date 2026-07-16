@@ -134,6 +134,19 @@ document.addEventListener("DOMContentLoaded", async () => {
             const state = await window.api.getUpdateState();
             renderUpdateUI(state);
         }
+
+        // Render app version in credit footer
+        if (window.api.getAppVersion) {
+            try {
+                const version = await window.api.getAppVersion();
+                const sidebarCredit = document.getElementById("sidebarCredit");
+                if (sidebarCredit) {
+                    sidebarCredit.innerHTML = `v${version} · Made by <a href="https://github.com/Debanjan110d" target="_blank" class="credit-link">Debanjan Dutta</a>`;
+                }
+            } catch (err) {
+                console.error("Failed to render app version:", err);
+            }
+        }
     }
 
     // Refresh Local metadata cache values
@@ -1511,7 +1524,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         return false;
     }
-
     let activeHoveredElement = null;
 
     function initScrollRowsNavigation() {
@@ -1545,6 +1557,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
         wireRowButtons(recentlyAddedRow, document.getElementById("recentlyAddedPrevBtn"), document.getElementById("recentlyAddedNextBtn"));
         wireRowButtons(randomRow, document.getElementById("randomPrevBtn"), document.getElementById("randomNextBtn"));
+
+        // Auto scroll helper with ping-pong boundaries and pause on drag/hover
+        const startRowAutoScroll = (row, speed = 1, intervalMs = 45) => {
+            if (!row) return;
+            let direction = 1; // 1 = right, -1 = left
+            
+            setInterval(() => {
+                if (activeHoveredElement === row || row.classList.contains("active-dragging")) {
+                    return;
+                }
+                
+                const maxScroll = row.scrollWidth - row.clientWidth;
+                if (maxScroll <= 0) return;
+                
+                row.scrollLeft += speed * direction;
+                
+                // Reverse direction if we hit boundary limits
+                if (row.scrollLeft >= maxScroll - 1) {
+                    direction = -1;
+                } else if (row.scrollLeft <= 1) {
+                    direction = 1;
+                }
+            }, intervalMs);
+        };
+
+        if (recentlyAddedRow) startRowAutoScroll(recentlyAddedRow);
+        if (randomRow) startRowAutoScroll(randomRow);
+    }
 
         // Window resize visibility check
         window.addEventListener("resize", () => {

@@ -22,7 +22,7 @@ export default function DocsPage() {
           Wallpaper Sync Documentation
         </h1>
         <p style={{ color: "var(--text-muted)", marginTop: "0.5rem", fontSize: "1.05rem" }}>
-          What is new in the version 3 release cycle.
+          What is new in the version 3 release cycle (v3.4.1).
         </p>
       </header>
 
@@ -48,10 +48,10 @@ export default function DocsPage() {
               <strong>Categories:</strong> The top-level containers representing wide genres (such as Anime, Game Art, Landscapes, or Space).
             </li>
             <li>
-              <strong>Collections:</strong> Mid-level albums grouped under specific categories (for example, a Naruto collection nested within the Anime category).
+              <strong>Collections:</strong> Mid-level albums grouped under specific categories (for example, a Naruto collection nested within the Anime category). Wallpapers are mapped to collections dynamically using a many-to-many junction structure based on matching weights and keywords.
             </li>
             <li>
-              <strong>Tags:</strong> A free-form, many-to-many labeling system. Multiple tags (like 4K, Dark, Minimal) can be assigned to any wallpaper to make searching fast.
+              <strong>Tags:</strong> A free-form, normalized labeling system. Multi-select grids let administrators tag and map wallpapers globally in a single action, which then synchronizes down to the client.
             </li>
           </ul>
         </section>
@@ -70,8 +70,28 @@ export default function DocsPage() {
             Offline-First Cache
           </h2>
           <p style={{ lineHeight: 1.6, color: "var(--foreground)", marginBottom: "1rem" }}>
-            To ensure the desktop client remains fully operational during network outages, all categories, collections, tags, and assignments are saved locally in a JSON cache. If you make changes while offline (such as creating categories or adding tags to files), they are queued locally and automatically uploaded to the Supabase database once a connection is re-established.
+            To ensure the desktop client remains fully operational during network outages, all categories, collections, tags, and assignments are saved locally in a JSON cache. Client-side pulls retrieve publishing lists from the server and match queries locally against visual styles, dominant colors, and names in milliseconds.
           </p>
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1rem" }}>
+            Technical Admin & Bulk Updates
+          </h2>
+          <p style={{ lineHeight: 1.6, color: "var(--foreground)", marginBottom: "1rem" }}>
+            The admin web dashboard incorporates robust scaling utilities:
+          </p>
+          <ul style={{ paddingLeft: "1.5rem", lineHeight: 1.8, marginBottom: "1rem" }}>
+            <li>
+              <strong>Bulk Update API:</strong> Batch assign categories/collections and push tag updates across groups of wallpapers instantly.
+            </li>
+            <li>
+              <strong>Progress Bar Feedback:</strong> Real-time progress updates visible directly on the UI layout during file uploads.
+            </li>
+            <li>
+              <strong>Background Indexing workers:</strong> Triggers Gemini vision categorization and tags matching pipelines seamlessly on ingestion.
+            </li>
+          </ul>
         </section>
 
         <section>
@@ -94,7 +114,7 @@ export default function DocsPage() {
       </main>
 
       <footer style={{ marginTop: "4rem", borderTop: "1px solid var(--border)", paddingTop: "1.5rem", textAlign: "center", fontSize: "0.85rem", color: "var(--text-muted)" }}>
-        Wallpaper Sync App - Core Version 3.2.0 - Designed by Debanjan Dutta
+        Wallpaper Sync App - Core Version 3.4.1 - Designed by Debanjan Dutta
       </footer>
     </div>
   );

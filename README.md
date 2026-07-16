@@ -13,8 +13,8 @@
     <strong>Download Latest Version</strong>
   </a>
   &nbsp;&bull;&nbsp;
-  <a href="RELEASE_NOTES_v3.md">
-    <strong>What's New in Version 3.2</strong>
+  <a href="CHANGELOG.md">
+    <strong>What's New in Version 3.4.1</strong>
   </a>
 </p>
 
@@ -41,6 +41,7 @@ This repo also contains an optional Next.js + Supabase web app under `web/` that
 
 - Desktop app (Electron): root folder (`main.js`, `ui/`, `wallpaperManager.js`)
 - Optional server/API + admin dashboard: `web/` (Next.js + Supabase)
+- Database Schema & Relations: [db_schema.md](architecture/db_schema.md) (documented layout of all tables, junctions, and states)
 
 ## Running locally (desktop app)
 

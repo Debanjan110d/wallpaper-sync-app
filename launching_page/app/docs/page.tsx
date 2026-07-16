@@ -64,23 +64,23 @@ export default function DocsPage() {
           <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>2</span>
-              AI Metadata Indexing Engine
+              AI Metadata & Junction Collection Mapping
             </h2>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1.2rem" }}>
-              Our system runs a **Generate Once, Search Locally** pipeline. When an admin uploads a wallpaper, the Vercel API sends the image data to **Gemini 2.5 Flash Vision** to perform automatic indexing:
+              Our system runs a **Generate Once, Search Locally** pipeline. When an admin uploads a wallpaper, the Vercel API sends the image to Gemini to perform automatic indexing:
             </p>
             <ul style={{ paddingLeft: "1.5rem", lineHeight: 1.8, color: "rgba(233, 238, 252, 0.8)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <li>
-                <strong>Category & Collection Mapping:</strong> Predefined categories (e.g. <em>Gaming</em>, <em>Anime</em>) and collections (e.g. <em>Naruto</em>) are fetched from the database and supplied to Gemini. The model selects the closest fit, mapping it safely without generating ad-hoc values.
+                <strong>Many-to-Many Collections:</strong> Wallpapers are matched to multiple collections using a flexible junction table (<code>wallpaper_collections</code>). The matching engine scores candidates based on keyword profiles and weights (<code>collection_keywords</code>), allowing wallpapers to cross-reference multiple groupings cleanly.
               </li>
               <li>
-                <strong>Visual Style Detection:</strong> Classifies the style of the wallpaper (e.g. <em>Minimal</em>, <em>Cyberpunk</em>, <em>3D Render</em>, <em>Realistic</em>).
+                <strong>Visual Style & Mood:</strong> Classifies visual styling attributes (e.g. <em>Minimalist</em>, <em>3D Render</em>, <em>Cyberpunk</em>) and mood expressions to support deep tag filtering.
               </li>
               <li>
-                <strong>Color Family extraction:</strong> Identifies dominant primary color families (e.g. <em>Blue</em>, <em>Dark</em>, <em>Purple</em>) to support future search improvements.
+                <strong>Dominant Colors:</strong> Extracts color families (e.g., <em>Blue</em>, <em>Dark</em>) automatically, storing them directly on the wallpaper record.
               </li>
               <li>
-                <strong>Tag Resolution:</strong> Generates up to 15 descriptive search keywords, checking if the tag already exists in the database before creating a relationship link.
+                <strong>Confidence Metrics:</strong> Logs AI confidence scores and generation timestamps to manage automated migrations.
               </li>
             </ul>
           </section>
@@ -95,7 +95,7 @@ export default function DocsPage() {
               During client sync, the desktop app downloads categories, collections, tags, and AI attributes to a local cache file (`local_metadata.json`).
             </p>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
-              {"Fuzzy matching algorithms analyze search strings against the wallpaper filenames, category names, collection titles, mapped style fields, quality tags, and tag lists. This means you can type 'realistic', 'anime' , '4K', or 'blue' and find results instantaneously without hits to the internet."}
+              {"Fuzzy matching algorithms analyze search queries against the wallpaper original filename, style keywords, primary colors, category names, collection titles, and tag lists. This means search matches happen instantaneously without internet connectivity."}
             </p>
           </section>
 
@@ -103,13 +103,27 @@ export default function DocsPage() {
           <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>4</span>
-              Troubleshooting & registry fallbacks
+              Troubleshooting & Registry Fallbacks
             </h2>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
               In cases where user administrative locks prevent the primary bindings from changing the background, Wallpaper Sync activates its registry fallback layer:
             </p>
             <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
               The application writes the file path directly to the Windows registry control panel key and restarts the Windows Shell (<code>explorer.exe</code>) in the background to force reload the desktop window without interrupting other programs.
+            </p>
+          </section>
+
+          {/* Section 5 */}
+          <section style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "16px", padding: "2.5rem", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4f8ef7", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.1rem", background: "rgba(79, 142, 247, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>5</span>
+              Technical Admin Tools & Bulk Updates
+            </h2>
+            <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
+              The Next.js management portal supports bulk operations for library scaling:
+            </p>
+            <p style={{ lineHeight: 1.6, color: "rgba(233, 238, 252, 0.8)" }}>
+              Administrators can select multiple wallpapers in a grid layout to execute batch metadata modifications, mapping them to collections or toggling tags simultaneously. Real-time visual progress feedback (progress bar indicators) has also been added to ensure visibility during large multi-image uploads.
             </p>
           </section>
         </div>

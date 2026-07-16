@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.4.1 (v3.4.1) — 2026-07-16
+
+### Desktop Client Enhancements
+- **Horizontal Row Auto-Scrolling:** Added smooth, hover-pausable auto-scrolling to the "Recently Added" and "Random Discoveries" rows, making the home discovery dashboard feel more dynamic and alive. Auto-scroll pauses automatically on drag or mouse hover, and gently ping-pongs directions at borders.
+
+### Web Admin & Upload Enhancements
+- **Wallpaper Bulk Update & Management UI:** Implemented bulk updating APIs and a grid-based bulk tagging management dashboard in the Next.js server web application.
+- **Upload Progress Bar:** Added real-time visual progress feedback bar for wallpaper image uploads.
+- **Improved AI Metadata Engine:** Migrated back-end auto-categorization to target a robust many-to-many relationship using wallpaper junction tables (`wallpaper_collections` and `collection_keywords`) driven by Gemini visual analysis of styles, primary colors, quality ratings, and keyword weights.
+
+### System & Database Documentation
+- **Database Schema Guide:** Introduced full architectural documentation of the normalized Supabase database structure and connected it directly to the primary repository documentation.
+
 ## 3.4.0 (v3.4.0) — 2026-07-15
 
 ### Architectural Simplification
