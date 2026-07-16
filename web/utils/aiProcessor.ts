@@ -289,30 +289,7 @@ export async function assignWallpaperToCollections(
       if (insErr) {
         console.error(`[Assign] Failed to insert assignments for ${wallpaperId}:`, insErr);
       }
-
-      // 7. Backward compatibility: update collection_id on wallpapers
-      // with the highest scoring collection.
-      const highestMatch = assignments.reduce((prev, current) => {
-        return (prev.match_score > current.match_score) ? prev : current;
-      });
-
-      const matchedCol = collections.find((c: any) => c.id === highestMatch.collection_id);
-      if (matchedCol) {
-        await supabaseAdmin
-          .from("wallpapers")
-          .update({
-            collection_id: matchedCol.id
-          })
-          .eq("id", wallpaperId);
-      }
-    } else {
-      // Clear columns if no collections match
-      await supabaseAdmin
-        .from("wallpapers")
-        .update({
-          collection_id: null
-        })
-        .eq("id", wallpaperId);
+      // 7. Backward compatibility: removed (wallpapers.collection_id column is no longer present)
     }
 
     // 8. Recount counts for all collections

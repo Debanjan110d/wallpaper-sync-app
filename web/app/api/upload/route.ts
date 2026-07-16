@@ -222,10 +222,9 @@ export async function POST(request: Request) {
           hash,
           status: "indexed",
           indexed_at: new Date().toISOString(),
-          collection_id: finalCollectionId || null,
         },
       ])
-      .select("id, file_name, storage_path, hash, status, collection_id, created_at")
+      .select("id, file_name, storage_path, hash, status, created_at")
       .single();
 
     const dbError = insertError as DbError | null;

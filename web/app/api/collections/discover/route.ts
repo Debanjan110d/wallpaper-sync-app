@@ -179,7 +179,6 @@ ${JSON.stringify(sampleWallpapers, null, 2)}`;
     try {
       await supabaseAdmin.from("wallpaper_collections").delete().neq("collection_id", -1);
       await supabaseAdmin.from("collection_keywords").delete().neq("collection_id", -1);
-      await supabaseAdmin.from("wallpapers").update({ collection_id: null }).neq("id", "00000000-0000-0000-0000-000000000000");
       await supabaseAdmin.from("collections").delete().neq("id", -1);
     } catch (cleanupErr: any) {
       console.warn("[Collection Discovery] Non-fatal error during collections wipe-out:", cleanupErr.message);

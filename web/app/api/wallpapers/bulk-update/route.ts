@@ -73,11 +73,10 @@ export async function POST(request: Request) {
         if (moods !== undefined) updateData.moods = Array.isArray(moods) ? moods : [];
         if (primary_color !== undefined) updateData.primary_color = primary_color;
         
-        let resolvedCollectionId = collection_id;
-
-        if (resolvedCollectionId !== undefined) {
-          updateData.collection_id = resolvedCollectionId;
-        }
+        // Resolve collection update
+        const effectiveCollectionIds = collection_ids !== undefined 
+          ? collection_ids 
+          : (collection_id !== undefined ? (collection_id ? [collection_id] : []) : undefined);
 
         // Apply wallpaper table update
         if (Object.keys(updateData).length > 0) {
@@ -91,7 +90,7 @@ export async function POST(request: Request) {
         }
 
         // 2. Many-to-many collection links
-        if (collection_ids !== undefined && Array.isArray(collection_ids)) {
+        if (effectiveCollectionIds !== undefined && Array.isArray(effectiveCollectionIds)) {
           // Clear current assignments
           const { error: delColErr } = await supabase
             .from("wallpaper_collections")
@@ -102,8 +101,8 @@ export async function POST(request: Request) {
             throw new Error(`Failed to clear collections: ${delColErr.message}`);
           }
 
-          if (collection_ids.length > 0) {
-            const insertRows = collection_ids.map((colId: any) => ({
+          if (effectiveCollectionIds.length > 0) {
+            const insertRows = effectiveCollectionIds.map((colId: any) => ({
               wallpaper_id: id,
               collection_id: Number(colId),
               match_score: 100,
@@ -117,24 +116,6 @@ export async function POST(request: Request) {
             if (insColErr) {
               throw new Error(`Failed to assign collections: ${insColErr.message}`);
             }
-
-            // Keep wallpapers.collection_id backward-compatible with the first collection
-            const primaryColId = Number(collection_ids[0]);
-
-            await supabase
-              .from("wallpapers")
-              .update({
-                collection_id: primaryColId
-              })
-              .eq("id", id);
-          } else {
-            // Clear backward compatible columns
-            await supabase
-              .from("wallpapers")
-              .update({
-                collection_id: null
-              })
-              .eq("id", id);
           }
         }
 

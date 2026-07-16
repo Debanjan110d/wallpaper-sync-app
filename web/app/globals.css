@@ -440,9 +440,15 @@ body {
   padding: 4px 12px;
   border-radius: 16px;
   background: rgba(255,255,255,0.05);
+  color: var(--foreground);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+}
+
+.tag-chip:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: var(--primary);
 }
 
 .tag-chip.active {

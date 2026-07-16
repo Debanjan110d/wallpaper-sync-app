@@ -75,204 +75,7 @@ export default function Page() {
   // Recommendation Engine State
   const [recommendations, setRecommendations] = useState<any[]>([]);
 
-  // AI Operations States
-  const [indexingLoading, setIndexingLoading] = useState(false);
-  const [indexingMessage, setIndexingMessage] = useState<string | null>(null);
-  const [indexingProgress, setIndexingProgress] = useState<any>(null);
-  const [showProgressCard, setShowProgressCard] = useState(false);
-  const [visionProvider, setVisionProvider] = useState<"gemini" | "imagga">("imagga");
 
-  const [migrationLoading, setMigrationLoading] = useState(false);
-  const [migrationProgress, setMigrationProgress] = useState<any>(null);
-  const [showMigrationCard, setShowMigrationCard] = useState(false);
-
-  const [discoveryLoading, setDiscoveryLoading] = useState(false);
-  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
-
-  // Check Phase 1 Migration Status
-  const checkMigrationStatus = async () => {
-    try {
-      const res = await fetch("/api/wallpapers/migrate");
-      if (res.ok) {
-        const data = await res.json();
-        setMigrationProgress(data);
-        if (data && data.active) {
-          setShowMigrationCard(true);
-        }
-        return data;
-      }
-    } catch (e) {
-      console.error("Failed to check migration status:", e);
-    }
-    return null;
-  };
-
-  // Check Batch Indexing Status
-  const checkIndexingStatus = async () => {
-    try {
-      const res = await fetch("/api/wallpapers/batch-index");
-      if (res.ok) {
-        const data = await res.json();
-        setIndexingProgress(data);
-        if (data && data.active) {
-          setShowProgressCard(true);
-        }
-        return data;
-      }
-    } catch (e) {
-      console.error("Failed to check indexing status:", e);
-    }
-    return null;
-  };
-
-  useEffect(() => {
-    checkIndexingStatus();
-    checkMigrationStatus();
-  }, []);
-
-  useEffect(() => {
-    if (!indexingProgress?.active && !migrationProgress?.active) {
-      return;
-    }
-
-    const interval = setInterval(async () => {
-      const idxProgress = await checkIndexingStatus();
-      const migProgress = await checkMigrationStatus();
-
-      if (
-        (idxProgress && !idxProgress.active) ||
-        (migProgress && !migProgress.active)
-      ) {
-        fetchGallery();
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [indexingProgress?.active, migrationProgress?.active]);
-
-  // Trigger Phase 1 Migration
-  const handleTriggerMigration = async (forceAll = false) => {
-    setMigrationLoading(true);
-    setDiscoveryMessage(null);
-    try {
-      const res = await fetch("/api/wallpapers/migrate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll, provider: visionProvider })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDiscoveryMessage(`Success: ${data.message}`);
-        await checkMigrationStatus();
-      } else {
-        setDiscoveryMessage(`Error: ${data.error || "Failed to trigger library migration"}`);
-      }
-    } catch (err: any) {
-      setDiscoveryMessage(`Error: ${err.message || err}`);
-    } finally {
-      setMigrationLoading(false);
-    }
-  };
-
-  const handleCancelMigration = async () => {
-    setMigrationLoading(true);
-    try {
-      const res = await fetch("/api/wallpapers/migrate", { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok) {
-        setDiscoveryMessage("Success: Library migration was aborted.");
-        await checkMigrationStatus();
-      } else {
-        setDiscoveryMessage(`Error: ${data.error || "Failed to abort migration"}`);
-      }
-    } catch (err: any) {
-      setDiscoveryMessage(`Error: ${err.message || err}`);
-    } finally {
-      setMigrationLoading(false);
-    }
-  };
-
-  // Trigger Phase 3 Discovery
-  const handleTriggerDiscovery = async () => {
-    setDiscoveryLoading(true);
-    setDiscoveryMessage(null);
-    try {
-      const res = await fetch("/api/collections/discover", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setDiscoveryMessage(`Success: ${data.message}`);
-        await fetchMetadata();
-        await fetchGallery();
-      } else {
-        setDiscoveryMessage(`Error: ${data.error || "Failed to discover collections"}`);
-      }
-    } catch (err: any) {
-      setDiscoveryMessage(`Error: ${err.message || err}`);
-    } finally {
-      setDiscoveryLoading(false);
-    }
-  };
-
-  // Trigger manual collection re-assignments
-  const handleReassignCollections = async () => {
-    setDiscoveryLoading(true);
-    setDiscoveryMessage(null);
-    try {
-      const res = await fetch("/api/wallpapers/assign-collections", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setDiscoveryMessage(`Success: ${data.message}`);
-        await fetchGallery();
-      } else {
-        setDiscoveryMessage(`Error: ${data.error || "Failed to assign collections"}`);
-      }
-    } catch (err: any) {
-      setDiscoveryMessage(`Error: ${err.message || err}`);
-    } finally {
-      setDiscoveryLoading(false);
-    }
-  };
-
-  const handleTriggerIndexing = async (reindexAll = false) => {
-    setIndexingLoading(true);
-    setIndexingMessage(null);
-    try {
-      const res = await fetch("/api/wallpapers/batch-index", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reindexAll, provider: visionProvider }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIndexingMessage(`Success: ${data.message}`);
-        await checkIndexingStatus();
-      } else {
-        setIndexingMessage(`Error: ${data.error || "Failed to trigger indexing"}`);
-      }
-    } catch (err: any) {
-      setIndexingMessage(`Error: ${err.message || err}`);
-    } finally {
-      setIndexingLoading(false);
-    }
-  };
-
-  const handleCancelIndexing = async () => {
-    setIndexingLoading(true);
-    setIndexingMessage(null);
-    try {
-      const res = await fetch("/api/wallpapers/batch-index", { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok) {
-        setIndexingMessage("Success: AI indexing run was aborted.");
-        await checkIndexingStatus();
-      } else {
-        setIndexingMessage(`Error: ${data.error || "Failed to abort indexing"}`);
-      }
-    } catch (err: any) {
-      setIndexingMessage(`Error: ${err.message || err}`);
-    } finally {
-      setIndexingLoading(false);
-    }
-  };
 
   const fetchMetadata = async () => {
     try {
@@ -572,7 +375,6 @@ export default function Page() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("username", username);
-      formData.append("provider", visionProvider);
 
       if (selectedCollectionForUpload) {
         formData.append("collection_id", selectedCollectionForUpload);
@@ -867,7 +669,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              Wallpaper Sync Administration Portal • v4.0 AI Architecture
+            Wallpaper Sync Administration Portal • v4.0
             </p>
           </div>
         </div>
@@ -886,140 +688,6 @@ export default function Page() {
           Documentation
         </Link>
       </div>
-
-      {/* Dynamic System Action Center (Phase 1, 3, 4 Operations) */}
-      <div className="card" style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%)", borderColor: "rgba(255,255,255,0.05)" }}>
-        <h3 style={{ margin: "0 0 1rem 0", display: "flex", alignItems: "center", gap: "8px" }}>
-          ⚙️ <span>AI Smart Core Operations Center</span>
-        </h3>
-        
-        <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-          Manage your AI operations cleanly. You can run one-time migrations to describe existing items (Vision AI + Gemma-4 normalization), discover global stable collections from the database, or trigger a manual layout evaluation.
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
-          
-          {/* Phase 1 Migration Card */}
-          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
-            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 1: Library Status Alignment</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-              Aligns database status and marks all wallpapers as indexed to enable collection discovery and manual tagging.
-            </p>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                className="btn"
-                style={{ padding: "6px 12px", fontSize: "0.8rem", flex: 1 }}
-                disabled={migrationLoading || migrationProgress?.active}
-                onClick={() => handleTriggerMigration(false)}
-              >
-                Start Alignment
-              </button>
-              <button
-                className="btn-secondary"
-                style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                disabled={migrationLoading || migrationProgress?.active}
-                onClick={() => handleTriggerMigration(true)}
-              >
-                Force All
-              </button>
-            </div>
-          </div>
-
-          {/* Phase 3 Collection Discovery Card */}
-          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
-            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 3: Collection Discovery</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-              Send metadata database to Gemma-4. Discovers 20-40 stable collections, keyword profiles, and synonyms.
-            </p>
-            <button
-              className="btn"
-              style={{ padding: "6px 12px", fontSize: "0.8rem", width: "100%" }}
-              disabled={discoveryLoading}
-              onClick={handleTriggerDiscovery}
-            >
-              {discoveryLoading ? "Discovering..." : "Discover AI Collections"}
-            </button>
-          </div>
-
-          {/* Phase 4 Engine Manual Assignment Card */}
-          <div style={{ padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.01)" }}>
-            <h4 style={{ margin: "0 0 0.5rem 0" }}>Phase 4: Run Keyword Assignment</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-              Evaluate all wallpapers against collection keyword profiles. Calculates scores and assigns junction rows.
-            </p>
-            <button
-              className="btn-secondary"
-              style={{ padding: "6px 12px", fontSize: "0.8rem", width: "100%" }}
-              disabled={discoveryLoading}
-              onClick={handleReassignCollections}
-            >
-              Recalculate Matches
-            </button>
-          </div>
-
-        </div>
-
-        {discoveryMessage && (
-          <div style={{
-            marginTop: "1rem",
-            padding: "10px 14px",
-            background: "rgba(26, 115, 232, 0.1)",
-            border: "1px solid var(--primary)",
-            borderRadius: "6px",
-            fontSize: "0.85rem",
-            color: "var(--foreground)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}>
-            <span>{discoveryMessage}</span>
-            <button style={{ background: "none", border: "none", color: "white", cursor: "pointer" }} onClick={() => setDiscoveryMessage(null)}>✕</button>
-          </div>
-        )}
-      </div>
-
-      {/* Migration Progress Card */}
-      {migrationProgress && showMigrationCard && (
-        <div style={{
-          background: "rgba(255, 255, 255, 0.03)",
-          border: "1px solid var(--border)",
-          borderRadius: "8px",
-          padding: "1rem",
-          marginBottom: "1.5rem",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-            <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
-              🚀 Phase 1 Library Migration: {migrationProgress.active ? "Running" : "Finished"}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
-                {Math.round(((migrationProgress.processed + migrationProgress.failed) / (migrationProgress.total || 1)) * 100)}% ({migrationProgress.processed + migrationProgress.failed} / {migrationProgress.total})
-              </span>
-              {migrationProgress.active && (
-                <button
-                  type="button"
-                  style={{ padding: "4px 8px", fontSize: "0.75rem", background: "rgba(219,68,85,0.2)", border: "1px solid #db4455", color: "#ff6b7b", borderRadius: 4, cursor: "pointer" }}
-                  onClick={handleCancelMigration}
-                >
-                  Stop
-                </button>
-              )}
-            </div>
-          </div>
-          <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: "0.5rem" }}>
-            <div style={{
-              width: `${((migrationProgress.processed + migrationProgress.failed) / (migrationProgress.total || 1)) * 100}%`,
-              height: "100%",
-              background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)"
-            }}></div>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            <span>Processed: {migrationProgress.processed} • Failed: {migrationProgress.failed}</span>
-            {migrationProgress.active && <span>Analyzing: <i>{migrationProgress.currentWallpaper}</i></span>}
-          </div>
-        </div>
-      )}
 
       {/* Visual System Architecture Map (Collapsible) */}
       <div className="card" style={{ marginBottom: "2rem", padding: "1.5rem" }}>
@@ -1429,84 +1097,11 @@ export default function Page() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
           <h2 style={{ margin: 0 }}>Manage Collection</h2>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-            {(() => {
-              const unindexedCount = galleryImages.filter(
-                (wp) => wp.status !== "deleted" && (!wp.indexed_at || wp.status === "uploaded")
-              ).length;
-              
-              return (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                    {galleryImages.length} wallpapers ({unindexedCount} unindexed)
-                  </span>
-                  {unindexedCount > 0 && (
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ padding: "6px 12px", fontSize: "0.85rem" }}
-                      disabled={indexingLoading || indexingProgress?.active}
-                      onClick={() => handleTriggerIndexing(false)}
-                    >
-                      {indexingLoading ? "Triggering..." : "⚡ Align Status"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{ padding: "6px 12px", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.05)", border: "1px solid var(--border)", color: "inherit" }}
-                    disabled={indexingLoading || indexingProgress?.active}
-                    onClick={() => handleTriggerIndexing(true)}
-                  >
-                    🔄 Re-index All
-                  </button>
-                </div>
-              );
-            })()}
+            <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+              {galleryImages.length} wallpapers
+            </span>
           </div>
         </div>
-
-        {indexingMessage && (
-          <div style={{
-            padding: "10px 14px",
-            background: "rgba(52, 168, 83, 0.15)",
-            border: "1px solid #34a853",
-            borderRadius: "6px",
-            fontSize: "0.9rem",
-            marginBottom: "1rem",
-            color: "var(--foreground)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}>
-            <span>{indexingMessage}</span>
-            <button onClick={() => setIndexingMessage(null)} style={{ background: "none", border: "none", color: "var(--foreground)", cursor: "pointer" }}>✕</button>
-          </div>
-        )}
-
-        {indexingProgress && showProgressCard && (
-          <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border)", borderRadius: "8px", padding: "1rem", marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>⚡ AI Indexing Progress</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "var(--primary)" }}>
-                  {Math.round(((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100)}% ({indexingProgress.processed + indexingProgress.failed} / {indexingProgress.total})
-                </span>
-                {indexingProgress.active && (
-                  <button type="button" style={{ padding: "4px 8px", fontSize: "0.75rem", background: "rgba(219,68,85,0.2)", border: "1px solid #db4455", color: "#ff6b7b", borderRadius: 4, cursor: "pointer" }} onClick={handleCancelIndexing}>
-                    Stop
-                  </button>
-                )}
-              </div>
-            </div>
-            <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: "0.5rem" }}>
-              <div style={{ width: `${((indexingProgress.processed + indexingProgress.failed) / (indexingProgress.total || 1)) * 100}%`, height: "100%", background: "linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%)" }}></div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-              <span>Processed: {indexingProgress.processed} • Failed: {indexingProgress.failed}</span>
-              {indexingProgress.active && <span>Analyzing: <i>{indexingProgress.currentWallpaper}</i></span>}
-            </div>
-          </div>
-        )}
 
         {/* Live Search and Filter Bar */}
         <div style={{ marginBottom: "1.5rem", display: "flex", gap: "10px" }}>
@@ -1548,57 +1143,12 @@ export default function Page() {
         </div>
 
         {/* Dynamic Filter Controls Panel */}
-        <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.5rem" }}>
-
-          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div className="filter-bar" style={{ display: "flex", gap: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.5rem" }}>
+          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "240px" }}>
             <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Collection</label>
             <select value={selectedCollectionFilter} onChange={(e) => setSelectedCollectionFilter(e.target.value)}>
               <option value="">All Collections</option>
               {filteredFilterCollections.map((col) => (<option key={col.id} value={col.id}>{col.name}</option>))}
-            </select>
-          </div>
-
-          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Style</label>
-            <select value={selectedStyleFilter} onChange={(e) => setSelectedStyleFilter(e.target.value)}>
-              <option value="">All Styles</option>
-              <option value="Realistic">Realistic</option>
-              <option value="Minimal">Minimal</option>
-              <option value="Illustration">Illustration</option>
-              <option value="3D Render">3D Render</option>
-              <option value="Anime">Anime</option>
-              <option value="Pixel Art">Pixel Art</option>
-              <option value="Cyberpunk">Cyberpunk</option>
-              <option value="Vector">Vector</option>
-            </select>
-          </div>
-
-          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Mood</label>
-            <select value={selectedMoodFilter} onChange={(e) => setSelectedMoodFilter(e.target.value)}>
-              <option value="">All Moods</option>
-              <option value="Dramatic">Dramatic</option>
-              <option value="Calm">Calm</option>
-              <option value="Mysterious">Mysterious</option>
-              <option value="Energetic">Energetic</option>
-              <option value="Dark">Dark</option>
-              <option value="Vibrant">Vibrant</option>
-            </select>
-          </div>
-
-          <div className="filter-group" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-muted)" }}>Colors</label>
-            <select value={selectedColorFilter} onChange={(e) => setSelectedColorFilter(e.target.value)}>
-              <option value="">All Colors</option>
-              <option value="Blue">Blue</option>
-              <option value="Black">Black</option>
-              <option value="Red">Red</option>
-              <option value="White">White</option>
-              <option value="Green">Green</option>
-              <option value="Yellow">Yellow</option>
-              <option value="Orange">Orange</option>
-              <option value="Purple">Purple</option>
-              <option value="Dark">Dark</option>
             </select>
           </div>
         </div>
