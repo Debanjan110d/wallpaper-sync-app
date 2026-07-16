@@ -1,6 +1,6 @@
 {
   "name": "wallpaper-app",
-  "version": "3.5.0",
+  "version": "3.4.1",
   "description": "A Windows background application that syncs wallpapers and manages a local collection.",
   "main": "main.js",
   "scripts": {
@@ -19,8 +19,8 @@
     "win": {
       "target": "nsis",
       "icon": "icon.png",
-      "certificateFile": "scripts/self-signed-cert.pfx",
-      "certificatePassword": "password"
+      "cscLink": "scripts/self-signed-cert.pfx",
+      "cscKeyPassword": "password"
     },
     "asar": true,
     "extraResources": [

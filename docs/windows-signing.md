@@ -22,6 +22,14 @@ We have provided a helper PowerShell script to automate creating a self-signed C
    ```
 3. A browser/system dialog might prompt you to confirm adding the certificate to your "Root" trust store. Accept the prompt.
 4. The script generates `scripts/self-signed-cert.pfx` and imports it into your user certificates.
+   ```json
+   "win": {
+      "target": "nsis",
+      "icon": "icon.png",
+      "cscLink": "scripts/self-signed-cert.pfx",
+      "cscKeyPassword": "password"
+    }
+   ```
 5. Re-compile the application:
    ```bash
    npm run dist
