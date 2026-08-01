@@ -834,7 +834,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            Wallpaper Sync Administration Portal • v4.0
+              Wallpaper Sync Administration Portal • v4.0 • 📊 <strong>{totalCount}</strong> Wallpapers
             </p>
           </div>
         </div>
@@ -1333,7 +1333,7 @@ export default function Page() {
           <h2 style={{ margin: 0 }}>Manage Collection</h2>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
             <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-              {galleryImages.length} wallpapers
+              Showing {galleryImages.length} of {totalCount} wallpapers
             </span>
           </div>
         </div>
