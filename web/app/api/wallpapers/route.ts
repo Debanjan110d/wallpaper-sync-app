@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
+export const dynamic = "force-dynamic";
+
 type DbWallpaper = {
   id: string;
   file_name: string | null;
@@ -372,7 +374,7 @@ export async function GET(request: Request) {
       return new Response(null, {
         status: 304,
         headers: {
-          "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+          "Cache-Control": "no-cache",
           "ETag": etag,
           "Vary": "Cookie, x-sync-token",
         },
@@ -487,7 +489,7 @@ export async function GET(request: Request) {
       },
       {
         headers: {
-          "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+          "Cache-Control": "no-cache",
           "ETag": etag,
           "Vary": "Cookie, x-sync-token",
         },

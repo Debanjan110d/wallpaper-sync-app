@@ -40,6 +40,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             slideshowOrder.value = store.state.settings.slideshowOrder || "sequential";
         }
 
+        // Populate server settings input fields
+        const apiUrlInput = document.getElementById("apiUrlInput");
+        const syncTokenInput = document.getElementById("syncTokenInput");
+        if (apiUrlInput) {
+            apiUrlInput.value = store.state.settings.apiUrl || "";
+        }
+        if (syncTokenInput) {
+            syncTokenInput.value = store.state.settings.syncToken || "";
+        }
+
         // Fetch local cache and sync connection status
         await store.refreshMetadata();
         await store.loadWallpapers();
@@ -246,6 +256,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             fetchWallpapersBtn.textContent = "Fetch server wallpapers";
             fetchWallpapersBtn.disabled = false;
+        });
+    }
+
+    const saveConnectionSettingsBtn = document.getElementById("saveConnectionSettingsBtn");
+    const apiUrlInputVal = document.getElementById("apiUrlInput");
+    const syncTokenInputVal = document.getElementById("syncTokenInput");
+
+    if (saveConnectionSettingsBtn && apiUrlInputVal && syncTokenInputVal) {
+        saveConnectionSettingsBtn.addEventListener("click", async () => {
+            saveConnectionSettingsBtn.disabled = true;
+            saveConnectionSettingsBtn.textContent = "Saving...";
+            const url = apiUrlInputVal.value.trim();
+            const token = syncTokenInputVal.value.trim();
+            try {
+                await window.api.saveConnectionSettings(url, token);
+                store.state.settings.apiUrl = url;
+                store.state.settings.syncToken = token;
+                showToast("Connection settings saved successfully!", "success");
+            } catch (e) {
+                showToast("Save failed: " + e.message, "error");
+            }
+            saveConnectionSettingsBtn.textContent = "Save Settings";
+            saveConnectionSettingsBtn.disabled = false;
         });
     }
 

@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("api", {
   updateSlideshowSource: (source) => ipcRenderer.invoke("update-slideshow-source", source),
   updateSlideshowOrder: (order) => ipcRenderer.invoke("update-slideshow-order", order),
   submitReview: (rating, comment, reviewerName) => ipcRenderer.invoke("submit-review", rating, comment, reviewerName),
+  saveConnectionSettings: (apiUrl, syncToken) => ipcRenderer.invoke("save-connection-settings", apiUrl, syncToken),
   onWindowShown: (callback) => ipcRenderer.on("app:window-shown", () => callback()),
   onMetadataSyncProgress: (callback) => ipcRenderer.on("metadata-sync-progress", (event, data) => callback(data))
 });

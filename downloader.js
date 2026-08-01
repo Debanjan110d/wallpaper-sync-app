@@ -40,7 +40,15 @@ async function syncWallpapers(config, onProgress) {
         return { ...wp, __key: key };
       })
       .filter((wp) => wp?.__key && String(wp.__key).match(/\.(jpg|jpeg|png|webp)$/i))
-      .filter((wp) => !ignored.has(String(wp.__key)));
+      .filter((wp) => !ignored.has(String(wp.__key)))
+      .filter((wp) => !!wp?.url);
+
+    // Sort descending by created_at to preserve proper sync cursor tracking
+    eligible.sort((a, b) => {
+      const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tB - tA;
+    });
 
     const total = eligible.length;
     if (typeof onProgress === "function") {
@@ -52,6 +60,8 @@ async function syncWallpapers(config, onProgress) {
     let latestFile = null;
     let downloadCount = 0;
     const serverFiles = wallpapers.map(wp => String(wp?.storage_path || wp?.name || "")).filter(Boolean);
+    const failedIndices = new Set();
+    const downloadErrors = [];
 
     for (let index = 0; index < eligible.length; index++) {
       const wp = eligible[index];
@@ -103,16 +113,23 @@ async function syncWallpapers(config, onProgress) {
           const writer = fs.createWriteStream(tempPath);
           
           await new Promise((resolve, reject) => {
+            let settled = false;
             imgRes.data.pipe(writer);
             imgRes.data.on("error", (err) => {
+              if (settled) return;
+              settled = true;
               writer.destroy();
               reject(err);
             });
             writer.on("error", (err) => {
+              if (settled) return;
+              settled = true;
               writer.destroy();
               reject(err);
             });
-            writer.on("finish", () => {
+            writer.on("close", () => {
+              if (settled) return;
+              settled = true;
               resolve();
             });
           });
@@ -132,12 +149,13 @@ async function syncWallpapers(config, onProgress) {
           downloadCount++;
         } catch (err) {
           console.error("Failed to download wallpaper:", filename, err.message);
+          failedIndices.add(index);
+          downloadErrors.push(`${filename}: ${err.message}`);
           try {
             if (fs.existsSync(tempPath)) {
               fs.unlinkSync(tempPath);
             }
           } catch {}
-          throw err;
         }
       }
 
@@ -155,7 +173,23 @@ async function syncWallpapers(config, onProgress) {
       } catch { }
     }
 
-    return { latestFile, downloadCount, serverFiles, maxCreatedAt };
+    // Safely calculate nextSyncCursor: do not advance past the oldest failed download
+    let safeMaxCreatedAt = maxCreatedAt;
+    if (failedIndices.size > 0) {
+      const oldestFailedIdx = Math.max(...failedIndices);
+      if (oldestFailedIdx + 1 < eligible.length) {
+        safeMaxCreatedAt = eligible[oldestFailedIdx + 1].created_at || null;
+      } else {
+        safeMaxCreatedAt = config.LAST_SYNC_CURSOR || null;
+      }
+    }
+
+    let finalError = null;
+    if (downloadErrors.length > 0) {
+      finalError = `Failed to download ${downloadErrors.length} file(s): ${downloadErrors.join("; ")}`;
+    }
+
+    return { latestFile, downloadCount, serverFiles, maxCreatedAt: safeMaxCreatedAt, error: finalError };
   } catch (error) {
     const status = error?.response?.status;
     const statusText = error?.response?.statusText;

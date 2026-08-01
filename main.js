@@ -24,7 +24,7 @@ const USER_DATA_PATHS = (() => {
 
     // Force Chromium cache to a guaranteed-writable location (Temp).
     // Use a per-launch directory to avoid lock/contention issues that can cause
-    // "Unable to move/create cache" (0x5) on Windows. so long as the temp dir is writable, this should succeed even in restrictive environments.Hehe
+    // "Unable to move/create cache" (0x5) on Windows. As long as the temp dir is writable, this should succeed even in restrictive environments.
     const desiredCache = path.join(os.tmpdir(), "wallpaper-sync-cache", String(process.pid));
 
     if (desiredUserData && desiredUserData !== oldUserData) {
@@ -34,7 +34,7 @@ const USER_DATA_PATHS = (() => {
     try {
       if (desiredCache) app.setPath("cache", desiredCache);
     } catch {
-      // ignore it bhai
+      // ignore
     }
 
     const activeUserData = app.getPath("userData");
@@ -714,14 +714,13 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
       const normalized = normalizeIsoTimestamp(maxCreatedAt);
       if (normalized) {
         settings.lastSyncCursor = normalized;
-        saveSettings(settings);
       }
     }
 
-    if (latestFile) {
-      settings.lastSyncDate = Date.now();
-      saveSettings(settings);
-      if (mainWindow) mainWindow.webContents.send("sync-complete");
+    settings.lastSyncDate = Date.now();
+    saveSettings(settings);
+    if (mainWindow) {
+      mainWindow.webContents.send("sync-complete");
     }
 
     return { downloadCount, orphanedCount: 0, serverDeletedCount, error: null };
@@ -992,6 +991,13 @@ app.on("activate", () => {
 
 ipcMain.handle("get-settings", () => {
   return settings;
+});
+
+ipcMain.handle("save-connection-settings", (event, apiUrl, syncToken) => {
+  settings.apiUrl = apiUrl;
+  settings.syncToken = syncToken;
+  saveSettings(settings);
+  return { success: true };
 });
 
 ipcMain.handle("toggle-slideshow", (event, state) => {
