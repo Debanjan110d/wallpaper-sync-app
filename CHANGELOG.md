@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.7.0 (v3.7.0) — 2026-08-02
+
+### Release Verification & Build Testing
+- **Minor Version Bump:** Incremented application version to 3.7.0 for release pipeline and installation package validation testing.
+
 ## 3.6.0 (v3.6.0) — 2026-08-01
 
 ### Network Egress & Caching Fixes
