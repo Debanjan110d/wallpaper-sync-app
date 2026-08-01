@@ -84,7 +84,8 @@ export async function GET(request: Request) {
     // Extract pagination parameters
     const limitParam = url.searchParams.get("limit");
     const cursor = url.searchParams.get("cursor") || null;
-    const limit = limitParam ? parseInt(limitParam, 10) : 30;
+    const defaultLimit = isValidSyncToken ? 100000 : 30;
+    const limit = limitParam ? parseInt(limitParam, 10) : defaultLimit;
 
     // Extract filters
     const categoryId = url.searchParams.get("category");
