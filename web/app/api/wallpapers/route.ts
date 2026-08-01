@@ -18,6 +18,7 @@ type DbWallpaper = {
   styles?: string[] | null;
   moods?: string[] | null;
   other_attributes?: string[] | null;
+  primary_color?: string | null;
   wallpaper_tags: {
     tag_id: number;
     tags: {
@@ -77,6 +78,11 @@ export async function GET(request: Request) {
     const countOnly = (url.searchParams.get("countOnly") || "").trim() === "1";
     const since = sinceParam ? new Date(sinceParam) : null;
     const hasValidSince = !!since && !Number.isNaN(since.getTime());
+
+    // Extract pagination parameters
+    const limitParam = url.searchParams.get("limit");
+    const cursor = url.searchParams.get("cursor") || null;
+    const limit = limitParam ? parseInt(limitParam, 10) : 30;
 
     // Extract filters
     const categoryId = url.searchParams.get("category");
@@ -177,7 +183,7 @@ export async function GET(request: Request) {
     }
 
     // Retrieve wallpapers based on schema-conforming fields
-    let query = supabase
+    let query: any = supabase
       .from("wallpapers")
       .select(`
         id,
@@ -195,6 +201,7 @@ export async function GET(request: Request) {
         styles,
         moods,
         other_attributes,
+        primary_color,
         wallpaper_tags (
           tag_id,
           tags (
@@ -224,7 +231,60 @@ export async function GET(request: Request) {
       query = query.gt("created_at", since!.toISOString());
     }
 
-    const { data: rows, error: dbError } = await query;
+    let queryResult = await query;
+
+    if (queryResult.error && (queryResult.error.message.includes("primary_color") || queryResult.error.message.includes("does not exist"))) {
+      console.warn("⚠️ primary_color column does not exist in wallpapers table. Retrying wallpapers fetch without it.");
+      let retryQuery = supabase
+        .from("wallpapers")
+        .select(`
+          id,
+          file_name,
+          storage_path,
+          hash,
+          status,
+          created_at,
+          confidence,
+          indexed_at,
+          title,
+          description,
+          characters,
+          franchises,
+          styles,
+          moods,
+          other_attributes,
+          wallpaper_tags (
+            tag_id,
+            tags (
+              id,
+              name
+            )
+          ),
+          wallpaper_collections (
+            collection_id,
+            collections (
+              id,
+              name,
+              category_id
+            )
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      retryQuery = retryQuery.neq("status", "deleted");
+
+      if (filteredWpIds !== null) {
+        retryQuery = retryQuery.in("id", filteredWpIds);
+      }
+
+      if (hasValidSince) {
+        retryQuery = retryQuery.gt("created_at", since!.toISOString());
+      }
+
+      queryResult = await retryQuery;
+    }
+
+    const { data: rows, error: dbError } = queryResult;
 
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
@@ -287,14 +347,74 @@ export async function GET(request: Request) {
       });
     }
 
+    const totalCount = filteredRows.length;
+
+    // ETag caching check (fingerprints edits to titles, tags, or collections to prevent stale cache displays)
+    const maxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : "empty";
+    
+    const editTracker = filteredRows
+      .map(
+        (r) =>
+          `${r.id}-${r.title || ""}-${(r.wallpaper_tags || []).map((wt: any) => wt.tag_id).sort().join(",")}-${(r.wallpaper_collections || []).map((wc: any) => wc.collection_id).sort().join(",")}`
+      )
+      .join("|");
+    
+    let hashVal = 0;
+    for (let i = 0; i < editTracker.length; i++) {
+      hashVal = (hashVal << 5) - hashVal + editTracker.charCodeAt(i);
+      hashVal |= 0;
+    }
+
+    const etag = `W/"${maxCreatedAt}-${totalCount}-${hashVal}-${cursor || "none"}"`;
+
+    const ifNoneMatch = request.headers.get("if-none-match");
+    if (ifNoneMatch === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+          "ETag": etag,
+          "Vary": "Cookie, x-sync-token",
+        },
+      });
+    }
+
+    let paginatedRows = filteredRows;
+    let nextCursor: string | null = null;
+    let hasMore = false;
+
+    if (cursor) {
+      const cursorIndex = filteredRows.findIndex((r) => r.created_at === cursor);
+      if (cursorIndex !== -1) {
+        paginatedRows = filteredRows.slice(cursorIndex + 1);
+      }
+    }
+
+    if (paginatedRows.length > limit) {
+      hasMore = true;
+      nextCursor = paginatedRows[limit - 1].created_at || null;
+      paginatedRows = paginatedRows.slice(0, limit);
+    }
+
     const wallpapers = await Promise.all(
-      filteredRows
+      paginatedRows
         .filter((row) => !!row.storage_path)
         .map(async (row) => {
           const storagePath = String(row.storage_path);
-          const { data: urlData, error: urlError } = await supabase.storage
-            .from("wallpapers")
-            .createSignedUrl(storagePath, 60 * 60);
+          const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL;
+
+          let url: string | null = null;
+
+          if (cdnUrl) {
+            const cleanCdn = cdnUrl.replace(/\/+$/, "");
+            url = `${cleanCdn}/${storagePath}`;
+          } else {
+            // Fallback to generating standard signed URLs
+            const { data: urlData, error: urlError } = await supabase.storage
+              .from("wallpapers")
+              .createSignedUrl(storagePath, 60 * 60);
+            url = urlError ? null : (urlData?.signedUrl || null);
+          }
 
           const wc = Array.isArray(row.wallpaper_collections) && row.wallpaper_collections.length > 0
             ? row.wallpaper_collections[0]
@@ -321,6 +441,10 @@ export async function GET(request: Request) {
                 .filter((c): c is { id: number; name: string; category_id: number | null } => !!c)
             : [];
 
+          // Version hash based on created_at to break caches when item updates
+          const version = row.created_at ? new Date(row.created_at).getTime() : 0;
+          const urlWithVersion = url ? `${url}?v=${version}` : null;
+
           return {
             id: row.id,
             file_name: row.file_name,
@@ -344,19 +468,31 @@ export async function GET(request: Request) {
             moods: row.moods || [],
             other_attributes: row.other_attributes || [],
             name: storagePath.split("/").pop() || storagePath,
-            url: urlError ? null : (urlData?.signedUrl || null),
+            url: urlWithVersion,
+            primary_color: row.primary_color || null,
           };
         })
     );
 
-    const maxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : null;
+    const finalMaxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : null;
 
-    return NextResponse.json({
-      wallpapers,
-      max_created_at: maxCreatedAt,
-      count: wallpapers.length,
-      since: hasValidSince ? since!.toISOString() : null,
-    });
+    return NextResponse.json(
+      {
+        wallpapers,
+        max_created_at: finalMaxCreatedAt,
+        count: totalCount,
+        nextCursor,
+        hasMore,
+        since: hasValidSince ? since!.toISOString() : null,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+          "ETag": etag,
+          "Vary": "Cookie, x-sync-token",
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -20,6 +20,10 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (error.message.includes("reviews' in the schema cache") || error.message.includes("relation \"reviews\" does not exist")) {
+        console.warn("⚠️ reviews table does not exist. Returning empty reviews list.");
+        return NextResponse.json({ reviews: [] });
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

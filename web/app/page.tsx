@@ -2,12 +2,153 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { imageKitLoader } from "@/utils/imageKitLoader";
+
+const getColorHex = (colorName: string | null) => {
+  if (!colorName) return "rgba(255,255,255,0.03)";
+  const colors: Record<string, string> = {
+    black: "#121212",
+    white: "#ffffff",
+    grey: "#8e8e93",
+    gray: "#8e8e93",
+    red: "#ff3b30",
+    green: "#34c759",
+    blue: "#007aff",
+    yellow: "#ffcc00",
+    orange: "#ff9500",
+    purple: "#af52de",
+    pink: "#ff2d55",
+    brown: "#a2845e",
+    cyan: "#32ade6",
+    teal: "#30b0c7",
+    indigo: "#5856d6",
+    violet: "#785ef0",
+  };
+  const name = colorName.toLowerCase().trim();
+  return colors[name] ? `${colors[name]}15` : "rgba(255,255,255,0.03)";
+};
+
+function OptimizedImage({
+  src,
+  alt,
+  className,
+  style,
+  sizes,
+  fill = false,
+  priority = false,
+  primaryColor = null,
+  objectFit = "cover",
+  showPreviews = true,
+  onClick,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  style?: React.CSSProperties;
+  sizes?: string;
+  fill?: boolean;
+  priority?: boolean;
+  primaryColor?: string | null;
+  objectFit?: "cover" | "contain" | "fill";
+  showPreviews?: boolean;
+  onClick?: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const placeholderUrl = src && src.includes("imagekit.io")
+    ? `${src.split("?")[0]}?tr=w-20,bl-10,q-40,f-auto`
+    : null;
+
+  return (
+    <div
+      className={className}
+      style={{
+        position: className && className.includes("slide") ? "absolute" : "relative",
+        width: "100%",
+        height: fill ? "100%" : "auto",
+        backgroundColor: getColorHex(primaryColor),
+        overflow: "hidden",
+        display: "block",
+        ...style,
+      }}
+      onClick={onClick}
+    >
+      {/* Blurred Low-Res Placeholder */}
+      {showPreviews && !loaded && placeholderUrl && (
+        <img
+          src={placeholderUrl}
+          alt=""
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit,
+            filter: "blur(10px)",
+            transform: "scale(1.1)",
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* Main Image */}
+      {showPreviews ? (
+        <Image
+          loader={imageKitLoader}
+          src={src}
+          alt={alt}
+          fill={fill}
+          width={!fill ? 400 : undefined}
+          height={!fill ? 250 : undefined}
+          sizes={sizes}
+          priority={priority}
+          loading={priority ? undefined : "lazy"}
+          onLoad={() => setLoaded(true)}
+          style={{
+            objectFit,
+            transition: "opacity 0.4s ease-in-out",
+            opacity: loaded ? 1 : 0,
+            zIndex: 1,
+          }}
+        />
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", opacity: 0.15 }}>
+          🖼️
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Page() {
   const [username, setUsername] = useState("Admin");
   const [files, setFiles] = useState<File[]>([]);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [favTrigger, setFavTrigger] = useState(0);
+  const [showPreviews, setShowPreviews] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("show_previews");
+      if (saved === "false") {
+        setShowPreviews(false);
+      }
+    }
+  }, []);
+
+  const togglePreviews = () => {
+    setShowPreviews((prev) => {
+      const newVal = !prev;
+      localStorage.setItem("show_previews", String(newVal));
+      return newVal;
+    });
+  };
+
   const [messages, setMessages] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showMindmap, setShowMindmap] = useState(false);
@@ -99,9 +240,14 @@ export default function Page() {
     }
   };
 
-  const fetchGallery = async () => {
+  const LIMIT = 30;
+
+  const fetchGallery = async (loadMore = false) => {
+    setLoading(true);
     try {
-      let queryStr = "?";
+      const currentCursor = loadMore ? nextCursor : null;
+      let queryStr = `?limit=${LIMIT}&`;
+      if (currentCursor) queryStr += `cursor=${encodeURIComponent(currentCursor)}&`;
       if (selectedCategoryFilter) queryStr += `category=${selectedCategoryFilter}&`;
       if (selectedCollectionFilter) queryStr += `collection=${selectedCollectionFilter}&`;
       if (selectedTagFilters.length > 0) queryStr += `tags=${selectedTagFilters.join(",")}&`;
@@ -113,10 +259,23 @@ export default function Page() {
       const res = await fetch(`/api/wallpapers${queryStr}`);
       const data = await res.json();
       if (data.wallpapers) {
-        setGalleryImages(data.wallpapers);
+        if (loadMore) {
+          setGalleryImages((prev) => {
+            const existingIds = new Set(prev.map(img => img.id));
+            const newImages = data.wallpapers.filter((img: any) => !existingIds.has(img.id));
+            return [...prev, ...newImages];
+          });
+        } else {
+          setGalleryImages(data.wallpapers);
+        }
+        setTotalCount(data.count || 0);
+        setNextCursor(data.nextCursor || null);
+        setHasMore(!!data.hasMore);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -242,11 +401,11 @@ export default function Page() {
     if (index > -1) {
       history.favorites.splice(index, 1);
       localStorage.setItem("interaction_history", JSON.stringify(history));
-      computeRecommendations(galleryImages);
     } else {
       trackInteraction(wallpaper, "favorite");
     }
-    fetchGallery();
+    setFavTrigger(prev => prev + 1);
+    computeRecommendations(galleryImages);
   };
 
   const isFavorited = (id: string) => {
@@ -264,7 +423,7 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    fetchGallery();
+    fetchGallery(false);
     setSelectedImageIds([]);
   }, [
     selectedCategoryFilter,
@@ -302,7 +461,7 @@ export default function Page() {
 
   const validateAspectRatio = (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         const ratio = img.width / img.height;
         if (ratio >= 0.5 && ratio <= 3.0) {
@@ -417,7 +576,7 @@ export default function Page() {
     setSelectedCollectionForUpload("");
     setSelectedTagsForUpload([]);
 
-    fetchGallery();
+    fetchGallery(false);
   };
 
   const deleteImage = async (filename: string) => {
@@ -583,7 +742,7 @@ export default function Page() {
       });
       if (res.ok) {
         setEditingWallpaper(null);
-        fetchGallery();
+        fetchGallery(false);
       } else {
         const data = await res.json();
         alert("Failed to update: " + data.error);
@@ -628,7 +787,7 @@ export default function Page() {
         setBulkCategoryId("");
         setBulkCollectionId("");
         setBulkTags([]);
-        fetchGallery();
+        fetchGallery(false);
       } else {
         alert("Bulk update failed: " + data.error);
       }
@@ -679,20 +838,42 @@ export default function Page() {
             </p>
           </div>
         </div>
-        <Link href="/docs" style={{
-          padding: "8px 18px",
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid var(--border)",
-          borderRadius: "8px",
-          color: "var(--foreground)",
-          textDecoration: "none",
-          fontSize: "0.9rem",
-          fontWeight: 500,
-          backdropFilter: "blur(10px)",
-          transition: "background 0.2s"
-        }}>
-          Documentation
-        </Link>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={togglePreviews}
+            className="btn-secondary"
+            style={{
+              padding: "8px 18px",
+              background: showPreviews ? "rgba(26,115,232,0.15)" : "rgba(255,255,255,0.05)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              color: showPreviews ? "var(--primary)" : "var(--foreground)",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+            title={showPreviews ? "Turn off to save bandwidth by hiding images" : "Turn on to show image previews"}
+          >
+            {showPreviews ? "🟢 Show Previews" : "🔴 Hide Previews"}
+          </button>
+          
+          <Link href="/docs" style={{
+            padding: "8px 18px",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: "0.9rem",
+            fontWeight: 500,
+            backdropFilter: "blur(10px)",
+            transition: "background 0.2s"
+          }}>
+            Documentation
+          </Link>
+        </div>
       </div>
 
       {/* Visual System Architecture Map (Collapsible) */}
@@ -771,7 +952,16 @@ export default function Page() {
                   trackInteraction(img, "view");
                 }}
               >
-                <img src={img.url} className="img-preview" style={{ height: "110px" }} alt={img.title || img.name} />
+                <OptimizedImage
+                  src={img.url}
+                  alt={img.title || img.name}
+                  className="img-preview"
+                  style={{ height: "110px" }}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  primaryColor={img.primary_color}
+                  showPreviews={showPreviews}
+                />
                 <div className="item-info" style={{ padding: "8px" }}>
                   <div className="item-name" style={{ fontSize: "0.8rem", fontWeight: 600 }}>{img.title || img.name}</div>
                   <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "4px" }}>
@@ -805,7 +995,16 @@ export default function Page() {
               aria-roledescription="slide"
               aria-label={`${idx + 1} of ${sliderImages.length}`}
             >
-              <img src={img.url} className="slide-img" alt={img.title || img.file_name || "Featured Wallpaper"} />
+              <OptimizedImage
+                src={img.url}
+                alt={img.title || img.file_name || "Featured Wallpaper"}
+                className="slide-img"
+                fill
+                sizes="100vw"
+                priority={idx === 0}
+                primaryColor={img.primary_color}
+                showPreviews={showPreviews}
+              />
               <div className="slide-overlay"></div>
               <div className="slide-content">
                 <div className="badge badge-category" style={{ marginBottom: "0.5rem" }}>
@@ -1219,9 +1418,9 @@ export default function Page() {
 
         {/* Wallpaper Image Grid */}
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "1.5rem" }}>
-          {galleryImages.map((img) => {
+          {galleryImages.map((img, idx) => {
             const isSelected = selectedImageIds.includes(img.id);
-            const fav = isFavorited(img.id);
+            const fav = favTrigger >= 0 && isFavorited(img.id);
             
             return (
               <div key={img.id} className={`gallery-item ${isSelected ? "selected" : ""}`} style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -1261,11 +1460,16 @@ export default function Page() {
                   </button>
                 </div>
 
-                <img
+                <OptimizedImage
                   src={img.url}
-                  className="img-preview"
                   alt={img.title || img.name}
-                  style={{ height: "160px", objectFit: "cover", cursor: "zoom-in" }}
+                  className="img-preview"
+                  style={{ height: "160px", cursor: "zoom-in" }}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  priority={idx < 4}
+                  primaryColor={img.primary_color}
+                  showPreviews={showPreviews}
                   onClick={() => {
                     setPreviewWallpaper(img);
                     trackInteraction(img, "view");
@@ -1352,6 +1556,19 @@ export default function Page() {
           })}
         </div>
 
+        {hasMore && (
+          <div style={{ display: "flex", justifyContent: "center", margin: "2rem 0" }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => fetchGallery(true)}
+              disabled={loading}
+            >
+              {loading ? "Loading..." : "Load More Wallpapers"}
+            </button>
+          </div>
+        )}
+
         {galleryImages.length === 0 && (
           <div style={{ textAlign: "center", padding: "3rem 0", color: "var(--text-muted)" }}>
             <h3>No wallpapers match your filters</h3>
@@ -1422,7 +1639,16 @@ export default function Page() {
             >
               ✕
             </button>
-            <img src={previewWallpaper.url} style={{ width: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 8 }} alt={previewWallpaper.title || previewWallpaper.name} />
+            <OptimizedImage
+              src={previewWallpaper.url}
+              alt={previewWallpaper.title || previewWallpaper.name}
+              style={{ width: "100%", height: "65vh", borderRadius: 8 }}
+              fill
+              sizes="(max-width: 1200px) 100vw, 1200px"
+              objectFit="contain"
+              primaryColor={previewWallpaper.primary_color}
+              showPreviews={showPreviews}
+            />
             <div style={{ marginTop: "1rem" }}>
               <h3 style={{ margin: "0 0 0.5rem 0" }}>{previewWallpaper.title || previewWallpaper.file_name}</h3>
               <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-muted)" }}>{previewWallpaper.description || "No description available."}</p>

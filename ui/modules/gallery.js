@@ -61,42 +61,48 @@ export function updateCollectionsDropdowns(selectedColFilterId = "") {
     colFilter.value = selectedColFilterId;
 }
 
-// 2. Render Categories Horizontal Section
+// 2. Render Collections Horizontal Section
 export function renderCategorySection() {
     const grid = document.getElementById("categoriesGrid");
     if (!grid) return;
     grid.innerHTML = "";
 
     const localMetadata = store.state.localMetadata;
-    const catFilter = document.getElementById("catFilter");
+    const colFilter = document.getElementById("colFilter");
+    const currentImages = store.state.currentImages || [];
 
-    if (localMetadata.categories.length === 0) {
-        grid.innerHTML = '<span style="color:var(--text-muted); font-size:12px; padding:10px;">No categories created yet</span>';
+    if (localMetadata.collections.length === 0) {
+        grid.innerHTML = '<span style="color:var(--text-muted); font-size:12px; padding:10px;">No collections created yet</span>';
         return;
     }
 
-    const catMap = {};
-    localMetadata.categories.forEach(cat => {
-        catMap[cat.id] = { name: cat.name, count: 0, cover: "" };
+    const colMap = {};
+    localMetadata.collections.forEach(col => {
+        colMap[col.id] = { name: col.name, count: 0, cover: "" };
     });
 
-    localMetadata.collections.forEach(col => {
-        if (catMap[col.category_id]) {
-            catMap[col.category_id].count++;
+    currentImages.forEach(img => {
+        const hash = img.filename.split(".")[0];
+        const meta = localMetadata.wallpaper_metadata[hash] || {};
+        if (meta.collection_id && colMap[meta.collection_id]) {
+            colMap[meta.collection_id].count++;
+            if (!colMap[meta.collection_id].cover) {
+                colMap[meta.collection_id].cover = toFileUrl(img.path);
+            }
         }
     });
 
-    localMetadata.categories.forEach(cat => {
-        const stats = catMap[cat.id];
+    localMetadata.collections.forEach(col => {
+        const stats = colMap[col.id] || { name: col.name, count: 0, cover: "" };
 
         const card = document.createElement("div");
         card.className = "category-card";
 
         const colors = ["#2b5c8f", "#126e51", "#8f3b2b", "#772b8f", "#8f7c2b", "#1a73e8"];
-        const color = colors[Math.abs(cat.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length];
+        const color = colors[Math.abs(col.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length];
 
-        if (cat.cover_image) {
-            card.style.backgroundImage = `url('${cat.cover_image}')`;
+        if (stats.cover) {
+            card.style.backgroundImage = `url('${stats.cover}')`;
             card.style.backgroundSize = "cover";
             card.style.backgroundPosition = "center";
         } else {
@@ -105,17 +111,16 @@ export function renderCategorySection() {
 
         card.innerHTML = `
             <div class="category-card-overlay" style="background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.75));">
-                <span class="category-card-title">${cat.name}</span>
-                <span class="category-card-subtitle">${stats.count} collections</span>
+                <span class="category-card-title">${col.name}</span>
+                <span class="category-card-subtitle">${stats.count} wallpapers</span>
             </div>
         `;
 
         card.addEventListener("click", () => {
-            if (catFilter) {
-                catFilter.value = cat.id;
-                catFilter.dispatchEvent(new Event("change"));
+            if (colFilter) {
+                colFilter.value = col.id;
+                colFilter.dispatchEvent(new Event("change"));
                 document.getElementById("catalogFilterSection")?.scrollIntoView({ behavior: "smooth" });
-                catFilter.scrollIntoView({ behavior: "smooth" });
             }
         });
 

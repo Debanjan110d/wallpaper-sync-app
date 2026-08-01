@@ -276,7 +276,30 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, data: { upload: uploadData, row } });
+    const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL;
+    let url: string | null = null;
+    if (cdnUrl) {
+      const cleanCdn = cdnUrl.replace(/\/+$/, "");
+      url = `${cleanCdn}/${storagePath}`;
+    } else {
+      const { data: urlData } = await supabaseAdmin.storage
+        .from("wallpapers")
+        .createSignedUrl(storagePath, 60 * 60);
+      url = urlData?.signedUrl || null;
+    }
+    const version = row?.created_at ? new Date(row.created_at).getTime() : 0;
+    const urlWithVersion = url ? `${url}?v=${version}` : null;
+
+    return NextResponse.json({ 
+      success: true, 
+      data: { 
+        upload: uploadData, 
+        row: row ? {
+          ...row,
+          url: urlWithVersion
+        } : null
+      } 
+    });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.6.0 (v3.6.0) — 2026-08-01
+
+### Network Egress & ETag Caching
+- **Resilient ETag Validation Caching:** Implemented conditional HTTP cache validation utilizing dynamic ETags built from database counts, latest creation times, and row metadata fingerprint hashes (representing ids, titles, collections, and tags). Bypasses 100% of body download payloads on both the web client and the desktop Electron client by returning `304 Not Modified` when database contents are unchanged, saving database CPU and outbound network bandwidth budget.
+- **Client Cache Synchronization:** Updated the desktop synchronization service (`metadataCache.js`) to persist ETags locally and attach them to sync check cycles, eliminating redundant offline calculations and disk writes.
+
+### Resiliency & Schema Fallbacks
+- **Database Schema Resiliency:** Added dynamic fallback query retry blocks in backend API routes. If the database schema is missing updated columns (like `primary_color`) or tables (like `reviews`), the endpoints gracefully warning-log and retry/fallback to return successfully rather than failing with `500 Internal Server Error`, ensuring the site operates seamlessly before/during migrations.
+- **Next.js Image Layout Stability:** Decoupled container layout styles from raw image attributes inside the React `OptimizedImage` component, resolving runtime clashing errors with Next.js's absolute `fill` property.
+
+### CDN & Performance Upgrades
+- **ImageKit Private S3 Path Resolution:** Enabled path-style URL formatting for ImageKit external storage origins, allowing it to correctly read private files in the root of the Supabase S3 S3-Compatible bucket.
+- **LCP Loading Optimizations:** Eagerly loaded above-the-fold wallpaper grid items using Next.js image priority flags, eliminating Largest Contentful Paint browser alerts.
+
+### Desktop Client Refactoring
+- **Category-to-Collection UI Migration:** Restructured the horizontal explorer grid inside the Electron client app to browse "Collections" rather than "Categories". Displays computed wallpaper counts per collection and assigns the first item's thumbnail as the card's visual background cover.
+
 ## 3.5.0 (v3.5.0) — 2026-07-17
 
 ### Desktop Client Enhancements

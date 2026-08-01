@@ -10,6 +10,7 @@ function getMetadataPath() {
 function loadLocalMetadata() {
   const metadataPath = getMetadataPath();
   const defaultMetadata = {
+    etag: "",
     categories: [],
     collections: [],
     tags: [],
@@ -131,11 +132,19 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
   try {
     // 2. Pull server metadata to fully synchronize local tables
     reportProgress("Fetching latest library data...", 50);
+    const wpsHeaders = { ...headers };
+    if (data.etag) {
+      wpsHeaders["if-none-match"] = data.etag;
+    }
+
     const [srvCatsRes, srvColsRes, srvTagsRes, srvWpsRes] = await Promise.all([
       axios.get(`${cleanUrl}/api/categories`, { headers }),
       axios.get(`${cleanUrl}/api/collections`, { headers }),
       axios.get(`${cleanUrl}/api/tags`, { headers }),
-      axios.get(`${cleanUrl}/api/wallpapers`, { headers }),
+      axios.get(`${cleanUrl}/api/wallpapers`, { 
+        headers: wpsHeaders,
+        validateStatus: (status) => status === 200 || status === 304
+      }),
     ]);
 
     // Overwrite local tables with server data
@@ -143,22 +152,28 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
     data.collections = srvColsRes.data.collections || [];
     data.tags = srvTagsRes.data.tags || [];
 
-    // Sync server wallpaper metadata (including original file_name) down to the local cache
-    data.wallpaper_metadata = {};
-    const serverWallpapers = srvWpsRes.data.wallpapers || [];
-    for (const sw of serverWallpapers) {
-      if (sw.hash) {
-        data.wallpaper_metadata[sw.hash] = {
-          file_name: sw.file_name || null,
-          collection_id: sw.collection_id ? Number(sw.collection_id) : null,
-          tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
-          style: sw.style || null,
-          primary_color: sw.primary_color || null,
-          quality: sw.quality || null,
-          confidence: sw.confidence || null,
-          indexed_at: sw.indexed_at || null,
-        };
+    if (srvWpsRes.status === 200) {
+      // Sync server wallpaper metadata (including original file_name) down to the local cache
+      data.wallpaper_metadata = {};
+      const serverWallpapers = srvWpsRes.data.wallpapers || [];
+      for (const sw of serverWallpapers) {
+        if (sw.hash) {
+          data.wallpaper_metadata[sw.hash] = {
+            file_name: sw.file_name || null,
+            collection_id: sw.collection_id ? Number(sw.collection_id) : null,
+            tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
+            style: sw.style || null,
+            primary_color: sw.primary_color || null,
+            quality: sw.quality || null,
+            confidence: sw.confidence || null,
+            indexed_at: sw.indexed_at || null,
+          };
+        }
       }
+      data.etag = srvWpsRes.headers["etag"] || srvWpsRes.headers["ETag"] || "";
+      console.log("Database metadata updated to version:", data.etag);
+    } else {
+      console.log("Database metadata unchanged (304 Not Modified), using cached metadata.");
     }
 
     // Reset local sync queue structure so we don't carry any stale state
