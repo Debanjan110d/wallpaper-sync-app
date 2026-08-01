@@ -22,6 +22,19 @@ import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI } from ".
 document.addEventListener("DOMContentLoaded", async () => {
     // Initial Setup and Lifecycles
     async function init() {
+        // Hide developer/admin controls if running a packaged production build
+        try {
+            const isPackaged = await window.api.isPackaged();
+            if (isPackaged) {
+                const maintenanceSection = document.getElementById("maintenanceSection");
+                const dragHintSection = document.getElementById("dragHintSection");
+                if (maintenanceSection) maintenanceSection.style.display = "none";
+                if (dragHintSection) dragHintSection.style.display = "none";
+            }
+        } catch (err) {
+            console.error("Failed to check packaging status:", err);
+        }
+
         store.state.settings = await window.api.getSettings();
 
         // 1. Initial setup of slideshow intervals & controls

@@ -1216,3 +1216,7 @@ ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => 
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle("is-packaged", () => {
+  return app.isPackaged;
+});

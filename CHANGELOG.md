@@ -2,20 +2,25 @@
 
 ## 3.6.0 (v3.6.0) — 2026-08-01
 
-### Network Egress & ETag Caching
+### Network Egress & Caching Fixes
 - **Resilient ETag Validation Caching:** Implemented conditional HTTP cache validation utilizing dynamic ETags built from database counts, latest creation times, and row metadata fingerprint hashes (representing ids, titles, collections, and tags). Bypasses 100% of body download payloads on both the web client and the desktop Electron client by returning `304 Not Modified` when database contents are unchanged, saving database CPU and outbound network bandwidth budget.
-- **Client Cache Synchronization:** Updated the desktop synchronization service (`metadataCache.js`) to persist ETags locally and attach them to sync check cycles, eliminating redundant offline calculations and disk writes.
+- **Bypassed Stale Browser Caching:** Set `/api/wallpapers` route to `force-dynamic` and changed the `Cache-Control` header to `no-cache`. This forces client browsers to perform ETag validation on every request, ensuring newly uploaded wallpapers appear immediately without requiring a browser cache clear.
+- **Sync Client Cache Synchronization:** Updated the desktop synchronization service (`metadataCache.js`) to persist ETags locally and attach them to sync check cycles, eliminating redundant offline calculations and disk writes.
 
-### Resiliency & Schema Fallbacks
+### Resiliency, Syncing & Limits
+- **Resilient Wallpaper Syncing:** Wrapped individual wallpaper downloads in `try/catch` blocks so that a single file failure does not crash or halt the entire sync process.
+- **Windows File Locking Bug:** Wait on the write-stream `close` event instead of `finish` before renaming files, ensuring the file descriptor is released by Windows and preventing `EPERM` or `EBUSY` rename errors.
+- **Dynamic Sync Completion:** Fixed a UI loader bug by always updating `lastSyncDate` and sending the `sync-complete` event to the Electron UI upon successful sync execution, even when no new images were found to download.
+- **Sync API Pagination Limit:** Bypassed the server's default 30-item pagination limit for client sync token requests (increasing it to `100,000`), allowing the sync client to retrieve all new wallpapers in a single request.
 - **Database Schema Resiliency:** Added dynamic fallback query retry blocks in backend API routes. If the database schema is missing updated columns (like `primary_color`) or tables (like `reviews`), the endpoints gracefully warning-log and retry/fallback to return successfully rather than failing with `500 Internal Server Error`, ensuring the site operates seamlessly before/during migrations.
 - **Next.js Image Layout Stability:** Decoupled container layout styles from raw image attributes inside the React `OptimizedImage` component, resolving runtime clashing errors with Next.js's absolute `fill` property.
 
-### CDN & Performance Upgrades
+### CDN, Performance & UI Enhancements
 - **ImageKit Private S3 Path Resolution:** Enabled path-style URL formatting for ImageKit external storage origins, allowing it to correctly read private files in the root of the Supabase S3 S3-Compatible bucket.
 - **LCP Loading Optimizations:** Eagerly loaded above-the-fold wallpaper grid items using Next.js image priority flags, eliminating Largest Contentful Paint browser alerts.
-
-### Desktop Client Refactoring
+- **Live Wallpaper Counts:** Added visual count indicators in the admin brand header showing total wallpapers, and updated the grid counter to show `Showing Y of X wallpapers` (e.g. 30 of 345) to clarify the pagination state.
 - **Category-to-Collection UI Migration:** Restructured the horizontal explorer grid inside the Electron client app to browse "Collections" rather than "Categories". Displays computed wallpaper counts per collection and assigns the first item's thumbnail as the card's visual background cover.
+- **Packaged UI Protections:** Exposed packaging status via `api.isPackaged` context bridge and added startup logic to automatically hide the "Maintenance & Sync" settings and "Drag & drop images" uploader in production/packaged builds. Keeps them visible only during development (`npm start`).
 
 ## 3.5.0 (v3.5.0) — 2026-07-17
 
