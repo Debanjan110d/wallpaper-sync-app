@@ -5,33 +5,25 @@ import { openDetailDrawer } from "./drawer.js";
 
 // 1. Populate Category, Collection, and Tag filters
 export function populateFiltersAndDropdowns() {
-    const catFilter = document.getElementById("catFilter");
     const colFilter = document.getElementById("colFilter");
     const tagFilter = document.getElementById("tagFilter");
-    if (!catFilter || !colFilter || !tagFilter) return;
+    if (!colFilter || !tagFilter) return;
 
-    const activeCatFilter = catFilter.value;
     const activeColFilter = colFilter.value;
     const activeTagFilter = tagFilter.value;
 
     // Clear dropdown filters
-    catFilter.innerHTML = '<option value="">All Categories</option>';
     colFilter.innerHTML = '<option value="">All Collections</option>';
     tagFilter.innerHTML = '<option value="">All Tags</option>';
 
-    // Populate categories
-    store.state.localMetadata.categories.forEach(cat => {
-        const opt = `<option value="${cat.id}">${cat.name}</option>`;
-        catFilter.innerHTML += opt;
-    });
+    const localMetadata = store.state.localMetadata;
 
     // Populate tags
-    store.state.localMetadata.tags.forEach(tag => {
+    localMetadata.tags.forEach(tag => {
         tagFilter.innerHTML += `<option value="${tag.id}">${tag.name}</option>`;
     });
 
     // Restore selections
-    catFilter.value = activeCatFilter;
     tagFilter.value = activeTagFilter;
 
     // Populate collections
@@ -40,24 +32,15 @@ export function populateFiltersAndDropdowns() {
 
 export function updateCollectionsDropdowns(selectedColFilterId = "") {
     const colFilter = document.getElementById("colFilter");
-    const catFilter = document.getElementById("catFilter");
-    if (!colFilter || !catFilter) return;
+    if (!colFilter) return;
 
     colFilter.innerHTML = '<option value="">All Collections</option>';
-    const filterCatId = catFilter.value;
-
     colFilter.disabled = false;
-    if (filterCatId) {
-        store.state.localMetadata.collections
-            .filter(col => col.category_id === Number(filterCatId))
-            .forEach(col => {
-                colFilter.innerHTML += `<option value="${col.id}">${col.name}</option>`;
-            });
-    } else {
-        store.state.localMetadata.collections.forEach(col => {
-            colFilter.innerHTML += `<option value="${col.id}">${col.name}</option>`;
-        });
-    }
+
+    store.state.localMetadata.collections.forEach(col => {
+        colFilter.innerHTML += `<option value="${col.id}">${col.name}</option>`;
+    });
+
     colFilter.value = selectedColFilterId;
 }
 
@@ -68,7 +51,6 @@ export function renderCategorySection() {
     grid.innerHTML = "";
 
     const localMetadata = store.state.localMetadata;
-    const colFilter = document.getElementById("colFilter");
     const currentImages = store.state.currentImages || [];
 
     if (localMetadata.collections.length === 0) {
@@ -84,12 +66,18 @@ export function renderCategorySection() {
     currentImages.forEach(img => {
         const hash = img.filename.split(".")[0];
         const meta = localMetadata.wallpaper_metadata[hash] || {};
-        if (meta.collection_id && colMap[meta.collection_id]) {
-            colMap[meta.collection_id].count++;
-            if (!colMap[meta.collection_id].cover) {
-                colMap[meta.collection_id].cover = toFileUrl(img.path);
+        const collectionIds = Array.isArray(meta.collection_ids)
+            ? meta.collection_ids
+            : (meta.collection_id ? [meta.collection_id] : []);
+
+        collectionIds.forEach(colId => {
+            if (colMap[colId]) {
+                colMap[colId].count++;
+                if (!colMap[colId].cover) {
+                    colMap[colId].cover = toFileUrl(img.path);
+                }
             }
-        }
+        });
     });
 
     localMetadata.collections.forEach(col => {
@@ -146,11 +134,11 @@ export function renderRecentlyAdded() {
     list.forEach(img => {
         const hash = img.filename.split(".")[0];
         const meta = localMetadata.wallpaper_metadata[hash] || {};
-        const col = localMetadata.collections.find(c => c.id === meta.collection_id);
-        const colName = col ? col.name : "None";
-        const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
+        const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
+        const matchedCols = localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
+        const colNames = matchedCols.map(c => c.name).join(", ") || "None";
 
-        const friendlyName = colName && colName !== "None" ? colName : img.filename.split(".")[0];
+        const friendlyName = colNames && colNames !== "None" ? colNames : img.filename.split(".")[0];
         const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
         const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
         const extraCount = wtags.length - 3;
@@ -165,8 +153,7 @@ export function renderRecentlyAdded() {
                 <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
                 <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
                 <div class="horizontal-card-meta">
-                    <span>${catName}</span>
-                    <span>${colName}</span>
+                    <span>${colNames}</span>
                 </div>
             </div>
         `;
@@ -204,11 +191,11 @@ export function renderRandomDiscoveries() {
     list.forEach(img => {
         const hash = img.filename.split(".")[0];
         const meta = localMetadata.wallpaper_metadata[hash] || {};
-        const col = localMetadata.collections.find(c => c.id === meta.collection_id);
-        const colName = col ? col.name : "None";
-        const catName = col ? (localMetadata.categories.find(c => c.id === col.category_id)?.name || "Uncategorized") : "Uncategorized";
+        const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
+        const matchedCols = localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
+        const colNames = matchedCols.map(c => c.name).join(", ") || "None";
 
-        const friendlyName = colName && colName !== "None" ? colName : img.filename.split(".")[0];
+        const friendlyName = colNames && colNames !== "None" ? colNames : img.filename.split(".")[0];
         const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
         const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
         const extraCount = wtags.length - 3;
@@ -223,8 +210,7 @@ export function renderRandomDiscoveries() {
                 <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
                 <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
                 <div class="horizontal-card-meta">
-                    <span>${catName}</span>
-                    <span>${colName}</span>
+                    <span>${colNames}</span>
                 </div>
             </div>
         `;
@@ -249,18 +235,15 @@ export function renderCatalog() {
     gallery.innerHTML = "";
 
     const globalSearchInput = document.getElementById("globalSearchInput");
-    const catFilter = document.getElementById("catFilter");
     const colFilter = document.getElementById("colFilter");
     const tagFilter = document.getElementById("tagFilter");
     const headerBackBtn = document.getElementById("headerBackBtn");
-    const slideshowSelectedCount = document.getElementById("slideshowSelectedCount");
 
     const query = globalSearchInput?.value.toLowerCase().trim() || "";
-    const catFilterId = catFilter?.value || "";
     const colFilterId = colFilter?.value || "";
     const tagFilterId = tagFilter?.value || "";
 
-    const isSearching = !!query || !!catFilterId || !!colFilterId || !!tagFilterId;
+    const isSearching = !!query || !!colFilterId || !!tagFilterId;
     const sliderSect = document.getElementById("heroSliderSection");
     const addedSect = document.getElementById("recentlyAddedSection");
     const catSect = document.getElementById("categoriesSection");
@@ -282,9 +265,6 @@ export function renderCatalog() {
         } else if (colFilterId) {
             const col = store.state.localMetadata.collections.find(c => String(c.id) === String(colFilterId));
             catalogTitle.innerText = col ? `Collection: ${col.name}` : "Explore Wallpapers";
-        } else if (catFilterId) {
-            const cat = store.state.localMetadata.categories.find(c => String(c.id) === String(catFilterId));
-            catalogTitle.innerText = cat ? `Category: ${cat.name}` : "Explore Wallpapers";
         } else if (tagFilterId) {
             const tag = store.state.localMetadata.tags.find(t => String(t.id) === String(tagFilterId));
             catalogTitle.innerText = tag ? `Tag: ${tag.name}` : "Explore Wallpapers";
@@ -296,14 +276,10 @@ export function renderCatalog() {
     const filtered = (store.state.currentImages || []).filter(img => {
         const hash = img.filename.split(".")[0];
         const meta = store.state.localMetadata.wallpaper_metadata[hash] || {};
-        const col = store.state.localMetadata.collections.find(c => c.id === meta.collection_id);
-        const cat = col ? store.state.localMetadata.categories.find(c => c.id === col.category_id) : null;
+        const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
         const wtags = meta.tags ? store.state.localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
 
-        if (catFilterId && (!col || String(col.category_id) !== String(catFilterId))) {
-            return false;
-        }
-        if (colFilterId && String(meta.collection_id) !== String(colFilterId)) {
+        if (colFilterId && !collectionIds.some(id => String(id) === String(colFilterId))) {
             return false;
         }
         if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) {
@@ -313,13 +289,13 @@ export function renderCatalog() {
         if (query) {
             const originalName = meta.file_name || img.filename;
             const inName = fuzzyMatch(originalName, query) || fuzzyMatch(img.filename, query);
-            const inCol = col ? fuzzyMatch(col.name, query) : false;
-            const inCat = cat ? fuzzyMatch(cat.name, query) : false;
+            const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
+            const inCol = matchedCols.some(c => fuzzyMatch(c.name, query));
             const inTags = wtags.some(t => fuzzyMatch(t.name, query));
             const inStyle = meta.style ? fuzzyMatch(meta.style, query) : false;
             const inColor = meta.primary_color ? fuzzyMatch(meta.primary_color, query) : false;
             const inQuality = meta.quality ? fuzzyMatch(meta.quality, query) : false;
-            return inName || inCol || inCat || inTags || inStyle || inColor || inQuality;
+            return inName || inCol || inTags || inStyle || inColor || inQuality;
         }
 
         return true;

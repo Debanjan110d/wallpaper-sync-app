@@ -123,7 +123,7 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
   try {
     // 1. Check server connectivity
     reportProgress("Checking server connection...", 10);
-    await axios.get(`${cleanUrl}/api/categories`, { headers, timeout: 5000 });
+    await axios.get(`${cleanUrl}/api/collections`, { headers, timeout: 5000 });
   } catch (err) {
     reportProgress("Server unreachable", 0);
     return { status: "offline", error: "Server unreachable: " + err.message };
@@ -161,6 +161,7 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
           data.wallpaper_metadata[sw.hash] = {
             file_name: sw.file_name || null,
             collection_id: sw.collection_id ? Number(sw.collection_id) : null,
+            collection_ids: Array.isArray(sw.collections) ? sw.collections.map((c) => Number(c.id)) : (sw.collection_id ? [Number(sw.collection_id)] : []),
             tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
             style: sw.style || null,
             primary_color: sw.primary_color || null,

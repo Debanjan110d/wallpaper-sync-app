@@ -34,17 +34,17 @@ export function openDetailDrawer(imgData) {
     drawerSize.textContent = imgData.sizeBytes ? formatBytes(imgData.sizeBytes) : "N/A";
 
     const hash = imgData.filename.split(".")[0];
-    const meta = store.state.localMetadata.wallpaper_metadata[hash] || { collection_id: null, tags: [], file_name: null };
+    const meta = store.state.localMetadata.wallpaper_metadata[hash] || { collection_id: null, collection_ids: [], tags: [], file_name: null };
 
     if (drawerFileName && meta.file_name) {
         drawerFileName.textContent = meta.file_name;
     }
 
-    const col = store.state.localMetadata.collections.find(c => c.id === meta.collection_id);
-    const cat = col ? store.state.localMetadata.categories.find(c => c.id === col.category_id) : null;
+    const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
+    const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
+    const collectionNames = matchedCols.map(c => c.name).join(", ");
 
-    if (drawerCategoryText) drawerCategoryText.textContent = cat ? cat.name : "None / Uncategorized";
-    if (drawerCollectionText) drawerCollectionText.textContent = col ? col.name : "None / Select Collection";
+    if (drawerCollectionText) drawerCollectionText.textContent = collectionNames || "None / Select Collection";
 
     renderDrawerTags(meta.tags || []);
 

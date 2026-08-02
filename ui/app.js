@@ -88,19 +88,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     initReviewModal();
 
     // Attach basic page event listeners
-    const catFilter = document.getElementById("catFilter");
     const colFilter = document.getElementById("colFilter");
     const tagFilter = document.getElementById("tagFilter");
     const clearFiltersBtn = document.getElementById("clearFiltersBtn");
     const headerBackBtn = document.getElementById("headerBackBtn");
     const globalSearchInput = document.getElementById("globalSearchInput");
 
-    if (catFilter) {
-        catFilter.addEventListener("change", () => {
-            updateCollectionsDropdowns("", "");
-            renderCatalog();
-        });
-    }
     if (colFilter) {
         colFilter.addEventListener("change", renderCatalog);
     }
@@ -110,7 +103,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener("click", () => {
-            if (catFilter) catFilter.value = "";
             if (colFilter) colFilter.value = "";
             if (tagFilter) tagFilter.value = "";
             if (globalSearchInput) globalSearchInput.value = "";
@@ -121,7 +113,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (headerBackBtn) {
         headerBackBtn.addEventListener("click", () => {
-            if (catFilter) catFilter.value = "";
             if (colFilter) colFilter.value = "";
             if (tagFilter) tagFilter.value = "";
             if (globalSearchInput) globalSearchInput.value = "";
