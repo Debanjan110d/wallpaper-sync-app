@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.0.0 (v4.0.0) — 2026-08-02
+
+### Pre-configured Default Fallback Sync Token
+- **Authentication Fix for New Systems:** Set `sync_secret_token_123` as the default fallback token in `config.js` to ensure fresh, packaged client installations authenticate with the Vercel API seamlessly. Prevents the app from throwing a `401 Unauthorized` block on other users' PCs now that the settings forms are removed from the client UI.
+
+### Restore Panels & Drag-and-Drop
+- **Settings Visibility:** Restored the `#maintenanceSection` and `#dragHintSection` visibility for production/packaged environments (which was temporarily disabled in 3.7.0).
+- **Drag-and-Drop Local Upload:** Restored drag-and-drop listeners to handle files dropped onto the Electron window, copying them to the local workspace image folders via IPC and reloading the gallery grid.
+
+### Removed Server Settings Form
+- **HTML & JS Clean Up:** Extracted the "Server Settings" input fields and "Save Settings" button from the collapsible sidebar panel to keep the interface focused. Settings variables and backend sync connection read configurations still run in the background.
+
+### Resolved Collection Creation API Bug (Admin Web Server)
+- **Database Insertion Fix:** Modified the Next.js `POST` API handler in [collections route.ts](file:///d:/projects/wallpaper-sync-app/web/app/api/collections/route.ts) to extract `category_id` from the payload and insert it into Supabase, avoiding orphaned collections that failed to appear under their categories.
+
 ## 3.7.0 (v3.7.0) — 2026-08-02
 
 ### Release Verification & Build Testing
