@@ -622,8 +622,8 @@ export default function Page() {
   };
 
   const handleCreateCollection = async () => {
-    if (!newColName.trim() || !selectedCategoryForUpload) {
-      alert("Please enter a collection name and ensure a category is selected.");
+    if (!newColName.trim()) {
+      alert("Please enter a collection name.");
       return;
     }
     try {
@@ -632,7 +632,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newColName.trim(),
-          category_id: Number(selectedCategoryForUpload),
+          category_id: selectedCategoryForUpload ? Number(selectedCategoryForUpload) : null,
         }),
       });
       const data = await res.json();

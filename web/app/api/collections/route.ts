@@ -71,10 +71,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    if (!category_id) {
-      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
-    }
-
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
         { error: "SUPABASE_SERVICE_ROLE_KEY is missing in the environment" },
