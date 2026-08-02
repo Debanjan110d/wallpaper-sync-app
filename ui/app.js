@@ -22,19 +22,6 @@ import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI } from ".
 document.addEventListener("DOMContentLoaded", async () => {
     // Initial Setup and Lifecycles
     async function init() {
-        // Hide developer/admin controls if running a packaged production build
-        try {
-            const isPackaged = await window.api.isPackaged();
-            if (isPackaged) {
-                const maintenanceSection = document.getElementById("maintenanceSection");
-                const dragHintSection = document.getElementById("dragHintSection");
-                if (maintenanceSection) maintenanceSection.style.display = "none";
-                if (dragHintSection) dragHintSection.style.display = "none";
-            }
-        } catch (err) {
-            console.error("Failed to check packaging status:", err);
-        }
-
         store.state.settings = await window.api.getSettings();
 
         // 1. Initial setup of slideshow intervals & controls
@@ -505,6 +492,59 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.api.onWindowShown(async () => {
             console.log("App window shown from tray. Executing server connection reachability check...");
             await store.triggerBackgroundSync();
+        });
+    }
+
+    // Drag and Drop Logic
+    const dropZone = document.getElementById("dropZoneOverlay");
+    let dragCounter = 0;
+
+    if (dropZone) {
+        document.addEventListener("dragenter", (e) => {
+            e.preventDefault();
+            dragCounter++;
+            dropZone.classList.remove("hidden");
+        });
+
+        document.addEventListener("dragover", (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropZone.classList.add("hidden");
+            }
+        });
+
+        document.addEventListener("drop", async (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropZone.classList.add("hidden");
+
+            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            if (files.length > 0) {
+                const fileDataArray = [];
+                for (const file of files) {
+                    try {
+                        const buffer = await file.arrayBuffer();
+                        fileDataArray.push({ name: file.name, data: buffer });
+                    } catch (err) {
+                        console.error("Error reading dragged file:", file.name, err);
+                    }
+                }
+                if (fileDataArray.length > 0 && window.api.uploadWallpapers) {
+                    try {
+                        await window.api.uploadWallpapers(fileDataArray);
+                        await store.loadWallpapers();
+                        await store.updateWallpaperInfo();
+                        showToast(`Uploaded ${fileDataArray.length} wallpaper(s)`, "success");
+                    } catch (err) {
+                        showToast("Upload failed: " + err.message, "error");
+                    }
+                }
+            }
         });
     }
 
