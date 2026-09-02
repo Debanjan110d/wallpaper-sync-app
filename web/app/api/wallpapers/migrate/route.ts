@@ -114,13 +114,7 @@ export async function POST(request: Request) {
     // Fetch wallpapers
     let query = supabaseAdmin
       .from("wallpapers")
-      .select("id, file_name, storage_path, status, hash")
-      .neq("status", "deleted");
-
-    if (!forceAll) {
-      // Only process uploaded wallpapers
-      query = query.eq("status", "uploaded");
-    }
+      .select("id, file_name, storage_path, hash");
 
     const { data: wallpapers, error: fetchErr } = await query;
     if (fetchErr) {

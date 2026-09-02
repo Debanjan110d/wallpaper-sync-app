@@ -23,12 +23,10 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Fetch all non-deleted indexed wallpapers
+    // Fetch wallpapers
     const { data: wallpapers, error: wpErr } = await supabaseAdmin
       .from("wallpapers")
-      .select("id, title, description, characters, franchises, styles, moods, other_attributes, primary_color, quality")
-      .neq("status", "deleted")
-      .not("indexed_at", "is", null);
+      .select("id, title, description, quality");
 
     if (wpErr) {
       return NextResponse.json({ error: wpErr.message }, { status: 500 });
@@ -54,13 +52,7 @@ export async function POST(request: Request) {
         {
           title: wp.title,
           description: wp.description,
-          characters: wp.characters || [],
-          franchises: wp.franchises || [],
           tags,
-          styles: wp.styles || [],
-          moods: wp.moods || [],
-          other_attributes: wp.other_attributes || [],
-          primary_color: wp.primary_color
         },
         supabaseAdmin
       );

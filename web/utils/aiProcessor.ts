@@ -143,76 +143,20 @@ export async function assignWallpaperToCollections(
   metadata: {
     title?: string | null;
     description?: string | null;
-    characters?: string[];
-    franchises?: string[];
     tags?: string[];
-    styles?: string[];
-    moods?: string[];
-    other_attributes?: string[];
-    primary_color?: string | null;
-    colors?: string[];
   },
   supabaseAdmin: any
 ) {
   try {
-    // 1. Fetch all collections
     const { data: collections, error: colsErr } = await supabaseAdmin
       .from("collections")
       .select("id, name, slug");
-    if (colsErr || !collections) {
-      console.error("[Assign] Failed to fetch collections:", colsErr);
-      return;
-    }
+    if (colsErr || !collections) return;
 
-    // 2. Fetch all keyword profiles (kewords column)
-    const { data: keywords, error: kwErr } = await supabaseAdmin
-      .from("collection_keywords")
-      .select("collection_id, kewords, weight");
-    if (kwErr || !keywords) {
-      console.error("[Assign] Failed to fetch collection keywords:", kwErr);
-      return;
-    }
-
-    // 3. Clear existing assignments
-    await supabaseAdmin
-      .from("wallpaper_collections")
-      .delete()
-      .eq("wallpaper_id", wallpaperId);
-
-    // 4. Gather terms for scoring
     const wallpaperTerms = new Set<string>();
 
     if (metadata.tags) {
       metadata.tags.forEach(t => wallpaperTerms.add(t.toLowerCase().trim()));
-    }
-    if (metadata.characters) {
-      metadata.characters.forEach(c => {
-        const lower = c.toLowerCase().trim();
-        wallpaperTerms.add(lower);
-        lower.split(/\s+/).forEach(w => wallpaperTerms.add(w));
-      });
-    }
-    if (metadata.franchises) {
-      metadata.franchises.forEach(f => {
-        const lower = f.toLowerCase().trim();
-        wallpaperTerms.add(lower);
-        lower.split(/\s+/).forEach(w => wallpaperTerms.add(w));
-      });
-    }
-    if (metadata.styles) {
-      metadata.styles.forEach(s => wallpaperTerms.add(s.toLowerCase().trim()));
-    }
-    if (metadata.moods) {
-      metadata.moods.forEach(m => wallpaperTerms.add(m.toLowerCase().trim()));
-    }
-    if (metadata.other_attributes) {
-      metadata.other_attributes.forEach(a => wallpaperTerms.add(a.toLowerCase().trim()));
-    }
-    if (metadata.colors) {
-      metadata.colors.forEach(c => wallpaperTerms.add(c.toLowerCase().trim()));
-    }
-    if (metadata.primary_color) {
-      wallpaperTerms.add(metadata.primary_color.toLowerCase().trim());
     }
 
     const cleanWord = (w: string) => w.toLowerCase().replace(/[^\w]/g, "");
@@ -223,61 +167,25 @@ export async function assignWallpaperToCollections(
       metadata.description.split(/\s+/).map(cleanWord).filter(Boolean).forEach(w => wallpaperTerms.add(w));
     }
 
-    // 5. Score collections
     const assignments: any[] = [];
     for (const col of collections) {
-      const colKeywords = keywords.filter((k: any) => k.collection_id === col.id);
-      if (colKeywords.length === 0) continue;
-
-      let score = 0;
-
-      for (const kwEntry of colKeywords) {
-        const kw = kwEntry.kewords.toLowerCase().trim();
-        const weight = Number(kwEntry.weight) || 1.0;
-
-        if (wallpaperTerms.has(kw)) {
-          score += weight;
-        } else {
-          // Substring checks
-          for (const term of wallpaperTerms) {
-            if (term.includes(kw) || kw.includes(term)) {
-              score += weight * 0.5;
-              break;
-            }
-          }
-        }
-      }
-
-      // Convert score to a scaled 0-100 percentage.
-      // Match if score >= 0.8 (e.g. at least one solid keyword matched)
-      // Percentage maps score 2.0+ to 100%, score 0.8 to 40%
-      const percentage = Math.min(100, Math.round((score / 2.0) * 100));
-
-      if (score >= 0.8) {
+      const colName = col.name.toLowerCase().trim();
+      if (wallpaperTerms.has(colName) || Array.from(wallpaperTerms).some(t => t.length > 2 && (t.includes(colName) || colName.includes(t)))) {
         assignments.push({
           wallpaper_id: wallpaperId,
           collection_id: col.id,
-          match_score: percentage,
-          assigned_by: "keyword_engine"
         });
       }
     }
 
-    // 6. Save collection links in many-to-many junction
     if (assignments.length > 0) {
-      const { error: insErr } = await supabaseAdmin
+      await supabaseAdmin
         .from("wallpaper_collections")
-        .insert(assignments);
-
-      if (insErr) {
-        console.error(`[Assign] Failed to insert assignments for ${wallpaperId}:`, insErr);
-      }
-      // 7. Backward compatibility: removed (wallpapers.collection_id column is no longer present)
+        .upsert(assignments, { onConflict: "wallpaper_id,collection_id" });
     }
-
-    // 8. Recount counts for all collections
-    await recountCollectionWallpapers(supabaseAdmin);
   } catch (err) {
     console.error(`[Assign] Error assigning collection to wallpaper ${wallpaperId}:`, err);
   }
 }
+
+

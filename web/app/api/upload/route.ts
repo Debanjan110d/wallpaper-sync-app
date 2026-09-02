@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { imageSize } from "image-size";
-import { processWallpaperAI } from "@/utils/aiProcessor";
 
 type DbError = {
   message: string;
@@ -42,16 +41,8 @@ export async function POST(request: Request) {
     const collectionRaw = formData.get("collection") || formData.get("username");
     const collection = typeof collectionRaw === "string" ? collectionRaw.trim() : null;
 
-    const providerRaw = formData.get("provider");
-    const provider = (typeof providerRaw === "string" && (providerRaw === "gemini" || providerRaw === "imagga"))
-      ? providerRaw
-      : undefined;
-
     const collectionIdRaw = formData.get("collection_id");
     const collectionId = collectionIdRaw ? Number(collectionIdRaw) : null;
-
-    const categoryIdRaw = formData.get("category_id");
-    const categoryId = categoryIdRaw ? Number(categoryIdRaw) : null;
 
     const tagsRaw = formData.get("tags");
     let tagIds: number[] = [];
@@ -76,7 +67,7 @@ export async function POST(request: Request) {
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
-        { error: "SUPABASE_SERVICE_ROLE_KEY is missing in .env.local" },
+        { error: "SUPABASE_SERVICE_ROLE_KEY is missing in .env" },
         { status: 500 }
       );
     }
@@ -86,63 +77,7 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    let finalCollectionId = collectionId;
-    let finalCollectionName = collection;
-
-    if (!finalCollectionId && categoryId) {
-      // 1. Get the category details to know its name
-      const { data: categoryData, error: catErr } = await supabaseAdmin
-        .from("categories")
-        .select("name")
-        .eq("id", categoryId)
-        .single();
-      
-      if (!catErr && categoryData) {
-        // 2. Try to find a collection under this category that has the same name as the category, or is named "General" or "Default"
-        const { data: existingCols, error: colsErr } = await supabaseAdmin
-          .from("collections")
-          .select("id, name")
-          .eq("category_id", categoryId);
-        
-        if (!colsErr && existingCols) {
-          const matchByDefault = existingCols.find(
-            (c) => ["default", "general", "uncategorized"].includes(c.name.toLowerCase())
-          );
-          const matchByName = existingCols.find(
-            (c) => c.name.toLowerCase() === categoryData.name.toLowerCase()
-          );
-          
-          const matchedCol = matchByDefault || matchByName || existingCols[0];
-          
-          if (matchedCol) {
-            finalCollectionId = matchedCol.id;
-            finalCollectionName = matchedCol.name;
-          }
-        }
-        
-        // 3. If no collection exists at all, create a default one named "Default"
-        if (!finalCollectionId) {
-          const slug = "default";
-            
-          const { data: newCol, error: newColErr } = await supabaseAdmin
-            .from("collections")
-            .insert([
-              {
-                name: "Default",
-                category_id: categoryId,
-                slug,
-              }
-            ])
-            .select()
-            .single();
-          
-          if (!newColErr && newCol) {
-            finalCollectionId = newCol.id;
-            finalCollectionName = newCol.name;
-          }
-        }
-      }
-    }
+    const finalCollectionId = collectionId;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -180,10 +115,10 @@ export async function POST(request: Request) {
 
     const hash = getHash(buffer);
 
-    // Database-first duplicate prevention (global, filename-independent)
+    // Database-first duplicate prevention
     const { data: existing, error: existingErr } = await supabaseAdmin
       .from("wallpapers")
-      .select("id, storage_path, hash, status")
+      .select("id, storage_path, hash")
       .eq("hash", hash)
       .limit(1)
       .maybeSingle();
@@ -220,16 +155,14 @@ export async function POST(request: Request) {
           file_name: file.name,
           storage_path: storagePath,
           hash,
-          status: "indexed",
-          indexed_at: new Date().toISOString(),
         },
       ])
-      .select("id, file_name, storage_path, hash, status, created_at")
+      .select("id, file_name, storage_path, hash, created_at")
       .single();
 
     const dbError = insertError as DbError | null;
     if (dbError) {
-      // Best-effort cleanup to keep DB as the source of truth.
+      // Best-effort cleanup
       try {
         await supabaseAdmin.storage.from("wallpapers").remove([storagePath]);
       } catch {
@@ -267,8 +200,6 @@ export async function POST(request: Request) {
         .insert([{
           wallpaper_id: row.id,
           collection_id: finalCollectionId,
-          match_score: 100,
-          assigned_by: "manual_upload"
         }]);
 
       if (colLinkErr) {

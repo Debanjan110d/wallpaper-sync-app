@@ -282,13 +282,7 @@ ${JSON.stringify(sampleWallpapers, null, 2)}`;
           {
             title: wp.title,
             description: wp.description,
-            characters: wp.characters || [],
-            franchises: wp.franchises || [],
             tags,
-            styles: wp.styles || [],
-            moods: wp.moods || [],
-            other_attributes: wp.other_attributes || [],
-            primary_color: wp.primary_color
           },
           supabaseAdmin
         );
