@@ -148,7 +148,7 @@ async function syncWallpapers(config, onProgress) {
           latestFile = destPath;
           downloadCount++;
         } catch (err) {
-          console.error("Failed to download wallpaper:", filename, err.message);
+          console.warn("Notice: Skipped unavailable wallpaper:", filename, err.message);
           failedIndices.add(index);
           downloadErrors.push(`${filename}: ${err.message}`);
           try {

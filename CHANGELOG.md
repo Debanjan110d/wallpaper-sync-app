@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.1.0 (v4.1.0) — 2026-09-02
+
+### Browse Collections & Discovery UI/UX Overhaul
+- **Horizontal Mouse Wheel & Drag Scrolling:** Enabled smooth horizontal scrolling on `#categoriesGrid` with mouse wheel controls, mouse drag-to-scroll, and left/right navigation arrows (`#categoriesPrevBtn`, `#categoriesNextBtn`).
+- **3D Card Aesthetics:** Upgraded collection cards with 3D hover elevation (`translateY(-6px) scale(1.03)`), smooth cover image zoom (`1.1x`), glowing glassmorphic count badges (`⚡ 8`), and active selection highlight rings (`.active-selected`).
+- **"View All Collections" Frosted Blur Explorer Modal:** Added a section header flex bar with a total collection count badge (`#collectionsCountBadge`) and a **"View All Collections →"** action button opening a full-screen frosted glass backdrop blur modal (`#allCollectionsModal`). Includes live search (`#modalCollectionSearch`) across all collections with thumbnail cover art and wallpaper counts.
+
+### Search Auto-Complete & Weighted Ranking Engine
+- **YouTube-Style Auto-Complete Suggestions:** Added a real-time auto-complete dropdown (`#searchSuggestionsDropdown`) below `#globalSearchInput` showing matching Collections, Tags, and Wallpaper Titles with query term highlighting (`.suggestion-highlight`) and full keyboard navigation (Up/Down arrows + Enter).
+- **Weighted Search Relevance Engine:** Implemented relevance scoring for search terms (+100 tag match, +90 collection match, +80 title match, +15 description match), dynamically sorting gallery results by relevance score descending.
+- **Top Searches & Randomizer:** Relocated popular search tags to a **"🔥 Top Searches"** header bar equipped with a **🎲 Shuffle** button to randomize tag suggestions dynamically.
+
+### 4-Table Database Architecture Migration & Optimization
+- **Database Simplification:** Migrated database down to **4 core tables** (`wallpapers`, `collections`, `tags`, `wallpaper_collections`, `wallpaper_tags`), eliminating legacy `ai_jobs`, `collection_keywords`, `categories`, and obsolete columns (`status`, `confidence`, `indexed_at`, `characters`, `franchises`, `styles`, `moods`, `other_attributes`, `ai_confidence`, `nsfw`).
+- **Prisma ORM Integration:** Added `web/prisma/schema.prisma` mapping the 4 core models with `@prisma/client`.
+- **Image & Data Safety Guarantee:** 100% of wallpaper records, metadata, titles, descriptions, collection assignments, tags, and images in the Supabase storage bucket (`wallpapers/`) were safely preserved.
+- **Resilient Image Downloader:** Wrapped image downloads in defensive `try/catch` checks to handle missing CDN files (404) gracefully without interrupting wallpaper downloads or crashing the desktop sync process.
+
 ## 4.0.0 (v4.0.0) — 2026-08-02
 
 ### Pre-configured Default Fallback Sync Token
