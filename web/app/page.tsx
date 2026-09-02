@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { driver } from "driver.js";
-import "driver.js/dist/driver.css";
 import { imageKitLoader } from "@/utils/imageKitLoader";
 
 const getColorHex = (colorName: string | null) => {
@@ -810,69 +808,12 @@ export default function Page() {
   const filteredFilterCollections = collections;
   const filteredBulkCollections = collections;
 
-  const startInteractiveTour = () => {
-    const driverObj = driver({
-      showProgress: true,
-      animate: true,
-      overlayColor: "rgba(15, 17, 23, 0.85)",
-      steps: [
-        {
-          element: "#tour-brand-header",
-          popover: {
-            title: "👋 Welcome to Wallpaper Sync!",
-            description: "Explore 4K desktop wallpapers, collection metadata, dynamic search filters, and live release downloads.",
-            side: "bottom",
-            align: "start"
-          }
-        },
-        {
-          element: "#tour-hero-carousel",
-          popover: {
-            title: "🖼️ Hero Carousel",
-            description: "Browse featured wallpaper slides with smooth auto-playing transitions.",
-            side: "bottom",
-            align: "center"
-          }
-        },
-        {
-          element: "#tour-upload-card",
-          popover: {
-            title: "📤 Upload & Auto-Index",
-            description: "Upload new wallpapers, assign collections & tags, and index them into the cloud database.",
-            side: "top",
-            align: "start"
-          }
-        },
-        {
-          element: "#tour-releases-card",
-          popover: {
-            title: "⚡ Desktop Sync App Installers",
-            description: "Download signed Windows installers to auto-rotate your desktop wallpaper background!",
-            side: "top",
-            align: "start"
-          }
-        },
-        {
-          element: "#tour-gallery-card",
-          popover: {
-            title: "✨ Interactive Gallery & Search",
-            description: "Use real-time weighted search to filter by title, collection, or tag. Click any item to manage or preview!",
-            side: "top",
-            align: "center"
-          }
-        }
-      ]
-    });
-
-    driverObj.drive();
-  };
-
   const sliderImages = galleryImages.slice(0, 5);
 
   return (
     <div className="container" style={{ paddingBottom: "100px" }}>
       {/* Brand Header */}
-      <div id="tour-brand-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div
             style={{
@@ -898,25 +839,6 @@ export default function Page() {
           </div>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={startInteractiveTour}
-            style={{
-              padding: "8px 18px",
-              background: "linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)",
-              border: "none",
-              borderRadius: "8px",
-              color: "white",
-              fontSize: "0.9rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: "0 0 15px rgba(99, 102, 241, 0.4)",
-              transition: "transform 0.2s, box-shadow 0.2s"
-            }}
-          >
-            ✨ Take a Tour
-          </button>
-
           <button
             type="button"
             onClick={togglePreviews}

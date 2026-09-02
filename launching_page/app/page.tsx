@@ -3,6 +3,7 @@ import TrackLink from "./_components/TrackLink";
 import Image from "next/image";
 import Link from "next/link";
 import BootTerminal from "./_components/BootTerminal";
+import InteractiveTour from "./_components/InteractiveTour";
 import {
   extractHighlights,
   fetchReleases,
@@ -37,7 +38,7 @@ export default async function HomePage() {
       <header className="header">
         <div className="container">
           <div className="headerInner">
-            <div className="brand">
+            <div className="brand" id="tour-brand">
               <Image src="/logo.png" alt="Wallpaper Sync" width={42} height={42} priority />
               <span className="brandText">Wallpaper Sync</span>
               <span className="badge">Windows · Open Source</span>
@@ -51,6 +52,7 @@ export default async function HomePage() {
               <a href="https://github.com/Debanjan110d/wallpaper-sync-app" target="_blank" rel="noreferrer">
                 GitHub
               </a>
+              <InteractiveTour />
             </nav>
 
             <details className="navMobile">
@@ -230,7 +232,7 @@ export default async function HomePage() {
         <hr className="hr" />
 
         <section className="section" id="download">
-          <div className="container" style={{ maxWidth: "800px" }}>
+          <div className="container" id="tour-download" style={{ maxWidth: "800px" }}>
             <h2 className="sectionTitle">Download Wallpaper Sync</h2>
             <p className="sectionSub">
               Get the latest installer for Windows. No account needed.
