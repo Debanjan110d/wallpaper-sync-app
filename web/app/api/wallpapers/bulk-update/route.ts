@@ -67,11 +67,6 @@ export async function POST(request: Request) {
         // 1. Resolve direct update columns
         if (title !== undefined) updateData.title = title;
         if (description !== undefined) updateData.description = description;
-        if (characters !== undefined) updateData.characters = Array.isArray(characters) ? characters : [];
-        if (franchises !== undefined) updateData.franchises = Array.isArray(franchises) ? franchises : [];
-        if (styles !== undefined) updateData.styles = Array.isArray(styles) ? styles : [];
-        if (moods !== undefined) updateData.moods = Array.isArray(moods) ? moods : [];
-        if (primary_color !== undefined) updateData.primary_color = primary_color;
         
         // Resolve collection update
         const effectiveCollectionIds = collection_ids !== undefined 
@@ -105,8 +100,6 @@ export async function POST(request: Request) {
             const insertRows = effectiveCollectionIds.map((colId: any) => ({
               wallpaper_id: id,
               collection_id: Number(colId),
-              match_score: 100,
-              assigned_by: "manual"
             }));
 
             const { error: insColErr } = await supabase

@@ -1,7 +1,7 @@
 // Details drawer panel component and actions binding
 import { store } from "../store.js";
 import { toFileUrl, showToast } from "./utils.js";
-import { renderCatalog } from "./gallery.js";
+import { renderCatalog, applyDynamicAccentColor, resetDynamicAccentColor } from "./gallery.js";
 import { checkReviewEligibility } from "./modal.js";
 
 // Open details panel
@@ -11,7 +11,6 @@ export function openDetailDrawer(imgData) {
     const drawerFileName = document.getElementById("drawerFileName");
     const drawerResolution = document.getElementById("drawerResolution");
     const drawerSize = document.getElementById("drawerSize");
-    const drawerCategoryText = document.getElementById("drawerCategoryText");
     const drawerCollectionText = document.getElementById("drawerCollectionText");
 
     if (!detailDrawer) return;
@@ -46,6 +45,34 @@ export function openDetailDrawer(imgData) {
 
     if (drawerCollectionText) drawerCollectionText.textContent = collectionNames || "None / Select Collection";
 
+    // Bind mockup screen background
+    const mockupScreen = document.getElementById("mockupScreen");
+    if (mockupScreen) {
+        mockupScreen.style.backgroundImage = `url('${toFileUrl(imgData.path)}')`;
+    }
+
+    // Update digital clock
+    const mockupClock = document.getElementById("mockupClock");
+    if (mockupClock) {
+        const updateClock = () => {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, "0");
+            const ampm = hours >= 12 ? "PM" : "AM";
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            mockupClock.textContent = `${hours}:${minutes} ${ampm}`;
+        };
+        updateClock();
+    }
+
+    // Dynamic color accent sync
+    if (meta.primary_color) {
+        applyDynamicAccentColor(meta.primary_color);
+    } else {
+        resetDynamicAccentColor();
+    }
+
     renderDrawerTags(meta.tags || []);
 
     const isFav = store.state.selectedSet.has(String(imgData.path));
@@ -58,6 +85,7 @@ export function closeDetailDrawer() {
         detailDrawer.classList.add("hidden");
     }
     store.state.currentSelectedImage = null;
+    resetDynamicAccentColor();
 }
 
 export function updateFavButton(isFav) {
@@ -192,5 +220,17 @@ export function initDrawer() {
 
     if (closeDrawerBtn) {
         closeDrawerBtn.addEventListener("click", closeDetailDrawer);
+    }
+
+    const mockupShowIcons = document.getElementById("mockupShowIcons");
+    const mockupIconsGrid = document.getElementById("mockupIconsGrid");
+    if (mockupShowIcons && mockupIconsGrid) {
+        mockupShowIcons.addEventListener("change", () => {
+            if (mockupShowIcons.checked) {
+                mockupIconsGrid.classList.remove("hidden");
+            } else {
+                mockupIconsGrid.classList.add("hidden");
+            }
+        });
     }
 }

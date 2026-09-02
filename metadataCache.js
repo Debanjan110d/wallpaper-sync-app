@@ -137,8 +137,7 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
       wpsHeaders["if-none-match"] = data.etag;
     }
 
-    const [srvCatsRes, srvColsRes, srvTagsRes, srvWpsRes] = await Promise.all([
-      axios.get(`${cleanUrl}/api/categories`, { headers }),
+    const [srvColsRes, srvTagsRes, srvWpsRes] = await Promise.all([
       axios.get(`${cleanUrl}/api/collections`, { headers }),
       axios.get(`${cleanUrl}/api/tags`, { headers }),
       axios.get(`${cleanUrl}/api/wallpapers`, { 
@@ -148,12 +147,12 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
     ]);
 
     // Overwrite local tables with server data
-    data.categories = srvCatsRes.data.categories || [];
+    data.categories = [];
     data.collections = srvColsRes.data.collections || [];
     data.tags = srvTagsRes.data.tags || [];
 
     if (srvWpsRes.status === 200) {
-      // Sync server wallpaper metadata (including original file_name) down to the local cache
+      // Sync server wallpaper metadata down to the local cache
       data.wallpaper_metadata = {};
       const serverWallpapers = srvWpsRes.data.wallpapers || [];
       for (const sw of serverWallpapers) {
@@ -163,11 +162,10 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
             collection_id: sw.collection_id ? Number(sw.collection_id) : null,
             collection_ids: Array.isArray(sw.collections) ? sw.collections.map((c) => Number(c.id)) : (sw.collection_id ? [Number(sw.collection_id)] : []),
             tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
-            style: sw.style || null,
-            primary_color: sw.primary_color || null,
+            title: sw.title || null,
+            description: sw.description || null,
+            orientation: sw.orientation || null,
             quality: sw.quality || null,
-            confidence: sw.confidence || null,
-            indexed_at: sw.indexed_at || null,
           };
         }
       }

@@ -13,7 +13,8 @@ import {
     renderCategorySection,
     renderCatalog,
     showLightboxAt,
-    closeLightbox
+    closeLightbox,
+    resetFiltersUI
 } from "./modules/gallery.js";
 import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
@@ -103,9 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener("click", () => {
-            if (colFilter) colFilter.value = "";
-            if (tagFilter) tagFilter.value = "";
-            if (globalSearchInput) globalSearchInput.value = "";
+            resetFiltersUI();
             updateCollectionsDropdowns("", "");
             renderCatalog();
         });
@@ -113,9 +112,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (headerBackBtn) {
         headerBackBtn.addEventListener("click", () => {
-            if (colFilter) colFilter.value = "";
-            if (tagFilter) tagFilter.value = "";
-            if (globalSearchInput) globalSearchInput.value = "";
+            resetFiltersUI();
             updateCollectionsDropdowns("", "");
             renderCatalog();
             document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
@@ -280,8 +277,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const heroSliderSection = document.getElementById("heroSliderSection");
 
         // Drag scroll logic
+        const categoriesGrid = document.getElementById("categoriesGrid");
         if (recentlyAddedRow) makeDragScrollable(recentlyAddedRow);
         if (randomRow) makeDragScrollable(randomRow);
+        if (categoriesGrid) makeDragScrollable(categoriesGrid);
 
         // Hover tracking
         const trackHover = (el) => {
@@ -291,6 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
         trackHover(recentlyAddedRow);
         trackHover(randomRow);
+        trackHover(categoriesGrid);
         trackHover(heroSliderSection);
 
         // Navigation button mappings
@@ -305,6 +305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
         wireRowButtons(recentlyAddedRow, document.getElementById("recentlyAddedPrevBtn"), document.getElementById("recentlyAddedNextBtn"));
         wireRowButtons(randomRow, document.getElementById("randomPrevBtn"), document.getElementById("randomNextBtn"));
+        wireRowButtons(categoriesGrid, document.getElementById("categoriesPrevBtn"), document.getElementById("categoriesNextBtn"));
 
         // Auto scrolling rows math
         const startRowAutoScroll = (row, speed = 1, intervalMs = 45) => {
@@ -380,6 +381,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.getElementById("randomPrevBtn"),
             document.getElementById("randomNextBtn")
         );
+        updateNavButtonsVisibility(
+            document.getElementById("categoriesGrid"),
+            document.getElementById("categoriesPrevBtn"),
+            document.getElementById("categoriesNextBtn")
+        );
     });
 
     // Top Header updater widgets
@@ -439,6 +445,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.api.onSyncComplete(async () => {
             await store.refreshMetadata();
             await store.loadWallpapers();
+            const { startProgressRingCountdown } = await import("./modules/player.js");
+            startProgressRingCountdown();
         });
     }
     if (window.api.onAppError) {
@@ -465,7 +473,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.addEventListener("dragenter", (e) => {
             e.preventDefault();
             dragCounter++;
+            const appLayout = document.getElementById("appLayout");
+            if (appLayout) appLayout.classList.add("drag-active");
             dropZone.classList.remove("hidden");
+            dropZone.classList.add("drag-over-active");
         });
 
         document.addEventListener("dragover", (e) => {
@@ -476,13 +487,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.preventDefault();
             dragCounter--;
             if (dragCounter === 0) {
-                dropZone.classList.add("hidden");
+                const appLayout = document.getElementById("appLayout");
+                if (appLayout) appLayout.classList.remove("drag-active");
+                dropZone.classList.remove("drag-over-active");
+                setTimeout(() => {
+                    if (dragCounter === 0) dropZone.classList.add("hidden");
+                }, 400);
             }
         });
 
         document.addEventListener("drop", async (e) => {
             e.preventDefault();
             dragCounter = 0;
+            const appLayout = document.getElementById("appLayout");
+            if (appLayout) appLayout.classList.remove("drag-active");
+            dropZone.classList.remove("drag-over-active");
             dropZone.classList.add("hidden");
 
             const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));

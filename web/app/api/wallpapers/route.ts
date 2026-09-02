@@ -9,18 +9,11 @@ type DbWallpaper = {
   file_name: string | null;
   storage_path: string | null;
   hash: string | null;
-  status: string | null;
-  created_at: string | null;
-  confidence?: number | null;
-  indexed_at?: string | null;
   title?: string | null;
   description?: string | null;
-  characters?: string[] | null;
-  franchises?: string[] | null;
-  styles?: string[] | null;
-  moods?: string[] | null;
-  other_attributes?: string[] | null;
-  primary_color?: string | null;
+  orientation?: string | null;
+  quality?: string | null;
+  created_at: string | null;
   wallpaper_tags: {
     tag_id: number;
     tags: {
@@ -33,7 +26,6 @@ type DbWallpaper = {
     collections: {
       id: number;
       name: string;
-      category_id: number | null;
     } | null;
   }[] | null;
 };
@@ -88,43 +80,12 @@ export async function GET(request: Request) {
     const limit = limitParam ? parseInt(limitParam, 10) : defaultLimit;
 
     // Extract filters
-    const categoryId = url.searchParams.get("category");
     const collectionId = url.searchParams.get("collection");
     const tagIds = url.searchParams.get("tags");
     const q = url.searchParams.get("q");
 
-    const style = url.searchParams.get("style");
-    const mood = url.searchParams.get("mood");
-
     let filteredWpIds: string[] | null = null;
     let noMatch = false;
-
-    if (categoryId) {
-      const { data: cols, error: colsErr } = await supabase
-        .from("collections")
-        .select("id")
-        .eq("category_id", Number(categoryId));
-
-      if (colsErr) {
-        return NextResponse.json({ error: colsErr.message }, { status: 500 });
-      }
-
-      const colIds = (cols || []).map((c) => c.id);
-      if (colIds.length === 0) {
-        noMatch = true;
-      } else {
-        const { data: wcLinks, error: wcErr } = await supabase
-          .from("wallpaper_collections")
-          .select("wallpaper_id")
-          .in("collection_id", colIds);
-
-        if (wcErr) {
-          return NextResponse.json({ error: wcErr.message }, { status: 500 });
-        }
-
-        filteredWpIds = (wcLinks || []).map((l) => l.wallpaper_id);
-      }
-    }
 
     if (collectionId && !noMatch) {
       const { data: wcLinks, error: wcErr } = await supabase
@@ -141,7 +102,8 @@ export async function GET(request: Request) {
       if (filteredWpIds === null) {
         filteredWpIds = matchedIds;
       } else {
-        filteredWpIds = filteredWpIds.filter((id) => matchedIds.includes(id));
+        const currentIds: string[] = filteredWpIds;
+        filteredWpIds = currentIds.filter((id) => matchedIds.includes(id));
       }
       if (filteredWpIds.length === 0) {
         noMatch = true;
@@ -168,7 +130,8 @@ export async function GET(request: Request) {
         if (filteredWpIds === null) {
           filteredWpIds = tagWpIds;
         } else {
-          filteredWpIds = filteredWpIds.filter((id) => tagWpIds.includes(id));
+          const currentIds: string[] = filteredWpIds;
+          filteredWpIds = currentIds.filter((id) => tagWpIds.includes(id));
         }
         if (filteredWpIds.length === 0) {
           noMatch = true;
@@ -193,18 +156,11 @@ export async function GET(request: Request) {
         file_name,
         storage_path,
         hash,
-        status,
-        created_at,
-        confidence,
-        indexed_at,
         title,
         description,
-        characters,
-        franchises,
-        styles,
-        moods,
-        other_attributes,
-        primary_color,
+        orientation,
+        quality,
+        created_at,
         wallpaper_tags (
           tag_id,
           tags (
@@ -216,15 +172,11 @@ export async function GET(request: Request) {
           collection_id,
           collections (
             id,
-            name,
-            category_id
+            name
           )
         )
       `)
       .order("created_at", { ascending: false });
-
-    // Show all non-deleted wallpapers (uploaded + indexed) on the dashboard
-    query = query.neq("status", "deleted");
 
     if (filteredWpIds !== null) {
       query = query.in("id", filteredWpIds);
@@ -234,78 +186,13 @@ export async function GET(request: Request) {
       query = query.gt("created_at", since!.toISOString());
     }
 
-    let queryResult = await query;
-
-    if (queryResult.error && (queryResult.error.message.includes("primary_color") || queryResult.error.message.includes("does not exist"))) {
-      console.warn("⚠️ primary_color column does not exist in wallpapers table. Retrying wallpapers fetch without it.");
-      let retryQuery = supabase
-        .from("wallpapers")
-        .select(`
-          id,
-          file_name,
-          storage_path,
-          hash,
-          status,
-          created_at,
-          confidence,
-          indexed_at,
-          title,
-          description,
-          characters,
-          franchises,
-          styles,
-          moods,
-          other_attributes,
-          wallpaper_tags (
-            tag_id,
-            tags (
-              id,
-              name
-            )
-          ),
-          wallpaper_collections (
-            collection_id,
-            collections (
-              id,
-              name,
-              category_id
-            )
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      retryQuery = retryQuery.neq("status", "deleted");
-
-      if (filteredWpIds !== null) {
-        retryQuery = retryQuery.in("id", filteredWpIds);
-      }
-
-      if (hasValidSince) {
-        retryQuery = retryQuery.gt("created_at", since!.toISOString());
-      }
-
-      queryResult = await retryQuery;
-    }
-
-    const { data: rows, error: dbError } = queryResult;
+    const { data: rows, error: dbError } = await query;
 
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 
     let filteredRows = (rows as unknown as DbWallpaper[]) || [];
-
-    // Filter in JS
-    if (style) {
-      filteredRows = filteredRows.filter(r => 
-        (r.styles || []).some((s: string) => s.toLowerCase() === style.toLowerCase())
-      );
-    }
-    if (mood) {
-      filteredRows = filteredRows.filter(r => 
-        (r.moods || []).some((m: string) => m.toLowerCase() === mood.toLowerCase())
-      );
-    }
 
     // Apply search keyword matching
     if (q && q.trim()) {
@@ -316,12 +203,6 @@ export async function GET(request: Request) {
           if (row.title) searchableTexts.push(row.title);
           if (row.description) searchableTexts.push(row.description);
           if (row.file_name) searchableTexts.push(row.file_name);
-          
-          if (Array.isArray(row.characters)) searchableTexts.push(...row.characters);
-          if (Array.isArray(row.franchises)) searchableTexts.push(...row.franchises);
-          if (Array.isArray(row.styles)) searchableTexts.push(...row.styles);
-          if (Array.isArray(row.moods)) searchableTexts.push(...row.moods);
-          if (Array.isArray(row.other_attributes)) searchableTexts.push(...row.other_attributes);
           
           if (row.wallpaper_tags) {
             row.wallpaper_tags.forEach((wt: any) => {
@@ -352,7 +233,7 @@ export async function GET(request: Request) {
 
     const totalCount = filteredRows.length;
 
-    // ETag caching check (fingerprints edits to titles, tags, or collections to prevent stale cache displays)
+    // ETag caching check
     const maxCreatedAt = filteredRows.length > 0 ? filteredRows[0].created_at : "empty";
     
     const editTracker = filteredRows
@@ -427,8 +308,6 @@ export async function GET(request: Request) {
             ? {
                 id: wc.collections.id,
                 name: wc.collections.name,
-                category_id: wc.collections.category_id,
-                category_name: null // Categories table does not exist
               }
             : null;
 
@@ -441,7 +320,7 @@ export async function GET(request: Request) {
           const multiCollections = Array.isArray(row.wallpaper_collections)
             ? row.wallpaper_collections
                 .map((wc) => wc.collections)
-                .filter((c): c is { id: number; name: string; category_id: number | null } => !!c)
+                .filter((c): c is { id: number; name: string } => !!c)
             : [];
 
           // Version hash based on created_at to break caches when item updates
@@ -453,26 +332,18 @@ export async function GET(request: Request) {
             file_name: row.file_name,
             storage_path: storagePath,
             hash: row.hash,
-            status: row.status,
             collection: wc?.collections?.name || null,
             created_at: row.created_at,
             collection_id: wc?.collections?.id || null,
             collection_details: collectionDetails,
             tags,
             collections: multiCollections,
-            style: row.styles?.[0] || null,
-            confidence: row.confidence || null,
-            indexed_at: row.indexed_at || null,
             title: row.title || null,
             description: row.description || null,
-            characters: row.characters || [],
-            franchises: row.franchises || [],
-            styles: row.styles || [],
-            moods: row.moods || [],
-            other_attributes: row.other_attributes || [],
+            orientation: row.orientation || null,
+            quality: row.quality || null,
             name: storagePath.split("/").pop() || storagePath,
             url: urlWithVersion,
-            primary_color: row.primary_color || null,
           };
         })
     );
@@ -567,12 +438,12 @@ export async function DELETE(request: Request) {
         .delete()
         .eq("wallpaper_id", rowIdToUpdate);
 
-      const { error: updateErr } = await supabaseAdmin
+      const { error: dbDeleteErr } = await supabaseAdmin
         .from("wallpapers")
-        .update({ status: "deleted" })
+        .delete()
         .eq("id", rowIdToUpdate);
-      if (updateErr) {
-        return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      if (dbDeleteErr) {
+        return NextResponse.json({ error: dbDeleteErr.message }, { status: 500 });
       }
     }
 

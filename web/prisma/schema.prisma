@@ -1,0 +1,73 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Wallpaper {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fileName    String   @map("file_name")
+  storagePath String   @map("storage_path")
+  hash        String   @unique
+  title       String?
+  description String?
+  orientation String?
+  quality     String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  collections WallpaperCollection[]
+  tags        WallpaperTag[]
+
+  @@map("wallpapers")
+}
+
+model Collection {
+  id          BigInt   @id @default(autoincrement())
+  name        String
+  slug        String
+  coverImage  String?  @map("cover_image")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  wallpapers WallpaperCollection[]
+
+  @@map("collections")
+}
+
+model Tag {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  wallpapers WallpaperTag[]
+
+  @@map("tags")
+}
+
+model WallpaperCollection {
+  wallpaperId  String     @map("wallpaper_id") @db.Uuid
+  collectionId BigInt     @map("collection_id")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  wallpaper  Wallpaper  @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([wallpaperId, collectionId])
+  @@map("wallpaper_collections")
+}
+
+model WallpaperTag {
+  wallpaperId String    @map("wallpaper_id") @db.Uuid
+  tagId       BigInt    @map("tag_id")
+
+  wallpaper Wallpaper @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([wallpaperId, tagId])
+  @@map("wallpaper_tags")
+}

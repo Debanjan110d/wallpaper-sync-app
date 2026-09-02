@@ -3,6 +3,52 @@ import { store } from "../store.js";
 import { showToast } from "./utils.js";
 import { renderCatalog } from "./gallery.js";
 
+let slideshowTimerInterval = null;
+let currentRemainingMs = 0;
+let totalIntervalMs = 10000;
+
+export function startProgressRingCountdown() {
+    stopProgressRingCountdown();
+    
+    const settings = store.state.settings;
+    if (!settings.slideshow) return;
+    
+    totalIntervalMs = settings.slideshowInterval || 10000;
+    currentRemainingMs = totalIntervalMs;
+    
+    const progressCircle = document.getElementById("playerProgressCircle");
+    if (!progressCircle) return;
+    
+    const circumference = 226.195;
+    progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+    
+    const updateRing = () => {
+        if (currentRemainingMs <= 0) {
+            progressCircle.style.strokeDashoffset = 0;
+            return;
+        }
+        
+        currentRemainingMs -= 100;
+        const percentage = Math.max(0, currentRemainingMs / totalIntervalMs);
+        const offset = circumference * (1 - percentage);
+        progressCircle.style.strokeDashoffset = offset;
+    };
+    
+    updateRing();
+    slideshowTimerInterval = setInterval(updateRing, 100);
+}
+
+export function stopProgressRingCountdown() {
+    if (slideshowTimerInterval) {
+        clearInterval(slideshowTimerInterval);
+        slideshowTimerInterval = null;
+    }
+    const progressCircle = document.getElementById("playerProgressCircle");
+    if (progressCircle) {
+        progressCircle.style.strokeDashoffset = 226.195;
+    }
+}
+
 // Adjust player button visibility and status text
 export function setSlideshowPlaybackUI(isPlaying) {
     const playerPlayBtn = document.getElementById("playerPlayBtn");
@@ -11,9 +57,11 @@ export function setSlideshowPlaybackUI(isPlaying) {
     if (isPlaying) {
         playerPlayBtn?.classList.add("hidden");
         playerPauseBtn?.classList.remove("hidden");
+        startProgressRingCountdown();
     } else {
         playerPlayBtn?.classList.remove("hidden");
         playerPauseBtn?.classList.add("hidden");
+        stopProgressRingCountdown();
     }
     updatePlayerStatusText();
 }
@@ -163,6 +211,9 @@ export function initPlayer() {
             await window.api.updateInterval(interval);
             store.state.settings.slideshowInterval = interval;
             updatePlayerStatusText();
+            if (store.state.settings.slideshow) {
+                startProgressRingCountdown();
+            }
         });
     }
 

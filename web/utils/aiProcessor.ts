@@ -116,38 +116,21 @@ export async function recountCollectionWallpapers(supabaseAdmin: any) {
 
     if (countErr || !counts) return;
 
-    const countMap: Record<number, number> = {};
-    counts.forEach((row: any) => {
-      countMap[row.collection_id] = (countMap[row.collection_id] || 0) + 1;
-    });
-
+    const activeCollectionIds = new Set(counts.map((row: any) => row.collection_id));
     const { data: collections } = await supabaseAdmin.from("collections").select("id");
     if (!collections) return;
 
     for (const col of collections) {
-      const count = countMap[col.id] || 0;
-      if (count === 0) {
-        // Cleaning up empty collections is like washing dishes: annoying but necessary.
-        // First delete keyword links to bypass database foreign key constraints
-        await supabaseAdmin
-          .from("collection_keywords")
-          .delete()
-          .eq("collection_id", col.id);
-
-        // Delete the empty collection
+      if (!activeCollectionIds.has(col.id)) {
+        // Delete empty collection
         await supabaseAdmin
           .from("collections")
           .delete()
-          .eq("id", col.id);
-      } else {
-        await supabaseAdmin
-          .from("collections")
-          .update({ wallpaper_count: count })
           .eq("id", col.id);
       }
     }
   } catch (e) {
-    console.error("Recounting collections failed:", e);
+    console.error("Cleaning empty collections failed:", e);
   }
 }
 

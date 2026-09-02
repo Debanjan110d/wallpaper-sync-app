@@ -12,15 +12,12 @@
 <body>
     <!-- Drag and Drop Overlay -->
     <div id="dropZoneOverlay" class="drop-zone-overlay hidden">
-        <div class="drop-zone-content">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" class="upload-icon">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            <h2>Drop Wallpapers Here</h2>
-            <p>Add wallpapers to your local collection</p>
+        <div class="portal-container">
+            <div class="portal-ring"></div>
+            <div class="portal-content">
+                <div class="portal-arrow">↓</div>
+                <div class="portal-text">Drop wallpapers here</div>
+            </div>
         </div>
     </div>
 
@@ -40,19 +37,28 @@
                 <div class="player-card">
                     <div class="player-status" id="playerStatus">Slideshow Stopped</div>
                     <div class="player-controls">
-                        <!-- Play Slideshow -->
-                        <button id="playerPlayBtn" class="player-btn" type="button" aria-label="Play Slideshow">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                        </button>
-                        <!-- Pause Slideshow -->
-                        <button id="playerPauseBtn" class="player-btn hidden" type="button" aria-label="Pause Slideshow">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="6" y="4" width="4" height="16"></rect>
-                                <rect x="14" y="4" width="4" height="16"></rect>
-                            </svg>
-                        </button>
+                        <div class="play-btn-circle-wrapper">
+                            <!-- Circular progress ring -->
+                            <div class="progress-ring-container">
+                                <svg class="progress-ring-svg">
+                                    <circle class="progress-ring-circle-bg" cx="39" cy="39" r="36" />
+                                    <circle id="playerProgressCircle" class="progress-ring-circle" cx="39" cy="39" r="36" stroke-dasharray="226.195" stroke-dashoffset="226.195" />
+                                </svg>
+                            </div>
+                            <!-- Play Slideshow -->
+                            <button id="playerPlayBtn" class="player-btn" type="button" aria-label="Play Slideshow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                            </button>
+                            <!-- Pause Slideshow -->
+                            <button id="playerPauseBtn" class="player-btn hidden" type="button" aria-label="Pause Slideshow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="6" y="4" width="4" height="16"></rect>
+                                    <rect x="14" y="4" width="4" height="16"></rect>
+                                </svg>
+                            </button>
+                        </div>
                         <!-- Skip to Next Wallpaper -->
                         <button id="playerNextBtn" class="player-btn" type="button" aria-label="Next Wallpaper">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -215,6 +221,15 @@
                     </div>
                 </div>
 
+                <!-- Top Searches / Quick Search Tags -->
+                <div class="search-quick-tags" id="searchQuickTags">
+                    <span class="quick-tags-label">🔥 Top Searches:</span>
+                    <div class="quick-tags-pills-wrap" id="quickTagsList">
+                        <!-- Dynamic randomized tag pills -->
+                    </div>
+                    <button class="shuffle-tags-btn" id="shuffleTagsBtn" type="button" title="Shuffle Random Tags">🎲 Shuffle</button>
+                </div>
+
                 <!-- TOP-RIGHT HEADER UPDATE CONTROLS -->
                 <div style="display:flex; align-items:center; gap:12px;">
                     <div class="update-compact-header" id="updatesSection">
@@ -250,11 +265,27 @@
                     </div>
                 </section>
 
-                <!-- 3. Browse Collections Grid -->
-                <section class="row-section" id="categoriesSection">
-                    <h2 class="section-title">Browse Collections</h2>
-                    <div class="categories-horizontal-grid" id="categoriesGrid">
-                        <!-- Large category cards will be injected here -->
+                <!-- 3. Browse Collections Section -->
+                <section class="row-section collections-section" id="categoriesSection">
+                    <div class="section-header-flex">
+                        <div class="section-title-wrap">
+                            <h2 class="section-title">Browse Collections</h2>
+                            <span class="collection-count-badge" id="collectionsCountBadge">0</span>
+                        </div>
+                        <button class="view-all-btn" id="viewAllCollectionsBtn" type="button">
+                            View All Collections
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="row-scroll-wrapper">
+                        <div class="categories-horizontal-grid" id="categoriesGrid">
+                            <!-- Large collection cards injected here -->
+                        </div>
+                        <button class="scroll-nav-btn prev" id="categoriesPrevBtn" aria-label="Previous">&lt;</button>
+                        <button class="scroll-nav-btn next" id="categoriesNextBtn" aria-label="Next">&gt;</button>
                     </div>
                 </section>
 
@@ -318,6 +349,36 @@
             <div class="drawer-body">
                 <div class="drawer-img-container">
                     <img id="drawerImage" src="" alt="Selected Wallpaper" />
+                </div>
+
+                <!-- Desktop Monitor Mockup Preview Widget -->
+                <div class="desktop-mockup-container">
+                    <span class="desktop-mockup-title">Desktop Preview</span>
+                    <div class="desktop-monitor">
+                        <div class="desktop-screen" id="mockupScreen">
+                            <div class="mockup-icons-grid" id="mockupIconsGrid">
+                                <div class="mockup-icon"></div>
+                                <div class="mockup-icon"></div>
+                                <div class="mockup-icon"></div>
+                                <div class="mockup-icon"></div>
+                                <div class="mockup-icon"></div>
+                                <div class="mockup-icon"></div>
+                            </div>
+                            <div class="mockup-clock" id="mockupClock">12:00 PM</div>
+                            <div class="mockup-taskbar">
+                                <div class="mockup-taskbar-start"></div>
+                                <div class="mockup-taskbar-icon"></div>
+                                <div class="mockup-taskbar-icon"></div>
+                                <div class="mockup-taskbar-icon"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="desktop-stand"></div>
+                    <div class="desktop-base"></div>
+                    <label class="mockup-options">
+                        <input type="checkbox" id="mockupShowIcons" checked />
+                        <span>Show Desktop Icons</span>
+                    </label>
                 </div>
 
                 <div class="drawer-stats">
@@ -451,6 +512,28 @@
             </div>
             <div id="metadataSyncSuccessActions" class="creator-modal-actions" style="display: none; justify-content: center; margin-top: 15px; border-top: none; padding-top: 0;">
                 <button id="metadataSyncCloseBtn" class="primary-btn" style="padding: 8px 24px; min-width: 120px;">Got it!</button>
+            </div>
+        </div>
+    <!-- All Collections Explorer Modal -->
+    <div id="allCollectionsModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="All Collections">
+        <div class="lightbox-backdrop" id="allCollectionsModalBackdrop"></div>
+        <div class="collections-modal-content">
+            <div class="collections-modal-header">
+                <div class="modal-title-wrap">
+                    <h3>All Collections</h3>
+                    <span class="modal-badge" id="allColsModalBadge">0 Collections</span>
+                </div>
+                <button id="closeAllCollectionsModal" class="icon-btn" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-search-wrap">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="modalCollectionSearch" placeholder="Filter collections by name..." />
+            </div>
+            <div class="all-collections-grid" id="allCollectionsModalGrid">
+                <!-- Full grid of collection cards injected here -->
             </div>
         </div>
     </div>

@@ -3,7 +3,68 @@ import { store } from "../store.js";
 import { toFileUrl, fuzzyMatch, showToast, updateNavButtonsVisibility } from "./utils.js";
 import { openDetailDrawer } from "./drawer.js";
 
-// 1. Populate Category, Collection, and Tag filters
+// Standard dominant color neon matching map
+const COLOR_NEON_MAP = {
+    "red": { primary: "#ff2d55", glow: "rgba(255, 45, 85, 0.4)" },
+    "orange": { primary: "#ff9500", glow: "rgba(255, 149, 0, 0.4)" },
+    "yellow": { primary: "#ffcc00", glow: "rgba(255, 204, 0, 0.4)" },
+    "green": { primary: "#34c759", glow: "rgba(52, 199, 89, 0.4)" },
+    "teal": { primary: "#30b0c7", glow: "rgba(48, 176, 199, 0.4)" },
+    "blue": { primary: "#007aff", glow: "rgba(0, 122, 255, 0.4)" },
+    "indigo": { primary: "#5856d6", glow: "rgba(88, 86, 214, 0.4)" },
+    "purple": { primary: "#af52de", glow: "rgba(175, 82, 222, 0.4)" },
+    "pink": { primary: "#ff2d55", glow: "rgba(255, 45, 85, 0.4)" },
+    "brown": { primary: "#a2845e", glow: "rgba(162, 132, 94, 0.4)" },
+    "gray": { primary: "#8e8e93", glow: "rgba(142, 142, 147, 0.4)" },
+    "black": { primary: "#ffffff", glow: "rgba(255, 255, 255, 0.15)" },
+    "white": { primary: "#ffffff", glow: "rgba(255, 255, 255, 0.4)" }
+};
+
+export function applyDynamicAccentColor(colorName) {
+    if (!colorName) return;
+    const lower = colorName.toLowerCase();
+    const mapped = COLOR_NEON_MAP[lower] || { primary: colorName, glow: colorName + "44" };
+    document.documentElement.style.setProperty("--primary", mapped.primary);
+    document.documentElement.style.setProperty("--primary-glow", mapped.glow);
+    
+    // Update taskbar start button color if mockup is visible
+    const startBtn = document.querySelector(".mockup-taskbar-start");
+    if (startBtn) {
+        startBtn.style.backgroundColor = mapped.primary;
+    }
+}
+
+export function resetDynamicAccentColor() {
+    // Restore default indigo glows
+    document.documentElement.style.setProperty("--primary", "#7209b7");
+    document.documentElement.style.setProperty("--primary-glow", "rgba(114, 9, 183, 0.4)");
+    
+    const startBtn = document.querySelector(".mockup-taskbar-start");
+    if (startBtn) {
+        startBtn.style.backgroundColor = "#7209b7";
+    }
+}
+
+export function resetFiltersUI() {
+    store.state.selectedColorFilter = "";
+    store.state.selectedTagFilters = [];
+    
+    // Reset quick tag pills active state
+    document.querySelectorAll("#quickTagsList .quick-tag-pill").forEach(p => p.classList.remove("active"));
+    
+    // Reset native dropdowns
+    const colFilter = document.getElementById("colFilter");
+    const tagFilter = document.getElementById("tagFilter");
+    const globalSearchInput = document.getElementById("globalSearchInput");
+    if (colFilter) colFilter.value = "";
+    if (tagFilter) tagFilter.value = "";
+    if (globalSearchInput) globalSearchInput.value = "";
+
+    // Reset active selected collection cards
+    document.querySelectorAll(".category-card").forEach(c => c.classList.remove("active-selected"));
+}
+
+// 1. Populate Collection and Tag filters + Search Quick Tags
 export function populateFiltersAndDropdowns() {
     const colFilter = document.getElementById("colFilter");
     const tagFilter = document.getElementById("tagFilter");
@@ -18,16 +79,65 @@ export function populateFiltersAndDropdowns() {
 
     const localMetadata = store.state.localMetadata;
 
-    // Populate tags
+    // Populate tags dropdown
     localMetadata.tags.forEach(tag => {
         tagFilter.innerHTML += `<option value="${tag.id}">${tag.name}</option>`;
     });
 
+    // Populate search quick-tags pills bar
+    renderSearchQuickTags();
+
     // Restore selections
     tagFilter.value = activeTagFilter;
 
-    // Populate collections
+    // Populate collections dropdown
     updateCollectionsDropdowns(activeColFilter);
+
+    // Initialize All Collections Explorer modal
+    initAllCollectionsModal();
+}
+
+export function renderSearchQuickTags() {
+    const container = document.getElementById("quickTagsList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const localMetadata = store.state.localMetadata;
+    if (!localMetadata.tags || localMetadata.tags.length === 0) return;
+
+    // Pick 10 randomized tags for dynamic suggestion
+    const shuffled = [...localMetadata.tags].sort(() => 0.5 - Math.random()).slice(0, 10);
+
+    shuffled.forEach(tag => {
+        const pill = document.createElement("div");
+        pill.className = "quick-tag-pill";
+        const globalSearchInput = document.getElementById("globalSearchInput");
+        if (globalSearchInput && globalSearchInput.value.toLowerCase().includes(tag.name.toLowerCase())) {
+            pill.classList.add("active");
+        }
+        pill.textContent = `#${tag.name}`;
+        pill.addEventListener("click", () => {
+            if (!globalSearchInput) return;
+            if (globalSearchInput.value.toLowerCase() === tag.name.toLowerCase()) {
+                globalSearchInput.value = "";
+                pill.classList.remove("active");
+            } else {
+                globalSearchInput.value = tag.name;
+                document.querySelectorAll("#quickTagsList .quick-tag-pill").forEach(p => p.classList.remove("active"));
+                pill.classList.add("active");
+            }
+            renderCatalog();
+        });
+        container.appendChild(pill);
+    });
+
+    const shuffleBtn = document.getElementById("shuffleTagsBtn");
+    if (shuffleBtn && !shuffleBtn.dataset.wired) {
+        shuffleBtn.dataset.wired = "true";
+        shuffleBtn.addEventListener("click", () => {
+            renderSearchQuickTags();
+        });
+    }
 }
 
 export function updateCollectionsDropdowns(selectedColFilterId = "") {
@@ -44,23 +154,14 @@ export function updateCollectionsDropdowns(selectedColFilterId = "") {
     colFilter.value = selectedColFilterId;
 }
 
-// 2. Render Collections Horizontal Section
-export function renderCategorySection() {
-    const grid = document.getElementById("categoriesGrid");
-    if (!grid) return;
-    grid.innerHTML = "";
-
+// Helper: Calculate statistics map for collections
+function getCollectionStatsMap() {
     const localMetadata = store.state.localMetadata;
     const currentImages = store.state.currentImages || [];
 
-    if (localMetadata.collections.length === 0) {
-        grid.innerHTML = '<span style="color:var(--text-muted); font-size:12px; padding:10px;">No collections created yet</span>';
-        return;
-    }
-
     const colMap = {};
     localMetadata.collections.forEach(col => {
-        colMap[col.id] = { name: col.name, count: 0, cover: "" };
+        colMap[col.id] = { id: col.id, name: col.name, count: 0, cover: "" };
     });
 
     currentImages.forEach(img => {
@@ -80,39 +181,168 @@ export function renderCategorySection() {
         });
     });
 
+    return colMap;
+}
+
+// 2. Render Overhauled Collections Horizontal Section
+export function renderCategorySection() {
+    const grid = document.getElementById("categoriesGrid");
+    const countBadge = document.getElementById("collectionsCountBadge");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    const localMetadata = store.state.localMetadata;
+    if (countBadge) {
+        countBadge.textContent = String(localMetadata.collections.length);
+    }
+
+    // Always wire up View All Collections modal handlers
+    initAllCollectionsModal();
+
+    if (localMetadata.collections.length === 0) {
+        grid.innerHTML = '<span style="color:var(--text-muted); font-size:12px; padding:10px;">No collections created yet</span>';
+        return;
+    }
+
+    const colMap = getCollectionStatsMap();
+    const colFilter = document.getElementById("colFilter");
+
     localMetadata.collections.forEach(col => {
-        const stats = colMap[col.id] || { name: col.name, count: 0, cover: "" };
-
-        const card = document.createElement("div");
-        card.className = "category-card";
-
-        const colors = ["#2b5c8f", "#126e51", "#8f3b2b", "#772b8f", "#8f7c2b", "#1a73e8"];
-        const color = colors[Math.abs(col.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length];
-
-        if (stats.cover) {
-            card.style.backgroundImage = `url('${stats.cover}')`;
-            card.style.backgroundSize = "cover";
-            card.style.backgroundPosition = "center";
-        } else {
-            card.style.backgroundColor = color;
-        }
-
-        card.innerHTML = `
-            <div class="category-card-overlay" style="background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.75));">
-                <span class="category-card-title">${col.name}</span>
-                <span class="category-card-subtitle">${stats.count} wallpapers</span>
-            </div>
-        `;
-
-        card.addEventListener("click", () => {
-            if (colFilter) {
-                colFilter.value = col.id;
-                colFilter.dispatchEvent(new Event("change"));
-                document.getElementById("catalogFilterSection")?.scrollIntoView({ behavior: "smooth" });
-            }
-        });
-
+        const stats = colMap[col.id] || { id: col.id, name: col.name, count: 0, cover: "" };
+        const card = createCollectionCardElement(col, stats, colFilter);
         grid.appendChild(card);
+    });
+
+    // Enable smooth horizontal wheel scroll on categories grid
+    if (!grid.dataset.wheelWired) {
+        grid.dataset.wheelWired = "true";
+        grid.addEventListener("wheel", (e) => {
+            if (e.ctrlKey || Math.abs(e.deltaY) < 0.01) return;
+            if (grid.scrollWidth <= grid.clientWidth) return;
+            e.preventDefault();
+            grid.scrollLeft += e.deltaY * 1.5;
+        }, { passive: false });
+    }
+}
+
+// Helper: Create a standard overhauled collection card DOM element
+function createCollectionCardElement(col, stats, colFilter) {
+    const card = document.createElement("div");
+    card.className = "category-card";
+    if (colFilter && colFilter.value && String(colFilter.value) === String(col.id)) {
+        card.classList.add("active-selected");
+    }
+
+    const colors = ["#2b5c8f", "#126e51", "#8f3b2b", "#772b8f", "#8f7c2b", "#1a73e8", "#38bdf8", "#a855f7"];
+    const color = colors[Math.abs(col.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length];
+
+    if (stats.cover) {
+        card.innerHTML = `<img class="category-card-img" src="${stats.cover}" alt="${col.name}" loading="lazy" />`;
+    } else {
+        card.style.backgroundColor = color;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "category-card-overlay";
+    overlay.innerHTML = `
+        <span class="category-card-badge">⚡ ${stats.count}</span>
+        <div class="category-card-info">
+            <span class="category-card-title">${col.name}</span>
+            <span class="category-card-subtitle">${stats.count} ${stats.count === 1 ? 'wallpaper' : 'wallpapers'}</span>
+        </div>
+    `;
+
+    card.appendChild(overlay);
+
+    card.addEventListener("click", () => {
+        if (colFilter) {
+            if (colFilter.value && String(colFilter.value) === String(col.id)) {
+                colFilter.value = "";
+            } else {
+                colFilter.value = col.id;
+            }
+            colFilter.dispatchEvent(new Event("change"));
+            
+            // Highlight active cards across grids
+            document.querySelectorAll(".category-card").forEach(c => c.classList.remove("active-selected"));
+            if (colFilter.value) {
+                card.classList.add("active-selected");
+            }
+            document.getElementById("catalogFilterSection")?.scrollIntoView({ behavior: "smooth" });
+        }
+    });
+
+    return card;
+}
+
+// 2b. All Collections Explorer Modal Logic
+export function initAllCollectionsModal() {
+    const viewAllBtn = document.getElementById("viewAllCollectionsBtn");
+    const modal = document.getElementById("allCollectionsModal");
+    const closeBtn = document.getElementById("closeAllCollectionsModal");
+    const backdrop = document.getElementById("allCollectionsModalBackdrop");
+    const modalSearch = document.getElementById("modalCollectionSearch");
+
+    if (!viewAllBtn || !modal) return;
+
+    if (!viewAllBtn.dataset.wired) {
+        viewAllBtn.dataset.wired = "true";
+        viewAllBtn.addEventListener("click", () => {
+            renderAllCollectionsModalGrid();
+            modal.classList.remove("hidden");
+        });
+    }
+
+    if (closeBtn && !closeBtn.dataset.wired) {
+        closeBtn.dataset.wired = "true";
+        closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
+    }
+
+    if (backdrop && !backdrop.dataset.wired) {
+        backdrop.dataset.wired = "true";
+        backdrop.addEventListener("click", () => modal.classList.add("hidden"));
+    }
+
+    if (modalSearch && !modalSearch.dataset.wired) {
+        modalSearch.dataset.wired = "true";
+        modalSearch.addEventListener("input", () => {
+            renderAllCollectionsModalGrid(modalSearch.value);
+        });
+    }
+}
+
+export function renderAllCollectionsModalGrid(filterQuery = "") {
+    const modalGrid = document.getElementById("allCollectionsModalGrid");
+    const modalBadge = document.getElementById("allColsModalBadge");
+    if (!modalGrid) return;
+    modalGrid.innerHTML = "";
+
+    const localMetadata = store.state.localMetadata;
+    const colMap = getCollectionStatsMap();
+    const colFilter = document.getElementById("colFilter");
+
+    let collections = localMetadata.collections;
+    if (filterQuery) {
+        const q = filterQuery.toLowerCase().trim();
+        collections = collections.filter(c => c.name.toLowerCase().includes(q));
+    }
+
+    if (modalBadge) {
+        modalBadge.textContent = `${collections.length} ${collections.length === 1 ? 'Collection' : 'Collections'}`;
+    }
+
+    if (collections.length === 0) {
+        modalGrid.innerHTML = '<span style="color:var(--text-muted); font-size:12px; grid-column:1/-1; text-align:center; padding:30px;">No matching collections found</span>';
+        return;
+    }
+
+    collections.forEach(col => {
+        const stats = colMap[col.id] || { id: col.id, name: col.name, count: 0, cover: "" };
+        const card = createCollectionCardElement(col, stats, colFilter);
+        card.addEventListener("click", () => {
+            document.getElementById("allCollectionsModal")?.classList.add("hidden");
+        });
+        modalGrid.appendChild(card);
     });
 }
 
@@ -243,7 +473,7 @@ export function renderCatalog() {
     const colFilterId = colFilter?.value || "";
     const tagFilterId = tagFilter?.value || "";
 
-    const isSearching = !!query || !!colFilterId || !!tagFilterId;
+    const isSearching = !!query || !!colFilterId || !!tagFilterId || !!store.state.selectedColorFilter || (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0);
     const sliderSect = document.getElementById("heroSliderSection");
     const addedSect = document.getElementById("recentlyAddedSection");
     const catSect = document.getElementById("categoriesSection");
@@ -268,6 +498,11 @@ export function renderCatalog() {
         } else if (tagFilterId) {
             const tag = store.state.localMetadata.tags.find(t => String(t.id) === String(tagFilterId));
             catalogTitle.innerText = tag ? `Tag: ${tag.name}` : "Explore Wallpapers";
+        } else if (store.state.selectedColorFilter) {
+            catalogTitle.innerText = `Color: ${store.state.selectedColorFilter}`;
+        } else if (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) {
+            const tagNames = store.state.selectedTagFilters.map(id => store.state.localMetadata.tags.find(t => t.id === id)?.name || "").filter(Boolean);
+            catalogTitle.innerText = `Tags: ${tagNames.join(", ")}`;
         } else {
             catalogTitle.innerText = "Explore All Wallpapers";
         }
@@ -284,6 +519,23 @@ export function renderCatalog() {
         }
         if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) {
             return false;
+        }
+
+        // Filter by color bubbles
+        if (store.state.selectedColorFilter) {
+            const wColor = (meta.primary_color || "").toLowerCase();
+            const fColor = store.state.selectedColorFilter.toLowerCase();
+            if (wColor !== fColor) {
+                return false;
+            }
+        }
+
+        // Filter by scrollable tag bar (AND selection)
+        if (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) {
+            const hasAllPills = store.state.selectedTagFilters.every(id => meta.tags && meta.tags.includes(Number(id)));
+            if (!hasAllPills) {
+                return false;
+            }
         }
 
         if (query) {
@@ -343,6 +595,25 @@ export function renderCatalog() {
             sBadge.innerText = meta.style;
             card.appendChild(sBadge);
         }
+
+        // Dynamic Accent color syncing on hover
+        card.addEventListener("mouseenter", () => {
+            if (meta.primary_color) {
+                applyDynamicAccentColor(meta.primary_color);
+            }
+        });
+        card.addEventListener("mouseleave", () => {
+            // Restore default unless drawer is open
+            if (store.state.currentSelectedImage) {
+                const activeHash = store.state.currentSelectedImage.filename.split(".")[0];
+                const activeMeta = store.state.localMetadata.wallpaper_metadata[activeHash] || {};
+                if (activeMeta.primary_color) {
+                    applyDynamicAccentColor(activeMeta.primary_color);
+                    return;
+                }
+            }
+            resetDynamicAccentColor();
+        });
 
         card.addEventListener("dblclick", (e) => {
             if (store.state.isManageSlideshowMode) return;
