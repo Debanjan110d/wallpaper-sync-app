@@ -93,8 +93,9 @@ export function populateFiltersAndDropdowns() {
     // Populate collections dropdown
     updateCollectionsDropdowns(activeColFilter);
 
-    // Initialize All Collections Explorer modal
+    // Initialize All Collections Explorer modal & Search Auto-Suggest
     initAllCollectionsModal();
+    initSearchAutoSuggest();
 }
 
 export function renderSearchQuickTags() {
@@ -508,50 +509,62 @@ export function renderCatalog() {
         }
     }
 
-    const filtered = (store.state.currentImages || []).filter(img => {
+    // Scored & Ranked Search Matching Engine
+    const scoredItems = (store.state.currentImages || []).map(img => {
         const hash = img.filename.split(".")[0];
         const meta = store.state.localMetadata.wallpaper_metadata[hash] || {};
         const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
         const wtags = meta.tags ? store.state.localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
+        const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
 
-        if (colFilterId && !collectionIds.some(id => String(id) === String(colFilterId))) {
-            return false;
-        }
-        if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) {
-            return false;
-        }
-
-        // Filter by color bubbles
-        if (store.state.selectedColorFilter) {
-            const wColor = (meta.primary_color || "").toLowerCase();
-            const fColor = store.state.selectedColorFilter.toLowerCase();
-            if (wColor !== fColor) {
-                return false;
-            }
-        }
-
-        // Filter by scrollable tag bar (AND selection)
+        // Mandatory dropdown filters
+        if (colFilterId && !collectionIds.some(id => String(id) === String(colFilterId))) return null;
+        if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) return null;
         if (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) {
             const hasAllPills = store.state.selectedTagFilters.every(id => meta.tags && meta.tags.includes(Number(id)));
-            if (!hasAllPills) {
-                return false;
-            }
+            if (!hasAllPills) return null;
         }
+
+        let score = 1;
 
         if (query) {
-            const originalName = meta.file_name || img.filename;
-            const inName = fuzzyMatch(originalName, query) || fuzzyMatch(img.filename, query);
-            const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
-            const inCol = matchedCols.some(c => fuzzyMatch(c.name, query));
-            const inTags = wtags.some(t => fuzzyMatch(t.name, query));
-            const inStyle = meta.style ? fuzzyMatch(meta.style, query) : false;
-            const inColor = meta.primary_color ? fuzzyMatch(meta.primary_color, query) : false;
-            const inQuality = meta.quality ? fuzzyMatch(meta.quality, query) : false;
-            return inName || inCol || inTags || inStyle || inColor || inQuality;
+            score = 0;
+            const q = query.toLowerCase();
+
+            // Tag matches (highest priority)
+            wtags.forEach(t => {
+                const tagName = t.name.toLowerCase();
+                if (tagName === q) score += 100;
+                else if (tagName.startsWith(q)) score += 65;
+                else if (tagName.includes(q)) score += 40;
+            });
+
+            // Collection matches (high priority)
+            matchedCols.forEach(c => {
+                const colName = c.name.toLowerCase();
+                if (colName === q) score += 90;
+                else if (colName.startsWith(q)) score += 55;
+                else if (colName.includes(q)) score += 35;
+            });
+
+            // Title / Description / Filename matches
+            const title = (meta.title || meta.file_name || img.filename).toLowerCase();
+            if (title === q) score += 80;
+            else if (title.startsWith(q)) score += 45;
+            else if (title.includes(q)) score += 25;
+
+            const desc = (meta.description || "").toLowerCase();
+            if (desc.includes(q)) score += 15;
+
+            if (score === 0) return null;
         }
 
-        return true;
-    });
+        return { img, score };
+    }).filter(Boolean);
+
+    // Sort by relevance score descending
+    scoredItems.sort((a, b) => b.score - a.score);
+    const filtered = scoredItems.map(item => item.img);
 
     if (filtered.length === 0) {
         gallery.innerHTML = '<span style="color:var(--text-muted); font-size:12px; grid-column: 1/-1; text-align:center; padding:40px;">No wallpapers match filters</span>';
@@ -688,4 +701,232 @@ export function closeLightbox() {
     const lightboxImage = document.getElementById("lightboxImage");
     setLightboxOpen(false);
     if (lightboxImage) lightboxImage.src = "";
+}
+
+// 7. Real-time YouTube-style Auto-complete Suggestions Controller
+export function initSearchAutoSuggest() {
+    const searchInput = document.getElementById("globalSearchInput");
+    const dropdown = document.getElementById("searchSuggestionsDropdown");
+    const clearBtn = document.getElementById("clearSearchBtn");
+    if (!searchInput || !dropdown) return;
+
+    let activeIndex = -1;
+
+    const renderSuggestions = (query) => {
+        const q = query.toLowerCase().trim();
+        dropdown.innerHTML = "";
+
+        if (clearBtn) {
+            if (q.length > 0) clearBtn.classList.remove("hidden");
+            else clearBtn.classList.add("hidden");
+        }
+
+        if (q.length < 1) {
+            dropdown.classList.add("hidden");
+            activeIndex = -1;
+            return;
+        }
+
+        const localMetadata = store.state.localMetadata;
+        const currentImages = store.state.currentImages || [];
+
+        // 1. Matching Collections
+        const matchingCols = (localMetadata.collections || [])
+            .filter(c => c.name.toLowerCase().includes(q))
+            .slice(0, 3);
+
+        // 2. Matching Tags
+        const matchingTags = (localMetadata.tags || [])
+            .filter(t => t.name.toLowerCase().includes(q))
+            .slice(0, 4);
+
+        // 3. Matching Wallpaper Titles
+        const matchingWps = [];
+        const seenTitles = new Set();
+        currentImages.forEach(img => {
+            const hash = img.filename.split(".")[0];
+            const meta = localMetadata.wallpaper_metadata[hash] || {};
+            const title = meta.title || img.filename.split(".")[0];
+            if (title.toLowerCase().includes(q) && !seenTitles.has(title.toLowerCase())) {
+                seenTitles.add(title.toLowerCase());
+                matchingWps.push({ title, hash });
+            }
+        });
+        const topWps = matchingWps.slice(0, 3);
+
+        if (matchingCols.length === 0 && matchingTags.length === 0 && topWps.length === 0) {
+            dropdown.classList.add("hidden");
+            return;
+        }
+
+        // Render Collection Suggestions
+        if (matchingCols.length > 0) {
+            const titleEl = document.createElement("div");
+            titleEl.className = "suggestion-group-title";
+            titleEl.textContent = "📁 Collections";
+            dropdown.appendChild(titleEl);
+
+            matchingCols.forEach(col => {
+                const item = createSuggestionItem("📁", col.name, "Collection", q, () => {
+                    selectSearchSuggestion(col.name);
+                });
+                dropdown.appendChild(item);
+            });
+        }
+
+        // Render Tag Suggestions
+        if (matchingTags.length > 0) {
+            const titleEl = document.createElement("div");
+            titleEl.className = "suggestion-group-title";
+            titleEl.textContent = "🏷️ Tags";
+            dropdown.appendChild(titleEl);
+
+            matchingTags.forEach(tag => {
+                const item = createSuggestionItem("🏷️", `#${tag.name}`, "Tag", q, () => {
+                    selectSearchSuggestion(tag.name);
+                });
+                dropdown.appendChild(item);
+            });
+        }
+
+        // Render Wallpaper Title Suggestions
+        if (topWps.length > 0) {
+            const titleEl = document.createElement("div");
+            titleEl.className = "suggestion-group-title";
+            titleEl.textContent = "🖼️ Wallpapers";
+            dropdown.appendChild(titleEl);
+
+            topWps.forEach(wp => {
+                const item = createSuggestionItem("🖼️", wp.title, "Wallpaper", q, () => {
+                    selectSearchSuggestion(wp.title);
+                });
+                dropdown.appendChild(item);
+            });
+        }
+
+        dropdown.classList.remove("hidden");
+        activeIndex = -1;
+    };
+
+    const createSuggestionItem = (icon, text, type, query, onClick) => {
+        const item = document.createElement("div");
+        item.className = "suggestion-item";
+
+        const iconEl = document.createElement("span");
+        iconEl.className = "suggestion-icon";
+        iconEl.textContent = icon;
+
+        const textEl = document.createElement("span");
+        textEl.className = "suggestion-text";
+        
+        // Highlight query match in text
+        const lowerText = text.toLowerCase();
+        const matchIdx = lowerText.indexOf(query.toLowerCase());
+        if (matchIdx !== -1) {
+            const before = text.substring(0, matchIdx);
+            const match = text.substring(matchIdx, matchIdx + query.length);
+            const after = text.substring(matchIdx + query.length);
+            textEl.innerHTML = `${escapeHtml(before)}<span class="suggestion-highlight">${escapeHtml(match)}</span>${escapeHtml(after)}`;
+        } else {
+            textEl.textContent = text;
+        }
+
+        const badgeEl = document.createElement("span");
+        badgeEl.className = "suggestion-badge";
+        badgeEl.textContent = type;
+
+        item.appendChild(iconEl);
+        item.appendChild(textEl);
+        item.appendChild(badgeEl);
+
+        item.addEventListener("click", (e) => {
+            e.stopPropagation();
+            onClick();
+        });
+
+        return item;
+    };
+
+    const selectSearchSuggestion = (text) => {
+        const cleanText = text.replace(/^#/, "");
+        searchInput.value = cleanText;
+        dropdown.classList.add("hidden");
+        renderCatalog();
+    };
+
+    const escapeHtml = (str) => {
+        return str.replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        })[m]);
+    };
+
+    if (!searchInput.dataset.wired) {
+        searchInput.dataset.wired = "true";
+
+        searchInput.addEventListener("input", (e) => {
+            renderSuggestions(e.target.value);
+            renderCatalog();
+        });
+
+        searchInput.addEventListener("focus", (e) => {
+            if (e.target.value.trim().length > 0) {
+                renderSuggestions(e.target.value);
+            }
+        });
+
+        searchInput.addEventListener("keydown", (e) => {
+            const items = dropdown.querySelectorAll(".suggestion-item");
+            if (items.length === 0 || dropdown.classList.contains("hidden")) {
+                if (e.key === "Enter") {
+                    dropdown.classList.add("hidden");
+                    renderCatalog();
+                }
+                return;
+            }
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                activeIndex = (activeIndex + 1) % items.length;
+                items.forEach((it, i) => it.classList.toggle("active-item", i === activeIndex));
+                items[activeIndex]?.scrollIntoView({ block: "nearest" });
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                activeIndex = (activeIndex - 1 + items.length) % items.length;
+                items.forEach((it, i) => it.classList.toggle("active-item", i === activeIndex));
+                items[activeIndex]?.scrollIntoView({ block: "nearest" });
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (activeIndex >= 0 && items[activeIndex]) {
+                    items[activeIndex].click();
+                } else {
+                    dropdown.classList.add("hidden");
+                    renderCatalog();
+                }
+            } else if (e.key === "Escape") {
+                dropdown.classList.add("hidden");
+            }
+        });
+    }
+
+    if (clearBtn && !clearBtn.dataset.wired) {
+        clearBtn.dataset.wired = "true";
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            clearBtn.classList.add("hidden");
+            dropdown.classList.add("hidden");
+            renderCatalog();
+        });
+    }
+
+    // Hide dropdown when clicking outside search box
+    document.addEventListener("click", (e) => {
+        const wrap = document.querySelector(".search-box-wrapper");
+        if (wrap && !wrap.contains(e.target)) {
+            dropdown.classList.add("hidden");
+        }
+    });
 }
