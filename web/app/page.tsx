@@ -198,6 +198,7 @@ export default function Page() {
   const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
   const [bulkCollectionId, setBulkCollectionId] = useState<string>("");
+  const [bulkCollectionIds, setBulkCollectionIds] = useState<number[]>([]);
   const [bulkTags, setBulkTags] = useState<number[]>([]);
 
   // Individual Wallpaper Edit Modal State
@@ -745,8 +746,8 @@ export default function Page() {
 
   const handleApplyBulkUpdate = async () => {
     if (selectedImageIds.length === 0) return;
-    if (!bulkCategoryId && !bulkCollectionId && bulkTags.length === 0) {
-      alert("Please select a category, collection, or tags to apply.");
+    if (bulkCollectionIds.length === 0 && bulkTags.length === 0) {
+      alert("Please select at least one collection or tag to assign.");
       return;
     }
 
@@ -754,8 +755,8 @@ export default function Page() {
     try {
       const items = selectedImageIds.map((id) => {
         const itemUpdate: any = { id };
-        if (bulkCollectionId) {
-          itemUpdate.collection_ids = [Number(bulkCollectionId)];
+        if (bulkCollectionIds.length > 0) {
+          itemUpdate.collection_ids = bulkCollectionIds;
         }
         if (bulkTags.length > 0) {
           itemUpdate.tags = bulkTags;
@@ -771,10 +772,9 @@ export default function Page() {
       const data = await res.json();
 
       if (res.ok) {
-        alert(`Successfully updated metadata for ${data.summary.successful} wallpapers!`);
+        alert(`Successfully updated metadata for ${data.summary?.successful || selectedImageIds.length} wallpapers!`);
         setSelectedImageIds([]);
-        setBulkCategoryId("");
-        setBulkCollectionId("");
+        setBulkCollectionIds([]);
         setBulkTags([]);
         fetchGallery(false);
       } else {
@@ -1596,19 +1596,130 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Floating Bulk Edit action bar */}
+      {/* Floating Bulk Edit Action Bar */}
       {selectedImageIds.length > 0 && (
-        <div className="bulk-actions-bar">
-          <div><strong style={{ fontSize: "1.1rem" }}>{selectedImageIds.length} item(s) selected</strong></div>
-          <div className="bulk-actions-controls">
-            <div>
-              <select value={bulkCollectionId} onChange={(e) => setBulkCollectionId(e.target.value)} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "#1a1a1a", color: "#e0e0e0" }}>
-                <option value="">-- Assign Collection --</option>
-                {filteredBulkCollections.map((col) => (<option key={col.id} value={col.id}>{col.name}</option>))}
-              </select>
+        <div 
+          className="bulk-actions-bar"
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(18, 20, 29, 0.94)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            border: "1px solid rgba(99, 102, 241, 0.35)",
+            borderRadius: "16px",
+            padding: "16px 24px",
+            boxShadow: "0 12px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(99, 102, 241, 0.25)",
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            width: "92%",
+            maxWidth: "780px"
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span className="badge" style={{ background: "linear-gradient(135deg, #6366f1, #a855f7)", color: "white", padding: "4px 12px", borderRadius: "12px", fontSize: "0.85rem", fontWeight: 700 }}>
+                {selectedImageIds.length} Selected
+              </span>
+              <span style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
+                Assign multiple collections & tags to all selected wallpapers
+              </span>
             </div>
-            <button type="button" className="btn" onClick={handleApplyBulkUpdate} disabled={loading}>Apply Changes</button>
-            <button type="button" className="btn-secondary" onClick={() => { setSelectedImageIds([]); setBulkCategoryId(""); setBulkCollectionId(""); setBulkTags([]); }}>Cancel</button>
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button 
+                type="button" 
+                className="btn" 
+                onClick={handleApplyBulkUpdate} 
+                disabled={loading}
+                style={{
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 18px",
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  cursor: "pointer"
+                }}
+              >
+                {loading ? "Applying..." : "✨ Apply to All"}
+              </button>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => { setSelectedImageIds([]); setBulkCollectionIds([]); setBulkTags([]); }}
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border)",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  fontSize: "0.85rem",
+                  cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            {/* Multi-Collection Checkboxes */}
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#ffb340", marginBottom: "6px" }}>
+                📁 Multi-Assign Collections ({bulkCollectionIds.length})
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "80px", overflowY: "auto" }}>
+                {collections.map((col) => (
+                  <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.78rem", cursor: "pointer", background: bulkCollectionIds.includes(col.id) ? "rgba(255, 179, 64, 0.2)" : "rgba(255, 255, 255, 0.04)", padding: "3px 8px", borderRadius: "4px", border: bulkCollectionIds.includes(col.id) ? "1px solid #ffb340" : "1px solid transparent", color: bulkCollectionIds.includes(col.id) ? "#ffca75" : "var(--text-muted)" }}>
+                    <input
+                      type="checkbox"
+                      checked={bulkCollectionIds.includes(col.id)}
+                      onChange={() => {
+                        setBulkCollectionIds((prev) =>
+                          prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id]
+                        );
+                      }}
+                      style={{ width: 12, height: 12, accentColor: "#ffb340" }}
+                    />
+                    <span>{col.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Multi-Tag Selector */}
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#b98cff", marginBottom: "6px" }}>
+                🏷️ Multi-Assign Tags ({bulkTags.length})
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", maxHeight: "80px", overflowY: "auto" }}>
+                {tags.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`tag-chip ${bulkTags.includes(t.id) ? "active" : ""}`}
+                    onClick={() => setBulkTags((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
+                    style={{
+                      padding: "2px 8px",
+                      fontSize: "0.75rem",
+                      borderRadius: "4px",
+                      background: bulkTags.includes(t.id) ? "rgba(168, 85, 247, 0.25)" : "rgba(255, 255, 255, 0.04)",
+                      border: bulkTags.includes(t.id) ? "1px solid #a855f7" : "1px solid transparent",
+                      color: bulkTags.includes(t.id) ? "#d8b4fe" : "var(--text-muted)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
