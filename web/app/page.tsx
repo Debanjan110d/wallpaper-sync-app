@@ -702,20 +702,14 @@ export default function Page() {
     setEditingWallpaper(img);
     setEditTitle(img.title || "");
     setEditDescription(img.description || "");
-    setEditCharacters(Array.isArray(img.characters) ? img.characters.join(", ") : "");
-    setEditFranchises(Array.isArray(img.franchises) ? img.franchises.join(", ") : "");
-    setEditStyles(Array.isArray(img.styles) ? img.styles.join(", ") : img.style || "");
-    setEditMoods(Array.isArray(img.moods) ? img.moods.join(", ") : "");
-    setEditPrimaryColor(img.primary_color || "");
     setEditTags(img.tags ? img.tags.map((t: any) => t.id) : []);
 
     const colIds = Array.isArray(img.collections)
       ? img.collections.map((c: any) => c.id)
-      : img.collection_id
-        ? [Number(img.collection_id)]
-        : [];
-    setEditCollectionIds(colIds);
-    setEditCategoryId(img.collection_details?.category_id ? String(img.collection_details.category_id) : "");
+      : Array.isArray(img.wallpaper_collections)
+        ? img.wallpaper_collections.map((wc: any) => wc.collection_id || wc.collections?.id)
+        : (img.collection_id ? [Number(img.collection_id)] : []);
+    setEditCollectionIds(colIds.filter(Boolean));
   };
 
   const handleSaveEdit = async () => {
@@ -726,11 +720,6 @@ export default function Page() {
         id: editingWallpaper.id,
         title: editTitle.trim(),
         description: editDescription.trim(),
-        characters: editCharacters.split(",").map((s) => s.trim()).filter(Boolean),
-        franchises: editFranchises.split(",").map((s) => s.trim()).filter(Boolean),
-        styles: editStyles.split(",").map((s) => s.trim()).filter(Boolean),
-        moods: editMoods.split(",").map((s) => s.trim()).filter(Boolean),
-        primary_color: editPrimaryColor.trim(),
         collection_ids: editCollectionIds,
         tags: editTags
       };
@@ -1678,32 +1667,7 @@ export default function Page() {
               <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} style={{ resize: "vertical" }} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-              <div className="form-group">
-                <label>Characters (Comma-separated)</label>
-                <input type="text" value={editCharacters} onChange={(e) => setEditCharacters(e.target.value)} placeholder="e.g. Naruto Uzumaki, Sasuke" />
-              </div>
-              <div className="form-group">
-                <label>Franchises (Comma-separated)</label>
-                <input type="text" value={editFranchises} onChange={(e) => setEditFranchises(e.target.value)} placeholder="e.g. Naruto, Shonen Jump" />
-              </div>
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-              <div className="form-group">
-                <label>Styles (Comma-separated)</label>
-                <input type="text" value={editStyles} onChange={(e) => setEditStyles(e.target.value)} placeholder="e.g. Anime, Digital Art" />
-              </div>
-              <div className="form-group">
-                <label>Moods (Comma-separated)</label>
-                <input type="text" value={editMoods} onChange={(e) => setEditMoods(e.target.value)} placeholder="e.g. Dramatic, Mysterious" />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Dominant Color</label>
-              <input type="text" value={editPrimaryColor} onChange={(e) => setEditPrimaryColor(e.target.value)} placeholder="e.g. Blue" />
-            </div>
 
             {/* Many-to-many Collection selection checkboxes */}
             <div className="form-group">
