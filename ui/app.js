@@ -412,7 +412,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (downloadUpdateBtn) downloadUpdateBtn.style.display = "none";
             if (installUpdateBtn) installUpdateBtn.style.display = "";
         } else {
-            updateStatusText.textContent = "Up to date";
+            updateStatusText.textContent = state.currentVersion ? `Up to date (v${state.currentVersion})` : "Up to date";
             if (checkUpdatesBtn) checkUpdatesBtn.style.display = "";
             if (downloadUpdateBtn) downloadUpdateBtn.style.display = "none";
             if (installUpdateBtn) installUpdateBtn.style.display = "none";

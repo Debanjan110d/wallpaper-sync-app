@@ -797,110 +797,69 @@ function refreshTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
 
+function compareSemver(v1, v2) {
+  const p1 = String(v1 || "").replace(/^v/i, "").split(".").map(Number);
+  const p2 = String(v2 || "").replace(/^v/i, "").split(".").map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
 function getUpdateStateSnapshot() {
   return {
-    supported: app.isPackaged && process.platform === "win32",
+    supported: process.platform === "win32",
     available: !!updateState.available,
     downloaded: !!updateState.downloaded,
     version: updateState.version,
     notes: updateState.notes,
     checking: !!updateState.checking,
-    downloading: !!updateState.downloading
+    downloading: !!updateState.downloading,
+    currentVersion: app.getVersion()
   };
 }
 
-function broadcastUpdateState() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("updater:state", getUpdateStateSnapshot());
-  }
-}
+async function checkGithubReleasesDirectly({ userInitiated }) {
+  try {
+    const repo = getGithubRepoFromPackageJson() || { owner: "Debanjan110d", repo: "wallpaper-sync-app" };
+    const apiUrl = `https://api.github.com/repos/${repo.owner}/${repo.repo}/releases/latest`;
+    const res = await axios.get(apiUrl, {
+      timeout: 10_000,
+      headers: {
+        "User-Agent": "wallpaper-sync-app",
+        "Accept": "application/vnd.github+json"
+      }
+    });
 
-function setupAutoUpdater() {
-  // Only works reliably for packaged installs (NSIS installer / installed app)
-  if (!app.isPackaged) return;
-  if (process.platform !== "win32") return;
+    const data = res && res.data ? res.data : null;
+    const tag = data && data.tag_name ? String(data.tag_name) : "";
+    const currentVersion = app.getVersion();
 
-  // Keep auto-download disabled; we open the installer in the browser instead.
-  autoUpdater.autoDownload = false;
-
-  autoUpdater.on("checking-for-update", () => {
-    updateState.checking = true;
-    refreshTrayMenu();
-    broadcastUpdateState();
-  });
-
-  autoUpdater.on("update-available", (info) => {
-    updateState.checking = false;
-    updateState.available = true;
-    updateState.version = info && info.version ? info.version : null;
-    updateState.notes = summarizeReleaseNotes(info && info.releaseNotes);
-    updateState.downloading = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-
-    if (Notification.isSupported()) {
-      const bodyParts = [];
-      if (updateState.version) bodyParts.push(`v${updateState.version}`);
-      if (updateState.notes) bodyParts.push(updateState.notes);
-      new Notification({
-        title: "Update available",
-        body: bodyParts.join(" — ") || "A new version is available."
-      }).show();
+    if (tag && compareSemver(tag, currentVersion) > 0) {
+      updateState.checking = false;
+      updateState.available = true;
+      updateState.version = tag.replace(/^v/i, "");
+      updateState.notes = summarizeReleaseNotes(data.body);
+    } else {
+      updateState.checking = false;
+      updateState.available = false;
+      updateState.downloaded = false;
+      updateState.version = currentVersion;
     }
-
-    // Do not download inside the app; user will download installer via browser.
-  });
-
-  autoUpdater.on("update-not-available", () => {
+  } catch (err) {
+    console.error("Direct GitHub release check error:", err && err.message ? err.message : err);
     updateState.checking = false;
     updateState.available = false;
-    updateState.downloaded = false;
-    updateState.version = null;
-    updateState.notes = null;
-    updateState.downloading = false;
+  } finally {
     refreshTrayMenu();
     broadcastUpdateState();
-  });
-
-  autoUpdater.on("download-progress", () => {
-    updateState.downloading = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-  });
-
-  autoUpdater.on("update-downloaded", () => {
-    updateState.downloading = false;
-    updateState.downloaded = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-
-    if (Notification.isSupported()) {
-      new Notification({
-        title: "Update ready",
-        body: "Install now (or later) from the app."
-      }).show();
-    }
-
-    // No in-app install flow; installer is downloaded via browser.
-  });
-
-  autoUpdater.on("error", (err) => {
-    updateState.checking = false;
-    updateState.downloading = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-    console.error("Auto-updater error:", err);
-  });
-
-  // Startup-only check (no polling), like wallpaper update check.
-  if (!didStartupUpdateCheck) {
-    didStartupUpdateCheck = true;
-    setTimeout(() => checkForUpdates({ userInitiated: false }), 4000);
   }
 }
 
-function checkForUpdates({ userInitiated }) {
-  if (!app.isPackaged) return;
+async function checkForUpdates({ userInitiated }) {
   if (process.platform !== "win32") return;
   if (updateState.checking) return;
 
@@ -909,21 +868,16 @@ function checkForUpdates({ userInitiated }) {
   broadcastUpdateState();
 
   try {
-    autoUpdater.checkForUpdates();
-  } catch (err) {
-    updateState.checking = false;
-    refreshTrayMenu();
-    broadcastUpdateState();
-    console.error("Failed to check for updates:", err);
-
-    if (userInitiated && Notification.isSupported()) {
-      new Notification({
-        title: "Update check failed",
-        body: "Could not check for updates. Please try again later."
-      }).show();
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates().catch(() => checkGithubReleasesDirectly({ userInitiated }));
+    } else {
+      await checkGithubReleasesDirectly({ userInitiated });
     }
+  } catch (err) {
+    await checkGithubReleasesDirectly({ userInitiated });
   }
 }
+
 if (gotSingleInstanceLock) app.whenReady().then(async () => {
   await migrateUserDataIfNeeded();
   settings = loadSettings();
@@ -955,13 +909,13 @@ ipcMain.handle("updater:get-state", () => {
   return getUpdateStateSnapshot();
 });
 
-ipcMain.handle("updater:check", () => {
-  checkForUpdates({ userInitiated: true });
+ipcMain.handle("updater:check", async () => {
+  await checkForUpdates({ userInitiated: true });
   return getUpdateStateSnapshot();
 });
 
 ipcMain.handle("updater:download", async () => {
-  if (!app.isPackaged || process.platform !== "win32") return getUpdateStateSnapshot();
+  if (process.platform !== "win32") return getUpdateStateSnapshot();
   // Always open the latest installer in the user's browser (direct .exe download).
   const openedUrl = await openLatestInstallerDownloadInBrowser();
   return { ...getUpdateStateSnapshot(), openedUrl };
