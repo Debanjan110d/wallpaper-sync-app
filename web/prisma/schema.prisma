@@ -71,3 +71,14 @@ model WallpaperTag {
   @@id([wallpaperId, tagId])
   @@map("wallpaper_tags")
 }
+
+model Review {
+  id           BigInt   @id @default(autoincrement())
+  reviewerName String   @default("Anonymous") @map("reviewer_name")
+  rating       Int
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("reviews")
+}
+
