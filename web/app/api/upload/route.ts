@@ -221,15 +221,15 @@ export async function POST(request: Request) {
     const version = row?.created_at ? new Date(row.created_at).getTime() : 0;
     const urlWithVersion = url ? `${url}?v=${version}` : null;
 
-    return NextResponse.json({ 
-      success: true, 
-      data: { 
-        upload: uploadData, 
+    return NextResponse.json({
+      success: true,
+      data: {
+        upload: uploadData,
         row: row ? {
           ...row,
           url: urlWithVersion
         } : null
-      } 
+      }
     });
 
   } catch (error: any) {

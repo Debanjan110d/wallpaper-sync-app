@@ -67,10 +67,10 @@ export async function POST(request: Request) {
         // 1. Resolve direct update columns
         if (title !== undefined) updateData.title = title;
         if (description !== undefined) updateData.description = description;
-        
+
         // Resolve collection update
-        const effectiveCollectionIds = collection_ids !== undefined 
-          ? collection_ids 
+        const effectiveCollectionIds = collection_ids !== undefined
+          ? collection_ids
           : (collection_id !== undefined ? (collection_id ? [collection_id] : []) : undefined);
 
         // Apply wallpaper table update

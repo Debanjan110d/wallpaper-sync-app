@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.1 (v4.1.1) — 2026-10-17
+
+### Bug Fix
+
+- **Fixed "View All Collections" Modal Not Opening:** Resolved a critical HTML nesting bug where the `#allCollectionsModal` was accidentally placed *inside* `#metadataSyncModal` due to a missing closing `</div>` tag for the Metadata Sync modal. This caused the "View All Collections" button to do nothing when clicked on its own, and caused the full collections grid to wrongly appear alongside the Sync Metadata popup instead of opening independently. Added the missing `</div>` closing tag for `#metadataSyncModal` so both modals are properly siblings in the DOM and work as intended.
+
+---
+
 ## 4.1.0 (v4.1.0) — 2026-09-02
 
 ### Browse Collections & Discovery UI/UX Overhaul

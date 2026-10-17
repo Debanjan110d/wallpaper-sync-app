@@ -581,18 +581,18 @@ export function renderCatalog() {
         const img = document.createElement("img");
         img.src = toFileUrl(imgData.path);
 
-        const overlay = document.createElement("div");
-        overlay.className = "overlay";
-
-        const overlayText = document.createElement("div");
-        overlayText.className = "overlay-text";
-        overlayText.innerText = store.state.isManageSlideshowMode
-            ? (store.state.selectedSet.has(String(imgData.path)) ? "Selected" : "Select")
-            : "Set Wallpaper";
-
-        overlay.appendChild(overlayText);
-        card.appendChild(img);
-        card.appendChild(overlay);
+        if (store.state.isManageSlideshowMode) {
+            const overlay = document.createElement("div");
+            overlay.className = "overlay";
+            const overlayText = document.createElement("div");
+            overlayText.className = "overlay-text";
+            overlayText.innerText = store.state.selectedSet.has(String(imgData.path)) ? "Selected" : "Select";
+            overlay.appendChild(overlayText);
+            card.appendChild(img);
+            card.appendChild(overlay);
+        } else {
+            card.appendChild(img);
+        }
 
         const hash = imgData.filename.split(".")[0];
         const meta = store.state.localMetadata.wallpaper_metadata[hash] || {};

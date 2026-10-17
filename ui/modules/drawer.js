@@ -45,26 +45,6 @@ export function openDetailDrawer(imgData) {
 
     if (drawerCollectionText) drawerCollectionText.textContent = collectionNames || "None / Select Collection";
 
-    // Bind mockup screen background
-    const mockupScreen = document.getElementById("mockupScreen");
-    if (mockupScreen) {
-        mockupScreen.style.backgroundImage = `url('${toFileUrl(imgData.path)}')`;
-    }
-
-    // Update digital clock
-    const mockupClock = document.getElementById("mockupClock");
-    if (mockupClock) {
-        const updateClock = () => {
-            const now = new Date();
-            let hours = now.getHours();
-            const minutes = String(now.getMinutes()).padStart(2, "0");
-            const ampm = hours >= 12 ? "PM" : "AM";
-            hours = hours % 12;
-            hours = hours ? hours : 12;
-            mockupClock.textContent = `${hours}:${minutes} ${ampm}`;
-        };
-        updateClock();
-    }
 
     // Dynamic color accent sync
     if (meta.primary_color) {
@@ -222,15 +202,5 @@ export function initDrawer() {
         closeDrawerBtn.addEventListener("click", closeDetailDrawer);
     }
 
-    const mockupShowIcons = document.getElementById("mockupShowIcons");
-    const mockupIconsGrid = document.getElementById("mockupIconsGrid");
-    if (mockupShowIcons && mockupIconsGrid) {
-        mockupShowIcons.addEventListener("change", () => {
-            if (mockupShowIcons.checked) {
-                mockupIconsGrid.classList.remove("hidden");
-            } else {
-                mockupIconsGrid.classList.add("hidden");
-            }
-        });
-    }
+
 }
