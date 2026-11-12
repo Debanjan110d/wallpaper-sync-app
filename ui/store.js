@@ -82,9 +82,9 @@ export async function updateWallpaperInfo() {
     }
 }
 
-export async function triggerBackgroundSync() {
+export async function triggerBackgroundSync(isManual = false) {
     updateConnectionDot("offline", "Syncing...");
-    showToast("Syncing library metadata...", "success");
+    if (isManual) showToast("Syncing library metadata...", "info");
     try {
         const syncRes = await window.api.syncMetadataNow();
         if (syncRes && !syncRes.error) {
@@ -96,20 +96,20 @@ export async function triggerBackgroundSync() {
 
             if (pendingCount > 0) {
                 updateConnectionDot("offline", `Offline (${pendingCount} pending)`);
-                showToast(`Synced! ${pendingCount} updates cached offline.`, "success");
+                if (isManual) showToast(`Synced! ${pendingCount} updates cached offline.`, "info");
             } else {
                 updateConnectionDot("online", "Connected");
-                showToast("Library metadata synced successfully!", "success");
+                if (isManual) showToast("Library metadata synced successfully!", "success");
             }
             await refreshMetadata();
             await loadWallpapers();
         } else {
             updateConnectionDot("unreachable", syncRes.error || "Server offline");
-            showToast("Sync failed: " + (syncRes.error || "Server offline"), "error");
+            if (isManual) showToast("Sync failed: " + (syncRes.error || "Server offline"), "error");
         }
     } catch (err) {
         updateConnectionDot("unreachable", "Sync failed");
-        showToast("Sync failed: Connection lost", "error");
+        if (isManual) showToast("Sync failed: Connection lost", "error");
     }
 }
 

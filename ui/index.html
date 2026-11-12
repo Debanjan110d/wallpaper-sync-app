@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallpaper Sync v4.3.0 - Desktop Wallpaper Manager</title>
+    <title>Wallpaper Sync v5.0.0 - Desktop Wallpaper Manager</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -36,16 +36,21 @@
                 <div class="brand-text-wrap">
                     <div class="brand-title-row">
                         <span class="brand-name">Wallpaper Sync</span>
-                        <span class="version-badge">v4.3.0</span>
+                        <span class="version-badge">v5.0.0</span>
                     </div>
                     <span class="brand-subtitle">Desktop Wallpaper Manager</span>
                 </div>
+                <button class="sidebar-collapse-btn" id="collapseSidebarBtn" title="Collapse Sidebar" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
             </div>
 
             <!-- Primary Navigation Tabs -->
             <nav class="sidebar-nav-section">
                 <ul class="nav-list">
-                    <li class="nav-item active" id="navHome" data-tab="home">
+                    <li class="nav-item active" id="navHome" data-tab="home" title="Home">
                         <div class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -54,7 +59,7 @@
                         </div>
                         <span class="nav-label">Home</span>
                     </li>
-                    <li class="nav-item" id="navDiscover" data-tab="discover">
+                    <li class="nav-item" id="navDiscover" data-tab="discover" title="Discover">
                         <div class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="11" cy="11" r="8"></circle>
@@ -63,7 +68,7 @@
                         </div>
                         <span class="nav-label">Discover</span>
                     </li>
-                    <li class="nav-item" id="navCollections" data-tab="collections">
+                    <li class="nav-item" id="navCollections" data-tab="collections" title="Collections">
                         <div class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -71,7 +76,7 @@
                         </div>
                         <span class="nav-label">Collections</span>
                     </li>
-                    <li class="nav-item" id="navLibrary" data-tab="library">
+                    <li class="nav-item" id="navLibrary" data-tab="library" title="Library">
                         <div class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -82,7 +87,7 @@
                         <span class="nav-label">Library</span>
                         <span class="nav-badge" id="navLibraryBadge">0</span>
                     </li>
-                    <li class="nav-item" id="navFavorites" data-tab="favorites">
+                    <li class="nav-item" id="navFavorites" data-tab="favorites" title="Favorites">
                         <div class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
@@ -91,62 +96,14 @@
                         <span class="nav-label">Favorites</span>
                         <span class="nav-badge highlight-badge" id="navFavoritesBadge">0</span>
                     </li>
-                    <li class="nav-item" id="navPlaylists" data-tab="playlists">
-                        <div class="nav-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="8" y1="6" x2="21" y2="6"></line>
-                                <line x1="8" y1="12" x2="21" y2="12"></line>
-                                <line x1="8" y1="18" x2="21" y2="18"></line>
-                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                            </svg>
-                        </div>
-                        <span class="nav-label">Playlists</span>
-                    </li>
-                    <li class="nav-item" id="navHistory" data-tab="history">
-                        <div class="nav-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                        </div>
-                        <span class="nav-label">History</span>
-                    </li>
                 </ul>
             </nav>
 
             <!-- Tools Section -->
             <div class="sidebar-tools-section">
-                <span class="sidebar-section-heading">Tools</span>
+                <span class="sidebar-section-heading">Preferences</span>
                 <ul class="nav-list tools-list">
-                    <li class="nav-item tool-item" id="toolSlideshow">
-                        <div class="nav-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                        </div>
-                        <span class="nav-label">Slideshow</span>
-                    </li>
-                    <li class="nav-item tool-item" id="toolSync">
-                        <div class="nav-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <polyline points="1 20 1 14 7 14"></polyline>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                            </svg>
-                        </div>
-                        <span class="nav-label">Sync &amp; Backup</span>
-                    </li>
-                    <li class="nav-item tool-item" id="toolMaintenance">
-                        <div class="nav-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                            </svg>
-                        </div>
-                        <span class="nav-label">Maintenance</span>
-                    </li>
-                    <li class="nav-item tool-item" id="toolSettings">
+                    <li class="nav-item tool-item" id="toolSettings" title="Settings">
                         <div class="nav-icon">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                                 <circle cx="12" cy="12" r="3"></circle>
@@ -154,6 +111,14 @@
                             </svg>
                         </div>
                         <span class="nav-label">Settings</span>
+                    </li>
+                    <li class="nav-item tool-item" id="toolReview" title="Rate &amp; Review">
+                        <div class="nav-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        </div>
+                        <span class="nav-label">Rate &amp; Review</span>
                     </li>
                 </ul>
             </div>
@@ -225,14 +190,70 @@
 
                 <!-- Top Right Quick Controls -->
                 <div class="top-actions-group">
-                    <button class="top-action-btn" id="btnNotifications" title="Notifications" type="button">
+                    <button class="top-action-btn" id="btnToggleControlPanel" title="Toggle Control Studio (Slideshow & Watchdog)" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
                         </svg>
-                        <span class="notif-dot"></span>
                     </button>
-                    <button class="top-action-btn" id="btnHelp" title="Help & Documentation" type="button">
+                    
+                    <div class="notifications-wrapper" style="position: relative;">
+                        <button class="top-action-btn" id="btnNotifications" title="Notifications & System Activity" type="button" aria-expanded="false" aria-haspopup="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="notif-dot" id="notifDot"></span>
+                        </button>
+
+                        <!-- Interactive Notifications Flyout -->
+                        <div class="notifications-flyout hidden" id="notificationsFlyout" role="dialog" aria-label="Notifications">
+                            <div class="notif-header">
+                                <div class="notif-header-title-wrap">
+                                    <span class="notif-title">Notifications</span>
+                                    <span class="notif-count-badge" id="notifCountBadge">3</span>
+                                </div>
+                                <button class="notif-clear-btn" id="notifMarkReadBtn" type="button">Mark as read</button>
+                            </div>
+
+                            <div class="notif-list" id="notifList">
+                                <!-- Permanent In-App Review Prompt Card -->
+                                <div class="notif-item highlight" id="notifReviewCard">
+                                    <div class="notif-icon-circle star-icon">⭐</div>
+                                    <div class="notif-body">
+                                        <div class="notif-item-title">Rate Wallpaper Sync</div>
+                                        <div class="notif-item-text">Loving the experience? Share a review and rating to help us shape future updates!</div>
+                                        <button class="notif-action-btn" id="notifOpenReviewBtn" type="button">★ Write a Review</button>
+                                    </div>
+                                </div>
+
+                                <!-- Recovery Watchdog Status Card -->
+                                <div class="notif-item" id="notifWatchdogCard">
+                                    <div class="notif-icon-circle guard-icon">🛡️</div>
+                                    <div class="notif-body">
+                                        <div class="notif-item-title">Recovery Watchdog Active</div>
+                                        <div class="notif-item-text" id="notifWatchdogText">Guarding desktop against Windows updates and wallpaper resets.</div>
+                                    </div>
+                                </div>
+
+                                <!-- Cloud Sync Status Card -->
+                                <div class="notif-item" id="notifSyncCard">
+                                    <div class="notif-icon-circle sync-icon">🔄</div>
+                                    <div class="notif-body">
+                                        <div class="notif-item-title">Cloud Library Synchronized</div>
+                                        <div class="notif-item-text" id="notifSyncText">Local wallpaper collection and tags are up to date.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="notif-footer">
+                                <span>Wallpaper Sync v5.0.0</span>
+                                <button class="notif-footer-link" id="notifOpenSettingsBtn" type="button">Studio Controls</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="top-action-btn" id="btnHelp" title="Help & System Health" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -411,6 +432,10 @@
 
         <!-- 3. RIGHT CONTROL PANEL: Slideshow, Applied Wallpaper, Watchdog & System Status -->
         <aside class="control-panel-v5" id="controlPanel">
+            <div class="panel-top-bar">
+                <span class="panel-section-title">Control Studio</span>
+                <button class="panel-close-btn" id="closeRightPanelBtn" type="button" title="Close Panel">✕</button>
+            </div>
 
             <!-- A. Slideshow Quick Controls Card -->
             <div class="panel-card-v5" id="panelSlideshowCard">
@@ -713,7 +738,8 @@
     <!-- 4. User Feedback / Reviews Modal Prompt -->
     <div id="reviewModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Submit Feedback">
         <div class="lightbox-backdrop" id="reviewModalBackdrop"></div>
-        <div class="creator-modal-content review-modal-content">
+        <div class="creator-modal-content review-modal-content" style="position: relative;">
+            <button id="closeReviewModalBtn" class="close-drawer-btn" style="position: absolute; top: 16px; right: 16px;" type="button" aria-label="Close">✕</button>
             <h3>Enjoying Wallpaper Sync?</h3>
             <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Share your rating and comments to help us improve the application.</p>
             

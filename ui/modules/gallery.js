@@ -45,10 +45,29 @@ export function resetDynamicAccentColor() {
     }
 }
 
+export function isWallpaperFavorite(img) {
+    if (!img) return false;
+    const pathStr = String(img.path || "");
+    const filename = String(img.filename || "");
+    const hash = filename.split(".")[0];
+    if (store.state.selectedSet.has(pathStr)) return true;
+    if (hash && store.state.selectedSet.has(hash)) return true;
+    if (filename && store.state.selectedSet.has(filename)) return true;
+    const normImg = pathStr.toLowerCase().replace(/\\/g, "/");
+    for (const fav of store.state.selectedSet) {
+        const normFav = String(fav).toLowerCase().replace(/\\/g, "/");
+        if (normFav === normImg || (filename && normFav.endsWith(filename.toLowerCase()))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function resetFiltersUI() {
     store.state.selectedColorFilter = "";
     store.state.selectedTagFilters = [];
     store.state.showFavoritesOnly = false;
+    store.state.showLibraryOnly = false;
     
     // Reset quick tag pills active state
     document.querySelectorAll("#quickTagsList .quick-tag-pill").forEach(p => p.classList.remove("active"));
@@ -114,13 +133,13 @@ export function renderSearchQuickTags() {
         const pill = document.createElement("div");
         pill.className = "quick-tag-pill";
         const globalSearchInput = document.getElementById("globalSearchInput");
-        if (globalSearchInput && globalSearchInput.value.toLowerCase().includes(tag.name.toLowerCase())) {
+        if (globalSearchInput && (globalSearchInput.value || "").toLowerCase().includes((tag.name || "").toLowerCase())) {
             pill.classList.add("active");
         }
         pill.textContent = `#${tag.name}`;
         pill.addEventListener("click", () => {
             if (!globalSearchInput) return;
-            if (globalSearchInput.value.toLowerCase() === tag.name.toLowerCase()) {
+            if ((globalSearchInput.value || "").toLowerCase() === (tag.name || "").toLowerCase()) {
                 globalSearchInput.value = "";
                 pill.classList.remove("active");
             } else {
@@ -257,6 +276,7 @@ function createCollectionCardElement(col, stats, colFilter) {
     card.appendChild(overlay);
 
     card.addEventListener("click", () => {
+        document.getElementById("allCollectionsModal")?.classList.add("hidden");
         if (colFilter) {
             if (colFilter.value && String(colFilter.value) === String(col.id)) {
                 colFilter.value = "";
@@ -279,20 +299,17 @@ function createCollectionCardElement(col, stats, colFilter) {
 
 // 2b. All Collections Explorer Modal Logic
 export function initAllCollectionsModal() {
-    const viewAllBtn = document.getElementById("viewAllCollectionsBtn");
     const modal = document.getElementById("allCollectionsModal");
+    if (!modal) return;
+
+    const viewAllBtn = document.getElementById("viewAllCollectionsBtn");
     const closeBtn = document.getElementById("closeAllCollectionsModal");
     const backdrop = document.getElementById("allCollectionsModalBackdrop");
     const modalSearch = document.getElementById("modalCollectionSearch");
 
-    if (!viewAllBtn || !modal) return;
-
-    if (!viewAllBtn.dataset.wired) {
+    if (viewAllBtn && !viewAllBtn.dataset.wired) {
         viewAllBtn.dataset.wired = "true";
-        viewAllBtn.addEventListener("click", () => {
-            renderAllCollectionsModalGrid();
-            modal.classList.remove("hidden");
-        });
+        viewAllBtn.addEventListener("click", () => openAllCollectionsModal());
     }
 
     if (closeBtn && !closeBtn.dataset.wired) {
@@ -310,6 +327,19 @@ export function initAllCollectionsModal() {
         modalSearch.addEventListener("input", () => {
             renderAllCollectionsModalGrid(modalSearch.value);
         });
+    }
+}
+
+export function openAllCollectionsModal() {
+    const modal = document.getElementById("allCollectionsModal");
+    if (!modal) return;
+    initAllCollectionsModal();
+    renderAllCollectionsModalGrid();
+    modal.classList.remove("hidden");
+    const modalSearch = document.getElementById("modalCollectionSearch");
+    if (modalSearch) {
+        modalSearch.value = "";
+        setTimeout(() => modalSearch.focus(), 50);
     }
 }
 
@@ -509,11 +539,11 @@ export function renderCatalog() {
     const tagFilter = document.getElementById("tagFilter");
     const headerBackBtn = document.getElementById("headerBackBtn");
 
-    const query = globalSearchInput?.value.toLowerCase().trim() || "";
+    const query = (globalSearchInput?.value || "").toLowerCase().trim();
     const colFilterId = colFilter?.value || "";
     const tagFilterId = tagFilter?.value || "";
 
-    const isSearching = !!query || !!colFilterId || !!tagFilterId || !!store.state.selectedColorFilter || (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0);
+    const isSearching = !!query || !!colFilterId || !!tagFilterId || !!store.state.selectedColorFilter || (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) || store.state.showFavoritesOnly || store.state.showLibraryOnly;
     const sliderSect = document.getElementById("heroSliderSection");
     const addedSect = document.getElementById("recentlyAddedSection");
     const catSect = document.getElementById("categoriesSection");
@@ -531,7 +561,11 @@ export function renderCatalog() {
     const catalogTitle = document.getElementById("catalogTitle");
     if (catalogTitle) {
         if (query) {
-            catalogTitle.innerText = `Search Results for "${globalSearchInput.value.trim()}"`;
+            catalogTitle.innerText = `Search Results for "${(globalSearchInput?.value || "").trim()}"`;
+        } else if (store.state.showFavoritesOnly) {
+            catalogTitle.innerText = `Favorite Wallpapers (${store.state.selectedSet.size})`;
+        } else if (store.state.showLibraryOnly) {
+            catalogTitle.innerText = `Local Library (${(store.state.currentImages || []).length})`;
         } else if (colFilterId) {
             const col = store.state.localMetadata.collections.find(c => String(c.id) === String(colFilterId));
             catalogTitle.innerText = col ? `Collection: ${col.name}` : "Explore Wallpapers";
@@ -557,7 +591,7 @@ export function renderCatalog() {
         const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
 
         // Mandatory dropdown filters
-        if (store.state.showFavoritesOnly && !store.state.selectedSet.has(hash)) return null;
+        if (store.state.showFavoritesOnly && !isWallpaperFavorite(img)) return null;
         if (colFilterId && !collectionIds.some(id => String(id) === String(colFilterId))) return null;
         if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) return null;
         if (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) {
@@ -611,110 +645,177 @@ export function renderCatalog() {
         return;
     }
 
-    filtered.forEach((imgData, index) => {
-        const card = document.createElement("div");
-        card.className = "wallpaper-card";
-        if (store.state.isManageSlideshowMode && store.state.selectedSet.has(String(imgData.path))) {
-            card.classList.add("selected");
-        }
+    if (window._catalogObserver) {
+        window._catalogObserver.disconnect();
+        window._catalogObserver = null;
+    }
 
-        const img = document.createElement("img");
-        img.src = toFileUrl(imgData.path);
+    const BATCH_SIZE = 32;
+    let currentRenderIndex = 0;
+    let sentinelEl = null;
 
-        if (store.state.isManageSlideshowMode) {
-            const overlay = document.createElement("div");
-            overlay.className = "overlay";
-            const overlayText = document.createElement("div");
-            overlayText.className = "overlay-text";
-            overlayText.innerText = store.state.selectedSet.has(String(imgData.path)) ? "Selected" : "Select";
-            overlay.appendChild(overlayText);
-            card.appendChild(img);
-            card.appendChild(overlay);
-        } else {
-            card.appendChild(img);
-
-            const isFav = store.state.selectedSet.has(String(imgData.path));
-            const favBtn = document.createElement("button");
-            favBtn.className = `card-fav-btn ${isFav ? 'active' : ''}`;
-            favBtn.type = "button";
-            favBtn.title = isFav ? "Remove from favorites" : "Add to favorites";
-            favBtn.innerHTML = isFav ? "❤️" : "♡";
-            favBtn.addEventListener("click", async (e) => {
-                e.stopPropagation();
-                const key = String(imgData.path);
-                const isSelected = !store.state.selectedSet.has(key);
-                if (isSelected) store.state.selectedSet.add(key);
-                else store.state.selectedSet.delete(key);
-                favBtn.classList.toggle("active", isSelected);
-                favBtn.innerHTML = isSelected ? "❤️" : "♡";
-                await window.api.toggleSelection(key, isSelected);
-                const navFav = document.getElementById("navFavoritesBadge");
-                if (navFav) navFav.textContent = String(store.state.selectedSet.size);
-                showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
-            });
-            card.appendChild(favBtn);
-        }
-
-        const hash = imgData.filename.split(".")[0];
-        const meta = store.state.localMetadata.wallpaper_metadata[hash] || {};
-        if (meta.quality) {
-            const qBadge = document.createElement("span");
-            qBadge.className = "card-badge quality-badge";
-            qBadge.innerText = meta.quality;
-            card.appendChild(qBadge);
-        }
-        if (meta.style) {
-            const sBadge = document.createElement("span");
-            sBadge.className = "card-badge style-badge";
-            sBadge.innerText = meta.style;
-            card.appendChild(sBadge);
-        }
-
-        // Dynamic Accent color syncing on hover
-        card.addEventListener("mouseenter", () => {
-            if (meta.primary_color) {
-                applyDynamicAccentColor(meta.primary_color);
+    function renderBatch() {
+        const nextBatch = filtered.slice(currentRenderIndex, currentRenderIndex + BATCH_SIZE);
+        if (nextBatch.length === 0) {
+            if (sentinelEl) {
+                sentinelEl.remove();
+                sentinelEl = null;
             }
-        });
-        card.addEventListener("mouseleave", () => {
-            // Restore default unless drawer is open
-            if (store.state.currentSelectedImage) {
-                const activeHash = store.state.currentSelectedImage.filename.split(".")[0];
-                const activeMeta = store.state.localMetadata.wallpaper_metadata[activeHash] || {};
-                if (activeMeta.primary_color) {
-                    applyDynamicAccentColor(activeMeta.primary_color);
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        nextBatch.forEach((imgData, batchIdx) => {
+            const index = currentRenderIndex + batchIdx;
+            const card = document.createElement("div");
+            card.className = "card wallpaper-card";
+            if (store.state.isManageSlideshowMode && isWallpaperFavorite(imgData)) {
+                card.classList.add("selected");
+            }
+
+            const img = document.createElement("img");
+            img.className = "card-img";
+            img.src = toFileUrl(imgData.path);
+            img.alt = imgData.filename;
+            img.loading = "lazy";
+            img.decoding = "async";
+
+            if (store.state.isManageSlideshowMode) {
+                const overlay = document.createElement("div");
+                overlay.className = "overlay";
+                const overlayText = document.createElement("div");
+                overlayText.className = "overlay-text";
+                overlayText.innerText = isWallpaperFavorite(imgData) ? "Selected" : "Select";
+                overlay.appendChild(overlayText);
+                card.appendChild(img);
+                card.appendChild(overlay);
+            } else {
+                card.appendChild(img);
+
+                const isFav = isWallpaperFavorite(imgData);
+                const favBtn = document.createElement("button");
+                favBtn.className = `card-fav-btn ${isFav ? 'active' : ''}`;
+                favBtn.type = "button";
+                favBtn.title = isFav ? "Remove from favorites" : "Add to favorites";
+                favBtn.innerHTML = isFav ? "❤️" : "♡";
+                favBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const key = String(imgData.path);
+                    const isSelected = !isWallpaperFavorite(imgData);
+                    if (isSelected) store.state.selectedSet.add(key);
+                    else {
+                        store.state.selectedSet.delete(key);
+                        const hash = imgData.filename.split(".")[0];
+                        store.state.selectedSet.delete(hash);
+                        store.state.selectedSet.delete(imgData.filename);
+                    }
+                    favBtn.classList.toggle("active", isSelected);
+                    favBtn.innerHTML = isSelected ? "❤️" : "♡";
+                    await window.api.toggleSelection(key, isSelected);
+                    const navFav = document.getElementById("navFavoritesBadge");
+                    if (navFav) navFav.textContent = String(store.state.selectedSet.size);
+                    showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
+                });
+                card.appendChild(favBtn);
+            }
+
+            const hash = imgData.filename.split(".")[0];
+            const meta = store.state.localMetadata.wallpaper_metadata[hash] || {};
+            if (meta.quality) {
+                const qBadge = document.createElement("span");
+                qBadge.className = "card-badge quality-badge";
+                qBadge.innerText = meta.quality;
+                card.appendChild(qBadge);
+            }
+            if (meta.style) {
+                const sBadge = document.createElement("span");
+                sBadge.className = "card-badge style-badge";
+                sBadge.innerText = meta.style;
+                card.appendChild(sBadge);
+            }
+
+            // Dynamic Accent color syncing on hover
+            card.addEventListener("mouseenter", () => {
+                if (meta.primary_color) {
+                    applyDynamicAccentColor(meta.primary_color);
+                }
+            });
+            card.addEventListener("mouseleave", () => {
+                // Restore default unless drawer is open
+                if (store.state.currentSelectedImage) {
+                    const activeHash = store.state.currentSelectedImage.filename.split(".")[0];
+                    const activeMeta = store.state.localMetadata.wallpaper_metadata[activeHash] || {};
+                    if (activeMeta.primary_color) {
+                        applyDynamicAccentColor(activeMeta.primary_color);
+                        return;
+                    }
+                }
+                resetDynamicAccentColor();
+            });
+
+            card.addEventListener("dblclick", (e) => {
+                if (store.state.isManageSlideshowMode) return;
+                e.stopPropagation();
+                openLightboxAt(index);
+            });
+
+            card.addEventListener("click", async () => {
+                if (store.state.isManageSlideshowMode) {
+                    const isSelected = !card.classList.contains("selected");
+                    if (isSelected) card.classList.add("selected");
+                    else card.classList.remove("selected");
+                    const key = String(imgData.path);
+                    if (isSelected) store.state.selectedSet.add(key);
+                    else store.state.selectedSet.delete(key);
+                    await window.api.toggleSelection(key, isSelected);
+                    const countEl = document.getElementById("slideshowSelectedCount");
+                    if (countEl) countEl.textContent = String(store.state.selectedSet.size);
+                    showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
                     return;
                 }
+
+                openDetailDrawer(imgData);
+            });
+
+            fragment.appendChild(card);
+        });
+
+        if (sentinelEl) {
+            gallery.insertBefore(fragment, sentinelEl);
+        } else {
+            gallery.appendChild(fragment);
+        }
+
+        currentRenderIndex += nextBatch.length;
+
+        if (currentRenderIndex < filtered.length) {
+            if (!sentinelEl) {
+                sentinelEl = document.createElement("div");
+                sentinelEl.className = "gallery-sentinel";
+                sentinelEl.style.cssText = "grid-column: 1/-1; height: 50px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 11px; padding: 10px;";
+                sentinelEl.textContent = `Showing ${currentRenderIndex} of ${filtered.length} wallpapers...`;
+                gallery.appendChild(sentinelEl);
+
+                if (typeof IntersectionObserver !== "undefined") {
+                    window._catalogObserver = new IntersectionObserver((entries) => {
+                        if (entries[0] && entries[0].isIntersecting) {
+                            renderBatch();
+                        }
+                    }, { root: document.getElementById("dashboardBody"), rootMargin: "300px" });
+                    window._catalogObserver.observe(sentinelEl);
+                }
+            } else {
+                sentinelEl.textContent = `Showing ${currentRenderIndex} of ${filtered.length} wallpapers...`;
             }
-            resetDynamicAccentColor();
-        });
-
-        card.addEventListener("dblclick", (e) => {
-            if (store.state.isManageSlideshowMode) return;
-            e.stopPropagation();
-            openLightboxAt(index);
-        });
-
-        card.addEventListener("click", async () => {
-            if (store.state.isManageSlideshowMode) {
-                const isSelected = !card.classList.contains("selected");
-                if (isSelected) card.classList.add("selected");
-                else card.classList.remove("selected");
-                const key = String(imgData.path);
-                if (isSelected) store.state.selectedSet.add(key);
-                else store.state.selectedSet.delete(key);
-                await window.api.toggleSelection(key, isSelected);
-                if (slideshowSelectedCount) slideshowSelectedCount.textContent = String(store.state.selectedSet.size);
-                overlayText.innerText = isSelected ? "Selected" : "Select";
-                showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
-                return;
+        } else {
+            if (sentinelEl) {
+                sentinelEl.remove();
+                sentinelEl = null;
             }
+        }
+    }
 
-            openDetailDrawer(imgData);
-        });
-
-        gallery.appendChild(card);
-    });
+    renderBatch();
 }
 
 // 6. Fullscreen Lightbox Image Viewer Logic

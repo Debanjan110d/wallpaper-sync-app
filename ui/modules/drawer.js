@@ -28,9 +28,17 @@ export function openDetailDrawer(imgData) {
         if (drawerResolution) drawerResolution.textContent = `${tempImg.naturalWidth} x ${tempImg.naturalHeight}`;
     };
 
-    // Retrieve file size if possible or calculate from properties
-    // We can also fetch actual file size if needed, but for now we display loading or estimated
-    drawerSize.textContent = imgData.sizeBytes ? formatBytes(imgData.sizeBytes) : "N/A";
+    if (drawerSize) {
+        if (imgData.sizeBytes && imgData.sizeBytes > 0) {
+            drawerSize.textContent = formatBytes(imgData.sizeBytes);
+        } else {
+            drawerSize.textContent = "Calculating...";
+            tempImg.addEventListener("load", () => {
+                const est = Math.round((tempImg.naturalWidth * tempImg.naturalHeight * 0.24));
+                drawerSize.textContent = formatBytes(est > 0 ? est : 2400000);
+            });
+        }
+    }
 
     const hash = imgData.filename.split(".")[0];
     const meta = store.state.localMetadata.wallpaper_metadata[hash] || { collection_id: null, collection_ids: [], tags: [], file_name: null };

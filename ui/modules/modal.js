@@ -101,23 +101,31 @@ export function initReviewModal() {
         });
     }
 
-    if (reviewCancelBtn) {
-        reviewCancelBtn.addEventListener("click", async () => {
-            const res = await window.api.submitReview(0, "", ""); // rating = 0 snoozes for 10 days
-            if (res && res.remindAfter) {
-                store.state.settings.reviewRemindAfter = res.remindAfter;
-            } else {
-                store.state.settings.reviewRemindAfter = Date.now() + 10 * 24 * 60 * 60 * 1000;
-            }
-            store.state.settings.wallpaperChangesCount = 0;
+    const closeReviewModalBtn = document.getElementById("closeReviewModalBtn");
+    if (closeReviewModalBtn) {
+        closeReviewModalBtn.addEventListener("click", () => {
             reviewModal?.classList.add("hidden");
-            showToast("We'll remind you in 10 days!", "info");
         });
     }
 
-    if (reviewModalBackdrop && reviewCancelBtn) {
+    if (reviewCancelBtn) {
+        reviewCancelBtn.addEventListener("click", async () => {
+            try {
+                const res = await window.api.submitReview(0, "", ""); // rating = 0 snoozes
+                if (res && res.remindAfter) {
+                    store.state.settings.reviewRemindAfter = res.remindAfter;
+                } else {
+                    store.state.settings.reviewRemindAfter = Date.now() + 10 * 24 * 60 * 60 * 1000;
+                }
+            } catch {}
+            store.state.settings.wallpaperChangesCount = 0;
+            reviewModal?.classList.add("hidden");
+        });
+    }
+
+    if (reviewModalBackdrop) {
         reviewModalBackdrop.addEventListener("click", () => {
-            reviewCancelBtn.click();
+            reviewModal?.classList.add("hidden");
         });
     }
 }

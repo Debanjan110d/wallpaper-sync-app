@@ -144,8 +144,8 @@ export function setActiveSlide(index) {
 export function startHeroSlideshow(slideCount) {
     if (store.state.sliderInterval) clearInterval(store.state.sliderInterval);
 
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mediaQuery.matches) return;
+    const mediaQuery = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+    if (mediaQuery && mediaQuery.matches) return;
 
     store.state.sliderInterval = setInterval(() => {
         if (!store.state.isSliderPaused) {

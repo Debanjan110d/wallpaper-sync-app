@@ -14,7 +14,7 @@
   </a>
   &nbsp;&bull;&nbsp;
   <a href="CHANGELOG.md">
-    <strong>What's New in Version 4.3.0</strong>
+    <strong>What's New in Version 5.0.0</strong>
   </a>
 </p>
 

@@ -63,23 +63,34 @@ export function fuzzyMatch(text, query) {
 }
 
 // 4. Toast notification alerts
-export function showToast(message, type = "error") {
+export function showToast(message, type = "info") {
     const toastContainer = document.getElementById("toastContainer");
     if (!toastContainer) return;
+
+    // Keep at most 2 toasts at a time to prevent screen clutter
+    while (toastContainer.children.length >= 2) {
+        toastContainer.firstChild?.remove();
+    }
+
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
 
-    const icon = type === "success"
-        ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
-        : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+    let iconSvg = "";
+    if (type === "success") {
+        iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    } else if (type === "error") {
+        iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+    } else {
+        iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    }
 
-    toast.innerHTML = `${icon} ${message}`;
+    toast.innerHTML = `<span class="toast-icon">${iconSvg}</span><span class="toast-text">${message}</span>`;
     toastContainer.appendChild(toast);
 
     setTimeout(() => {
         toast.classList.add("fade-out");
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+        setTimeout(() => toast.remove(), 250);
+    }, 2400);
 }
 
 // 5. Scroll optimization wheel logic

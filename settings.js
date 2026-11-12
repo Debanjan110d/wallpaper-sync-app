@@ -36,7 +36,7 @@ function loadSettings() {
     selectedImages: [],
     apiUrl: "",
     syncToken: "",
-    appVersion: "4.3.0",
+    appVersion: "5.0.0",
     alreadyReviewed: false,
     firstUsedAt,
     reviewRemindAfter: 0,

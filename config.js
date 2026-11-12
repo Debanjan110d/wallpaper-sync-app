@@ -2,7 +2,7 @@ const path = require("path");
 const { app } = require("electron");
 
 module.exports = {
-  VERSION: "4.3.0",
+  VERSION: "5.0.0",
   get API_URL() {
     return process.env.WALLPAPER_SYNC_API_URL
       || "https://wallpaper-sync-app.vercel.app/api/wallpapers";

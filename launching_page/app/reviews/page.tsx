@@ -32,7 +32,7 @@ export default function ReviewsPage() {
       try {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://wallpaper-sync-app.vercel.app";
         const targetUrl = `${apiBase.replace(/\/$/, "")}/api/reviews`;
-        
+
         let res = await fetch(targetUrl);
         if (!res.ok) {
           // Fallback directly to production web API

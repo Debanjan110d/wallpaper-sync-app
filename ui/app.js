@@ -14,11 +14,12 @@ import {
     renderCatalog,
     showLightboxAt,
     closeLightbox,
-    resetFiltersUI
+    resetFiltersUI,
+    openAllCollectionsModal
 } from "./modules/gallery.js";
 import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
-import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI } from "./modules/modal.js";
+import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal } from "./modules/modal.js";
 import { initQuickActions } from "./modules/quickActions.js";
 import { initControlPanel } from "./modules/controlPanel.js";
 
@@ -115,6 +116,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         navHome.addEventListener("click", () => {
             setActiveNavTab("navHome");
             resetFiltersUI();
+            closeDetailDrawer();
             updateCollectionsDropdowns("", "");
             renderCatalog();
             document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
@@ -128,21 +130,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateCollectionsDropdowns("", "");
             renderCatalog();
             document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
-            const searchInput = document.getElementById("globalSearchInput");
-            if (searchInput) searchInput.focus();
+            if (globalSearchInput) {
+                globalSearchInput.focus();
+                globalSearchInput.select();
+            }
         });
     }
 
     if (navCollections) {
         navCollections.addEventListener("click", () => {
             setActiveNavTab("navCollections");
-            const catSection = document.getElementById("categoriesRowSection");
-            if (catSection) {
-                catSection.scrollIntoView({ behavior: "smooth" });
-            } else {
-                const btn = document.getElementById("viewAllCollectionsBtn");
-                if (btn) btn.click();
-            }
+            openAllCollectionsModal();
         });
     }
 
@@ -150,9 +148,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         navLibrary.addEventListener("click", () => {
             setActiveNavTab("navLibrary");
             resetFiltersUI();
-            updateCollectionsDropdowns("", "");
+            store.state.showLibraryOnly = true;
             renderCatalog();
-            document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
+            document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
         });
     }
 
@@ -162,63 +160,156 @@ document.addEventListener("DOMContentLoaded", async () => {
             resetFiltersUI();
             store.state.showFavoritesOnly = true;
             renderCatalog();
-            document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
-            showToast(`Showing ${store.state.selectedSet.size} favorite wallpaper(s)`, "info");
+            document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
         });
     }
 
-    if (navPlaylists) {
-        navPlaylists.addEventListener("click", () => {
-            setActiveNavTab("navPlaylists");
-            const panel = document.getElementById("slideshowSettingsPanel");
-            if (panel) {
-                panel.classList.remove("hidden");
-                panel.scrollIntoView({ behavior: "smooth" });
+    // Sidebar Collapse Controls
+    const collapseSidebarBtn = document.getElementById("collapseSidebarBtn");
+    if (collapseSidebarBtn) {
+        collapseSidebarBtn.addEventListener("click", () => {
+            const layout = document.getElementById("appLayout");
+            if (layout) {
+                layout.classList.toggle("sidebar-collapsed");
+                const isCollapsed = layout.classList.contains("sidebar-collapsed");
+                localStorage.setItem("ws_sidebar_collapsed", isCollapsed ? "1" : "0");
             }
         });
     }
-
-    if (navHistory) {
-        navHistory.addEventListener("click", () => {
-            setActiveNavTab("navHistory");
-            const recent = document.getElementById("recentlyAddedSection");
-            if (recent) {
-                recent.scrollIntoView({ behavior: "smooth" });
-            }
-        });
+    if (localStorage.getItem("ws_sidebar_collapsed") === "1") {
+        document.getElementById("appLayout")?.classList.add("sidebar-collapsed");
     }
 
-    // Sidebar Tools Section Triggers
-    const toolSlideshow = document.getElementById("toolSlideshow");
-    const toolSync = document.getElementById("toolSync");
-    const toolMaintenance = document.getElementById("toolMaintenance");
+    // Right Control Panel Toggle Controls
+    const btnToggleControlPanel = document.getElementById("btnToggleControlPanel");
+    const closeRightPanelBtn = document.getElementById("closeRightPanelBtn");
+
+    function toggleRightControlPanel(forceOpen) {
+        const layout = document.getElementById("appLayout");
+        if (!layout) return;
+        if (typeof forceOpen === "boolean") {
+            layout.classList.toggle("right-panel-collapsed", !forceOpen);
+        } else {
+            layout.classList.toggle("right-panel-collapsed");
+        }
+        const isCollapsed = layout.classList.contains("right-panel-collapsed");
+        localStorage.setItem("ws_right_panel_collapsed", isCollapsed ? "1" : "0");
+    }
+
+    if (btnToggleControlPanel) {
+        btnToggleControlPanel.addEventListener("click", () => toggleRightControlPanel());
+    }
+    if (closeRightPanelBtn) {
+        closeRightPanelBtn.addEventListener("click", () => toggleRightControlPanel(false));
+    }
+    if (localStorage.getItem("ws_right_panel_collapsed") === "1") {
+        document.getElementById("appLayout")?.classList.add("right-panel-collapsed");
+    }
+
+    // Common DOM Elements
+    const globalSearchInput = document.getElementById("globalSearchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
     const toolSettings = document.getElementById("toolSettings");
+    const colFilter = document.getElementById("colFilter");
+    const tagFilter = document.getElementById("tagFilter");
+    const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+    const headerBackBtn = document.getElementById("headerBackBtn");
 
-    if (toolSlideshow) {
-        toolSlideshow.addEventListener("click", () => {
-            const panel = document.getElementById("slideshowSettingsPanel");
-            if (panel) panel.classList.toggle("hidden");
+    // Search Clear Button Trigger
+    if (clearSearchBtn && globalSearchInput) {
+        globalSearchInput.addEventListener("input", () => {
+            if (globalSearchInput.value.trim().length > 0) {
+                clearSearchBtn.classList.remove("hidden");
+            } else {
+                clearSearchBtn.classList.add("hidden");
+            }
         });
-    }
-
-    if (toolSync) {
-        toolSync.addEventListener("click", () => {
-            const quickSync = document.getElementById("quickActionSync");
-            if (quickSync) quickSync.click();
-        });
-    }
-
-    if (toolMaintenance) {
-        toolMaintenance.addEventListener("click", () => {
-            const quickHealth = document.getElementById("quickActionHealth");
-            if (quickHealth) quickHealth.click();
+        clearSearchBtn.addEventListener("click", () => {
+            globalSearchInput.value = "";
+            clearSearchBtn.classList.add("hidden");
+            renderCatalog();
+            globalSearchInput.focus();
         });
     }
 
     if (toolSettings) {
         toolSettings.addEventListener("click", () => {
-            const panel = document.getElementById("slideshowSettingsPanel");
-            if (panel) panel.classList.toggle("hidden");
+            toggleRightControlPanel(true);
+        });
+    }
+
+    // Permanent Review Trigger from Left Sidebar
+    const toolReview = document.getElementById("toolReview");
+    if (toolReview) {
+        toolReview.addEventListener("click", () => {
+            openReviewModal();
+        });
+    }
+
+    // Interactive Notification Center Flyout
+    const btnNotifications = document.getElementById("btnNotifications");
+    const notificationsFlyout = document.getElementById("notificationsFlyout");
+    const notifDot = document.getElementById("notifDot");
+    const notifMarkReadBtn = document.getElementById("notifMarkReadBtn");
+    const notifOpenReviewBtn = document.getElementById("notifOpenReviewBtn");
+    const notifOpenSettingsBtn = document.getElementById("notifOpenSettingsBtn");
+    const btnHelp = document.getElementById("btnHelp");
+
+    if (btnNotifications && notificationsFlyout) {
+        btnNotifications.addEventListener("click", (e) => {
+            e.stopPropagation();
+            notificationsFlyout.classList.toggle("hidden");
+            const isOpen = !notificationsFlyout.classList.contains("hidden");
+            btnNotifications.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            if (isOpen && notifDot) {
+                notifDot.classList.add("hidden");
+            }
+        });
+
+        // Close on click outside
+        document.addEventListener("click", (e) => {
+            if (!notificationsFlyout.classList.contains("hidden") && !notificationsFlyout.contains(e.target) && e.target !== btnNotifications) {
+                notificationsFlyout.classList.add("hidden");
+                btnNotifications.setAttribute("aria-expanded", "false");
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !notificationsFlyout.classList.contains("hidden")) {
+                notificationsFlyout.classList.add("hidden");
+                btnNotifications.setAttribute("aria-expanded", "false");
+            }
+        });
+    }
+
+    if (notifMarkReadBtn) {
+        notifMarkReadBtn.addEventListener("click", () => {
+            if (notifDot) notifDot.classList.add("hidden");
+            const countBadge = document.getElementById("notifCountBadge");
+            if (countBadge) countBadge.textContent = "0";
+            notificationsFlyout?.classList.add("hidden");
+            showToast("Notifications marked as read", "info");
+        });
+    }
+
+    if (notifOpenReviewBtn) {
+        notifOpenReviewBtn.addEventListener("click", () => {
+            notificationsFlyout?.classList.add("hidden");
+            openReviewModal();
+        });
+    }
+
+    if (notifOpenSettingsBtn) {
+        notifOpenSettingsBtn.addEventListener("click", () => {
+            notificationsFlyout?.classList.add("hidden");
+            toggleRightControlPanel(true);
+        });
+    }
+
+    if (btnHelp) {
+        btnHelp.addEventListener("click", () => {
+            import("./modules/quickActions.js").then(m => m.openHealthCheckModal());
         });
     }
 
@@ -226,20 +317,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
             e.preventDefault();
-            const searchInput = document.getElementById("globalSearchInput");
-            if (searchInput) {
-                searchInput.focus();
-                searchInput.select();
+            if (globalSearchInput) {
+                globalSearchInput.focus();
+                globalSearchInput.select();
             }
         }
     });
-
-    // Attach basic page event listeners
-    const colFilter = document.getElementById("colFilter");
-    const tagFilter = document.getElementById("tagFilter");
-    const clearFiltersBtn = document.getElementById("clearFiltersBtn");
-    const headerBackBtn = document.getElementById("headerBackBtn");
-    const globalSearchInput = document.getElementById("globalSearchInput");
 
     if (colFilter) {
         colFilter.addEventListener("change", renderCatalog);
@@ -452,32 +535,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         wireRowButtons(recentlyAddedRow, document.getElementById("recentlyAddedPrevBtn"), document.getElementById("recentlyAddedNextBtn"));
         wireRowButtons(randomRow, document.getElementById("randomPrevBtn"), document.getElementById("randomNextBtn"));
         wireRowButtons(categoriesGrid, document.getElementById("categoriesPrevBtn"), document.getElementById("categoriesNextBtn"));
-
-        // Auto scrolling rows math
-        const startRowAutoScroll = (row, speed = 1, intervalMs = 45) => {
-            if (!row) return;
-            let direction = 1;
-
-            setInterval(() => {
-                if (store.state.activeHoveredElement === row || row.classList.contains("active-dragging")) {
-                    return;
-                }
-
-                const maxScroll = row.scrollWidth - row.clientWidth;
-                if (maxScroll <= 0) return;
-
-                row.scrollLeft += speed * direction;
-
-                if (row.scrollLeft >= maxScroll - 1) {
-                    direction = -1;
-                } else if (row.scrollLeft <= 1) {
-                    direction = 1;
-                }
-            }, intervalMs);
-        };
-
-        if (recentlyAddedRow) startRowAutoScroll(recentlyAddedRow);
-        if (randomRow) startRowAutoScroll(randomRow);
     }
 
     // Global Keydown arrow keys listener for scrolling rows or active slides

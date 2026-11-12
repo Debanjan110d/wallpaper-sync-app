@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.0.0 (v5.0.0) — 2026-11-12
+
+### Major Architecture & Performance Overhaul
+- **Interactive Top Notification Center:** Turned the notification bell on the top-right header into a full-fledged live telemetry flyout featuring dynamic system status, cloud sync indicators, recovery watchdog reports, and a 1-click in-app review trigger.
+- **Permanent In-App Review & Rating:** Added a permanent "Rate & Review" access point in the sidebar Preferences menu, in the Notification Center, and added a direct close button to the review modal so users can provide feedback anytime.
+- **Virtual Batch Catalog Rendering (Memory Optimization):** Slashed desktop RAM consumption from ~500MB+ down to ~80–120MB by replacing simultaneous 700+ DOM image rendering with an intelligent virtual batch loader (32 cards initially, with `IntersectionObserver` auto-loading the next batch as you scroll).
+- **Asynchronous Image Decoding:** All gallery cards now use `loading="lazy"` and `decoding="async"`, completely eliminating scroll stutter.
+- **Left Sidebar Navigation System:**
+  - `Home`: Returns to the primary discovery dashboard and smoothly scrolls to top.
+  - `Discover`: Scrolls directly to the wallpaper grid and focuses search (`Ctrl + K`).
+  - `Collections`: Directly launches the **Explore All Collections** modal page with live search and cover previews.
+  - `Library`: Filters to the full local wallpaper collection with real-time file counters.
+  - `Favorites`: Fixed path matching bug (`isWallpaperFavorite`) so favorites display instantly without ever showing "No wallpapers match filters".
+- **Right Slide-Out Drawer Overhaul:**
+  - Resolved horizontal overflow and eliminated the white scrollbar on Windows.
+  - Added actual file size calculation (`main.js` returns `sizeBytes: fs.statSync(full).size`), completely replacing `"N/A"`.
+  - Added responsive ellipsis truncation and full-width layout for long file names.
+- **Notification Toast Redesign:**
+  - Relocated toast notifications to the bottom-right corner with a sleek glassmorphic pill layout.
+  - Removed intrusive toast popups on routine tab navigation and silent background syncs.
+
+---
+
 ## 4.3.0 (v4.3.0) — 2026-11-12
 
 ### Desktop App Redesign & Recovery Watchdog

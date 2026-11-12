@@ -362,8 +362,10 @@ function createMainWindow() {
     return;
   }
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 1220,
+    height: 820,
+    minWidth: 860,
+    minHeight: 600,
     show: false,
     autoHideMenuBar: true,
     icon: path.join(__dirname, "icon.png"),
@@ -373,7 +375,10 @@ function createMainWindow() {
     }
   });
   mainWindow.loadFile(path.join(__dirname, "ui", "index.html"));
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
   mainWindow.on("show", () => {
     if (mainWindow && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send("app:window-shown");
@@ -484,7 +489,10 @@ function getImages() {
 
   if (fs.existsSync(sourceDir)) {
     fs.readdirSync(sourceDir).filter(f => f.match(/\.(jpg|jpeg|png|webp)$/i)).forEach(f => {
-      files.push({ filename: f, path: path.join(sourceDir, f) });
+      const full = path.join(sourceDir, f);
+      let sizeBytes = 0;
+      try { sizeBytes = fs.statSync(full).size || 0; } catch {}
+      files.push({ filename: f, path: full, sizeBytes });
     });
   }
   if (fs.existsSync(userDir)) {
@@ -494,18 +502,22 @@ function getImages() {
       .map((f) => {
         const full = path.join(userDir, f);
         let mtimeMs = 0;
+        let sizeBytes = 0;
         try {
-          mtimeMs = fs.statSync(full).mtimeMs || 0;
+          const st = fs.statSync(full);
+          mtimeMs = st.mtimeMs || 0;
+          sizeBytes = st.size || 0;
         } catch {
           mtimeMs = 0;
+          sizeBytes = 0;
         }
-        return { filename: f, path: full, mtimeMs };
+        return { filename: f, path: full, mtimeMs, sizeBytes };
       })
       .sort((a, b) => a.mtimeMs - b.mtimeMs);
 
     for (const f of userFiles) {
       if (!files.find((existing) => existing.filename === f.filename)) {
-        files.push({ filename: f.filename, path: f.path });
+        files.push({ filename: f.filename, path: f.path, sizeBytes: f.sizeBytes });
       }
     }
   }
@@ -594,7 +606,12 @@ async function nextSlideshowImage() {
     // Add a small delay to ensure file is ready
     await new Promise((resolve) => setTimeout(resolve, 100));
     await setWallpaper(image.path);
-    if (mainWindow) mainWindow.webContents.send("sync-complete");
+    settings.activeWallpaper = image.path;
+    saveSettings(settings);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("sync-complete");
+      mainWindow.webContents.send("wallpaper:changed", { path: image.path, filename: image.filename });
+    }
   } catch (err) {
     console.error("Slideshow error:", err.message);
     console.error("Full error:", err);
@@ -911,8 +928,6 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
   checkForNewWallpapersOnce();
 
   registerWindowsStartupOnce();
-
-  setupAutoUpdater();
 
   const isStartupLaunch =
     process.platform === "win32" && app.getLoginItemSettings().wasOpenedAtLogin;

@@ -798,7 +798,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              Wallpaper Sync Administration Portal • v4.3.0 • 📊 <strong>{totalCount}</strong> Wallpapers
+              Wallpaper Sync Administration Portal • v5.0.0 • 📊 <strong>{totalCount}</strong> Wallpapers
             </p>
           </div>
         </div>
