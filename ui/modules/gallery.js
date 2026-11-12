@@ -48,6 +48,7 @@ export function resetDynamicAccentColor() {
 export function resetFiltersUI() {
     store.state.selectedColorFilter = "";
     store.state.selectedTagFilters = [];
+    store.state.showFavoritesOnly = false;
     
     // Reset quick tag pills active state
     document.querySelectorAll("#quickTagsList .quick-tag-pill").forEach(p => p.classList.remove("active"));
@@ -375,19 +376,38 @@ export function renderRecentlyAdded() {
         const extraCount = wtags.length - 3;
         const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
 
+        const isFav = store.state.selectedSet.has(String(img.path));
+
         const card = document.createElement("div");
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
             <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
-            <div class="horizontal-card-info">
-                <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
-                <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
-                <div class="horizontal-card-meta">
-                    <span>${colNames}</span>
-                </div>
+            <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                ${isFav ? '❤️' : '♡'}
+            </button>
+            <div class="horizontal-card-overlay">
+                <div class="horizontal-card-title">${friendlyName}</div>
+                <div class="horizontal-card-meta">${colNames}</div>
             </div>
         `;
+
+        const favBtn = card.querySelector(".card-fav-btn");
+        if (favBtn) {
+            favBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const key = String(img.path);
+                const isSelected = !store.state.selectedSet.has(key);
+                if (isSelected) store.state.selectedSet.add(key);
+                else store.state.selectedSet.delete(key);
+                favBtn.classList.toggle("active", isSelected);
+                favBtn.textContent = isSelected ? "❤️" : "♡";
+                await window.api.toggleSelection(key, isSelected);
+                const navFav = document.getElementById("navFavoritesBadge");
+                if (navFav) navFav.textContent = String(store.state.selectedSet.size);
+                showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
+            });
+        }
 
         card.addEventListener("click", () => openDetailDrawer(img));
         container.appendChild(card);
@@ -432,19 +452,38 @@ export function renderRandomDiscoveries() {
         const extraCount = wtags.length - 3;
         const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
 
+        const isFav = store.state.selectedSet.has(String(img.path));
+
         const card = document.createElement("div");
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
             <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
-            <div class="horizontal-card-info">
-                <div class="horizontal-card-title" style="margin-bottom: 2px;">${friendlyName}</div>
-                <div class="horizontal-card-tags" style="font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${wtags.map(t => '#' + t.name).join(" ")}">${displayName || "No tags"}</div>
-                <div class="horizontal-card-meta">
-                    <span>${colNames}</span>
-                </div>
+            <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                ${isFav ? '❤️' : '♡'}
+            </button>
+            <div class="horizontal-card-overlay">
+                <div class="horizontal-card-title">${friendlyName}</div>
+                <div class="horizontal-card-meta">${colNames}</div>
             </div>
         `;
+
+        const favBtn = card.querySelector(".card-fav-btn");
+        if (favBtn) {
+            favBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const key = String(img.path);
+                const isSelected = !store.state.selectedSet.has(key);
+                if (isSelected) store.state.selectedSet.add(key);
+                else store.state.selectedSet.delete(key);
+                favBtn.classList.toggle("active", isSelected);
+                favBtn.textContent = isSelected ? "❤️" : "♡";
+                await window.api.toggleSelection(key, isSelected);
+                const navFav = document.getElementById("navFavoritesBadge");
+                if (navFav) navFav.textContent = String(store.state.selectedSet.size);
+                showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
+            });
+        }
 
         card.addEventListener("click", () => openDetailDrawer(img));
         container.appendChild(card);
@@ -518,6 +557,7 @@ export function renderCatalog() {
         const matchedCols = store.state.localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
 
         // Mandatory dropdown filters
+        if (store.state.showFavoritesOnly && !store.state.selectedSet.has(hash)) return null;
         if (colFilterId && !collectionIds.some(id => String(id) === String(colFilterId))) return null;
         if (tagFilterId && (!meta.tags || !meta.tags.includes(Number(tagFilterId)))) return null;
         if (store.state.selectedTagFilters && store.state.selectedTagFilters.length > 0) {
@@ -592,6 +632,27 @@ export function renderCatalog() {
             card.appendChild(overlay);
         } else {
             card.appendChild(img);
+
+            const isFav = store.state.selectedSet.has(String(imgData.path));
+            const favBtn = document.createElement("button");
+            favBtn.className = `card-fav-btn ${isFav ? 'active' : ''}`;
+            favBtn.type = "button";
+            favBtn.title = isFav ? "Remove from favorites" : "Add to favorites";
+            favBtn.innerHTML = isFav ? "❤️" : "♡";
+            favBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const key = String(imgData.path);
+                const isSelected = !store.state.selectedSet.has(key);
+                if (isSelected) store.state.selectedSet.add(key);
+                else store.state.selectedSet.delete(key);
+                favBtn.classList.toggle("active", isSelected);
+                favBtn.innerHTML = isSelected ? "❤️" : "♡";
+                await window.api.toggleSelection(key, isSelected);
+                const navFav = document.getElementById("navFavoritesBadge");
+                if (navFav) navFav.textContent = String(store.state.selectedSet.size);
+                showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
+            });
+            card.appendChild(favBtn);
         }
 
         const hash = imgData.filename.split(".")[0];

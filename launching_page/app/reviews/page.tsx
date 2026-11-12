@@ -30,13 +30,13 @@ export default function ReviewsPage() {
   useEffect(() => {
     const getReviews = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-        const targetUrl = apiBase ? `${apiBase.replace(/\/$/, "")}/api/reviews` : "/api/reviews";
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://wallpaper-sync-app.vercel.app";
+        const targetUrl = `${apiBase.replace(/\/$/, "")}/api/reviews`;
         
         let res = await fetch(targetUrl);
-        if (!res.ok && !apiBase) {
-          // Fallback to production web API if relative API route is not hosted locally
-          res = await fetch("https://wallpaper-sync-app-web.vercel.app/api/reviews");
+        if (!res.ok) {
+          // Fallback directly to production web API
+          res = await fetch("https://wallpaper-sync-app.vercel.app/api/reviews");
         }
 
         if (res.ok) {

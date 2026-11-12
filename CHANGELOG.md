@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.3.0 (v4.3.0) — 2026-11-12
+
+### Desktop App Redesign & Recovery Watchdog
+- **Desktop Studio Evolution:** Evolved the Windows desktop application into a 3-column layout (Left Navigation, Center Wallpaper Discovery Viewport, Right Control Panel) styled with a deep dark palette (`#080D1B`), surface elevations (`#111A30`), and purple/indigo accents (`#7838F5`, `#A855F7`).
+- **Real Background Recovery Watchdog:** Implemented an autonomous background service (`recoveryWatchdog.js`) that monitors Windows session and power events (`resume`, `unlock-screen`, registry checks) to auto-restore the intended desktop wallpaper if Windows overrides or resets it.
+- **Dedicated Right-Side Control Panel:** Quick slideshow controls, real-time "Now Playing" desktop wallpaper card, system status telemetry, and live watchdog status toggle.
+- **Quick Actions Row:** Instant access buttons for `⚡ Apply Random`, `🖥️ Start Slideshow`, `🔄 Sync Library`, and `🔧 Health Check`.
+- **Card Enhancements:** 16:9 widescreen previews with 1-click heart favorite toggles, hover quick-apply, and cleaner metadata pills.
+
+### Collection Search Filtering (Admin Dashboard)
+- **Live Collection Search:** Added real-time search input filters to all collection selection interfaces in [web/app/page.tsx](file:///d:/projects/wallpaper-sync-app/web/app/page.tsx):
+  - **Upload Form:** Quickly filter through collection chips while retaining selected collections.
+  - **Bulk Edit Floating Bar:** Search and filter multi-assign collection checkboxes.
+  - **Individual Edit Modal:** Search collections inside the metadata editor modal.
+
+### Usage-Based Review Prompts & Client Website Fix
+- **3-Day Usage Threshold:** Users are prompted for a review only after using the app for at least 3 days (`firstUsedAt`).
+- **10-Day Snooze Interval:** Dismissed prompts ("Maybe Later") snooze for 10 days before checking again.
+- **Permanent Completion Flag:** Once a review is submitted, `alreadyReviewed` is stored in `settings.json`, disabling future prompts.
+- **Client Website Live Sync:** Cleaned out mock/test reviews from Supabase Storage and pointed the client website (`launching_page/app/reviews/page.tsx`) to the live production API endpoint.
+
+---
+
 ## 4.2.0 (v4.2.0) — 2026-11-12
 
 ### Admin Panel Overhaul — Multi-Collection Architecture

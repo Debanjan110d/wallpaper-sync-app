@@ -130,6 +130,12 @@ const config = require("./config");
 const { syncWallpapers } = require("./downloader");
 const { setWallpaper } = require("./wallpaperManager");
 const { loadSettings, saveSettings } = require("./settings");
+const {
+  initWatchdog,
+  getWatchdogStatus,
+  setWatchdogEnabled,
+  verifyAndRecoverNow
+} = require("./recoveryWatchdog");
 const axios = require("axios");
 const {
   loadLocalMetadata,
@@ -883,6 +889,24 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
   settings = loadSettings();
   setupTray();
 
+  // Initialize Recovery Watchdog service
+  initWatchdog({
+    getSettings: () => settings,
+    saveSettings: (s) => saveSettings(s),
+    setWallpaper: async (fp) => {
+      await setWallpaper(fp);
+      settings.activeWallpaper = fp;
+      saveSettings(settings);
+    },
+    onRecovered: (evt) => {
+      console.log("[main] Watchdog auto-recovered wallpaper:", evt);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("watchdog:recovered", evt);
+        mainWindow.webContents.send("sync-complete");
+      }
+    }
+  });
+
   // Cold launch wallpaper update check (runs exactly once on startup)
   checkForNewWallpapersOnce();
 
@@ -1144,9 +1168,12 @@ ipcMain.handle("update-slideshow-order", (event, order) => {
 
 ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => {
   if (rating === 0) {
+    // User snoozed / ignored for later: remind after 10 days
+    const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+    settings.reviewRemindAfter = Date.now() + TEN_DAYS_MS;
     settings.wallpaperChangesCount = 0;
     saveSettings(settings);
-    return { success: true, dismissed: true };
+    return { success: true, dismissed: true, remindAfter: settings.reviewRemindAfter };
   }
   const syncConfig = getSyncConfig();
   let cleanUrl = syncConfig.API_URL.endsWith("/") ? syncConfig.API_URL.slice(0, -1) : syncConfig.API_URL;
@@ -1173,4 +1200,64 @@ ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => 
 
 ipcMain.handle("is-packaged", () => {
   return app.isPackaged;
+});
+
+// Recovery Watchdog IPC Handlers
+ipcMain.handle("watchdog:get-status", () => {
+  return getWatchdogStatus();
+});
+
+ipcMain.handle("watchdog:toggle", (event, enabled) => {
+  return setWatchdogEnabled(enabled);
+});
+
+ipcMain.handle("watchdog:verify-now", async () => {
+  return await verifyAndRecoverNow();
+});
+
+// System Health Check Handler
+ipcMain.handle("app:health-check", async () => {
+  const imagesDir = getTargetImagesDir();
+  let totalFiles = 0;
+  let readableFiles = 0;
+  let corruptedFiles = 0;
+  let totalBytes = 0;
+
+  if (fs.existsSync(imagesDir)) {
+    try {
+      const files = fs.readdirSync(imagesDir);
+      for (const file of files) {
+        if (!file.match(/\.(jpg|jpeg|png|webp|bmp)$/i)) continue;
+        totalFiles++;
+        const fullPath = path.join(imagesDir, file);
+        try {
+          const stats = fs.statSync(fullPath);
+          if (stats.size > 1024) { // larger than 1KB
+            readableFiles++;
+            totalBytes += stats.size;
+          } else {
+            corruptedFiles++;
+          }
+        } catch {
+          corruptedFiles++;
+        }
+      }
+    } catch (err) {
+      console.error("Health check directory error:", err);
+    }
+  }
+
+  const watchdogStatus = getWatchdogStatus();
+  const hasActiveWp = !!(settings.activeWallpaper && fs.existsSync(settings.activeWallpaper));
+
+  return {
+    healthy: corruptedFiles === 0 && hasActiveWp,
+    totalFiles,
+    readableFiles,
+    corruptedFiles,
+    diskUsageMB: Math.round(totalBytes / (1024 * 1024) * 10) / 10,
+    activeWallpaperValid: hasActiveWp,
+    activeWallpaper: settings.activeWallpaper || "None",
+    watchdogStatus
+  };
 });

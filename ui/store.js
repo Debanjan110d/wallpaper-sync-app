@@ -25,6 +25,7 @@ const state = {
     lightboxIndex: -1,
     isManualSyncInProgress: false,
     activeHoveredElement: null,
+    showFavoritesOnly: false,
 };
 
 // Lifecycle Data Fetchers and Synchronizers
@@ -50,12 +51,27 @@ export async function loadWallpapers() {
         slideshowSelectedCount.textContent = String(state.selectedSet.size);
     }
 
+    const navLibraryBadge = document.getElementById("navLibraryBadge");
+    if (navLibraryBadge) {
+        navLibraryBadge.textContent = String(state.currentImages.length);
+    }
+
+    const navFavoritesBadge = document.getElementById("navFavoritesBadge");
+    if (navFavoritesBadge) {
+        navFavoritesBadge.textContent = String(state.selectedSet.size);
+    }
+
     // Redraw lists
     renderHeroSlider();
     renderRecentlyAdded();
     renderRandomDiscoveries();
     renderCatalog();
     populateSlideshowSourceOptions();
+
+    // Notify control panel and cards of wallpaper catalog availability
+    if (typeof window !== "undefined" && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent("wallpaper:changed"));
+    }
 }
 
 export async function updateWallpaperInfo() {

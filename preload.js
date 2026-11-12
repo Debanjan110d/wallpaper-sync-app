@@ -37,5 +37,12 @@ contextBridge.exposeInMainWorld("api", {
   saveConnectionSettings: (apiUrl, syncToken) => ipcRenderer.invoke("save-connection-settings", apiUrl, syncToken),
   isPackaged: () => ipcRenderer.invoke("is-packaged"),
   onWindowShown: (callback) => ipcRenderer.on("app:window-shown", () => callback()),
-  onMetadataSyncProgress: (callback) => ipcRenderer.on("metadata-sync-progress", (event, data) => callback(data))
+  onMetadataSyncProgress: (callback) => ipcRenderer.on("metadata-sync-progress", (event, data) => callback(data)),
+
+  // Recovery Watchdog & System Health APIs
+  getWatchdogStatus: () => ipcRenderer.invoke("watchdog:get-status"),
+  toggleWatchdog: (enabled) => ipcRenderer.invoke("watchdog:toggle", enabled),
+  verifyWatchdogNow: () => ipcRenderer.invoke("watchdog:verify-now"),
+  onWatchdogRecovered: (callback) => ipcRenderer.on("watchdog:recovered", (event, data) => callback(data)),
+  performHealthCheck: () => ipcRenderer.invoke("app:health-check")
 });

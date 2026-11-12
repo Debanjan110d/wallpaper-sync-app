@@ -31,25 +31,60 @@ export function renderHeroSlider() {
             <img src="${toFileUrl(img.path)}" class="hero-slide-img" alt="${img.filename}" draggable="false" />
             <div class="hero-slide-overlay"></div>
             <div class="hero-slide-content">
-                <span class="hero-slide-tag">${catName}</span>
+                <div class="hero-featured-tag">✨ Featured Collection</div>
                 <h3 class="hero-slide-title">${colName}</h3>
-                <p class="hero-slide-desc">Recently added to your desktop wallpaper collection</p>
-                <button class="primary-btn slider-browse-btn" data-path="${img.path}">Apply Wallpaper</button>
+                <p class="hero-slide-desc">Breathtaking high-definition wallpapers for your desktop.</p>
+                <div class="hero-actions-row">
+                    <button class="hero-btn-primary slider-explore-btn">
+                        <span>Explore Collection</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                    <button class="hero-btn-secondary slider-apply-btn" data-path="${img.path}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span>Quick Apply</span>
+                    </button>
+                </div>
             </div>
         `;
 
-        slide.querySelector(".slider-browse-btn").addEventListener("click", async (e) => {
-            e.stopPropagation();
-            const btn = e.target;
-            btn.textContent = "Applying...";
-            await window.api.setWallpaper(img.path);
-            btn.textContent = "Applied!";
-            setTimeout(() => { btn.textContent = "Apply Wallpaper"; }, 2000);
-            
-            // Trigger review eligibility check after application
-            store.state.settings = await window.api.getSettings();
-            import("./modal.js").then(m => m.checkReviewEligibility());
-        });
+        const applyBtn = slide.querySelector(".slider-apply-btn");
+        if (applyBtn) {
+            applyBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                applyBtn.querySelector("span").textContent = "Applying...";
+                await window.api.setWallpaper(img.path);
+                store.state.settings.activeWallpaper = img.path;
+                applyBtn.querySelector("span").textContent = "Applied!";
+                
+                // Dispatch wallpaper change event
+                window.dispatchEvent(new CustomEvent("wallpaper:changed", { detail: img }));
+
+                setTimeout(() => {
+                    if (applyBtn.querySelector("span")) applyBtn.querySelector("span").textContent = "Quick Apply";
+                }, 2000);
+
+                // Trigger review eligibility check after application
+                store.state.settings = await window.api.getSettings();
+                import("./modal.js").then(m => m.checkReviewEligibility());
+            });
+        }
+
+        const exploreBtn = slide.querySelector(".slider-explore-btn");
+        if (exploreBtn) {
+            exploreBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const colFilter = document.getElementById("colFilter");
+                if (colFilter && meta.collection_id) {
+                    colFilter.value = meta.collection_id;
+                    colFilter.dispatchEvent(new Event("change"));
+                }
+                document.getElementById("catalogFilterSection")?.scrollIntoView({ behavior: "smooth" });
+            });
+        }
 
         container.appendChild(slide);
     });

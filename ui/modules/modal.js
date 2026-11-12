@@ -6,11 +6,28 @@ let selectedRating = 0;
 
 // 1. Review Prompt Modal Logic
 export function checkReviewEligibility() {
-    const settings = store.state.settings;
-    const count = settings.wallpaperChangesCount || 0;
-    if (count >= 5 && !settings.alreadyReviewed) {
-        openReviewModal();
+    const settings = store.state.settings || {};
+    
+    // If user already reviewed, never prompt again
+    if (settings.alreadyReviewed) {
+        return;
     }
+
+    const now = Date.now();
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+    // Must have used app for at least 3 days
+    const firstUsedAt = settings.firstUsedAt || now;
+    if (now - firstUsedAt < THREE_DAYS_MS) {
+        return;
+    }
+
+    // If postponed/ignored, wait until 10 days cooldown has passed
+    if (settings.reviewRemindAfter && now < settings.reviewRemindAfter) {
+        return;
+    }
+
+    openReviewModal();
 }
 
 export function openReviewModal() {
@@ -86,10 +103,15 @@ export function initReviewModal() {
 
     if (reviewCancelBtn) {
         reviewCancelBtn.addEventListener("click", async () => {
-            await window.api.submitReview(0, "", ""); // rating = 0 resets local counter
+            const res = await window.api.submitReview(0, "", ""); // rating = 0 snoozes for 10 days
+            if (res && res.remindAfter) {
+                store.state.settings.reviewRemindAfter = res.remindAfter;
+            } else {
+                store.state.settings.reviewRemindAfter = Date.now() + 10 * 24 * 60 * 60 * 1000;
+            }
             store.state.settings.wallpaperChangesCount = 0;
             reviewModal?.classList.add("hidden");
-            showToast("Reminding you later", "success");
+            showToast("We'll remind you in 10 days!", "info");
         });
     }
 

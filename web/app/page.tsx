@@ -183,6 +183,11 @@ export default function Page() {
   const [tagSearchBulk, setTagSearchBulk] = useState("");
   const [tagSearchEdit, setTagSearchEdit] = useState("");
 
+  // Collection Search states for different forms
+  const [colSearchUpload, setColSearchUpload] = useState("");
+  const [colSearchBulk, setColSearchBulk] = useState("");
+  const [colSearchEdit, setColSearchEdit] = useState("");
+
   // Upload Progress State
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; currentFileName: string } | null>(null);
 
@@ -793,7 +798,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              Wallpaper Sync Administration Portal • v4.2.0 • 📊 <strong>{totalCount}</strong> Wallpapers
+              Wallpaper Sync Administration Portal • v4.3.0 • 📊 <strong>{totalCount}</strong> Wallpapers
             </p>
           </div>
         </div>
@@ -1072,20 +1077,43 @@ export default function Page() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "8px", border: "1px solid var(--border)", borderRadius: 6, background: "rgba(0,0,0,0.15)", maxHeight: "100px", overflowY: "auto" }}>
-                    {collections.length === 0 && <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No collections yet</span>}
-                    {collections.map((col) => (
-                      <button
-                        key={col.id}
-                        type="button"
-                        onClick={() => setSelectedCollectionsForUpload((prev) => prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id])}
-                        className={`tag-chip ${selectedCollectionsForUpload.includes(col.id) ? "active" : ""}`}
-                        style={{ fontSize: "0.78rem" }}
-                      >
-                        📁 {col.name}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <input
+                      type="text"
+                      placeholder="🔍 Search collections..."
+                      value={colSearchUpload}
+                      onChange={(e) => setColSearchUpload(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--border)",
+                        background: "rgba(0,0,0,0.2)",
+                        color: "white",
+                        fontSize: "0.85rem",
+                        marginBottom: "0.5rem",
+                      }}
+                    />
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "8px", border: "1px solid var(--border)", borderRadius: 6, background: "rgba(0,0,0,0.15)", maxHeight: "100px", overflowY: "auto" }}>
+                      {collections.length === 0 && <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No collections yet</span>}
+                      {collections
+                        .filter((col) =>
+                          col.name.toLowerCase().includes(colSearchUpload.toLowerCase()) ||
+                          selectedCollectionsForUpload.includes(col.id)
+                        )
+                        .map((col) => (
+                          <button
+                            key={col.id}
+                            type="button"
+                            onClick={() => setSelectedCollectionsForUpload((prev) => prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id])}
+                            className={`tag-chip ${selectedCollectionsForUpload.includes(col.id) ? "active" : ""}`}
+                            style={{ fontSize: "0.78rem" }}
+                          >
+                            📁 {col.name}
+                          </button>
+                        ))}
+                    </div>
+                  </>
                 )}
                 {selectedCollectionsForUpload.length > 0 && (
                   <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
@@ -1687,22 +1715,43 @@ export default function Page() {
               <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#ffb340", marginBottom: "6px" }}>
                 📁 Multi-Assign Collections ({bulkCollectionIds.length})
               </div>
+              <input
+                type="text"
+                placeholder="🔍 Search collections..."
+                value={colSearchBulk}
+                onChange={(e) => setColSearchBulk(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  border: "1px solid var(--border)",
+                  background: "rgba(0,0,0,0.2)",
+                  color: "white",
+                  fontSize: "0.78rem",
+                  marginBottom: "0.5rem",
+                }}
+              />
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "80px", overflowY: "auto" }}>
-                {collections.map((col) => (
-                  <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.78rem", cursor: "pointer", background: bulkCollectionIds.includes(col.id) ? "rgba(255, 179, 64, 0.2)" : "rgba(255, 255, 255, 0.04)", padding: "3px 8px", borderRadius: "4px", border: bulkCollectionIds.includes(col.id) ? "1px solid #ffb340" : "1px solid transparent", color: bulkCollectionIds.includes(col.id) ? "#ffca75" : "var(--text-muted)" }}>
-                    <input
-                      type="checkbox"
-                      checked={bulkCollectionIds.includes(col.id)}
-                      onChange={() => {
-                        setBulkCollectionIds((prev) =>
-                          prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id]
-                        );
-                      }}
-                      style={{ width: 12, height: 12, accentColor: "#ffb340" }}
-                    />
-                    <span>{col.name}</span>
-                  </label>
-                ))}
+                {collections
+                  .filter((col) =>
+                    col.name.toLowerCase().includes(colSearchBulk.toLowerCase()) ||
+                    bulkCollectionIds.includes(col.id)
+                  )
+                  .map((col) => (
+                    <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.78rem", cursor: "pointer", background: bulkCollectionIds.includes(col.id) ? "rgba(255, 179, 64, 0.2)" : "rgba(255, 255, 255, 0.04)", padding: "3px 8px", borderRadius: "4px", border: bulkCollectionIds.includes(col.id) ? "1px solid #ffb340" : "1px solid transparent", color: bulkCollectionIds.includes(col.id) ? "#ffca75" : "var(--text-muted)" }}>
+                      <input
+                        type="checkbox"
+                        checked={bulkCollectionIds.includes(col.id)}
+                        onChange={() => {
+                          setBulkCollectionIds((prev) =>
+                            prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id]
+                          );
+                        }}
+                        style={{ width: 12, height: 12, accentColor: "#ffb340" }}
+                      />
+                      <span>{col.name}</span>
+                    </label>
+                  ))}
               </div>
             </div>
 
@@ -1796,13 +1845,34 @@ export default function Page() {
             {/* Many-to-many Collection selection checkboxes */}
             <div className="form-group">
               <label style={{ fontWeight: "bold", display: "block", marginBottom: "8px" }}>Assigned Collections (Multi-Select)</label>
+              <input
+                type="text"
+                placeholder="🔍 Search collections..."
+                value={colSearchEdit}
+                onChange={(e) => setColSearchEdit(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "rgba(0,0,0,0.2)",
+                  color: "white",
+                  fontSize: "0.85rem",
+                  marginBottom: "0.5rem",
+                }}
+              />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px", maxHeight: "120px", overflowY: "auto", border: "1px solid var(--border)", padding: "10px", borderRadius: "6px", background: "rgba(0,0,0,0.1)" }}>
-                {collections.map((col) => (
-                  <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", cursor: "pointer" }}>
-                    <input type="checkbox" checked={editCollectionIds.includes(col.id)} onChange={() => toggleCollectionEditCheckbox(col.id)} style={{ width: 14, height: 14 }} />
-                    <span>{col.name}</span>
-                  </label>
-                ))}
+                {collections
+                  .filter((col) =>
+                    col.name.toLowerCase().includes(colSearchEdit.toLowerCase()) ||
+                    editCollectionIds.includes(col.id)
+                  )
+                  .map((col) => (
+                    <label key={col.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", cursor: "pointer" }}>
+                      <input type="checkbox" checked={editCollectionIds.includes(col.id)} onChange={() => toggleCollectionEditCheckbox(col.id)} style={{ width: 14, height: 14 }} />
+                      <span>{col.name}</span>
+                    </label>
+                  ))}
               </div>
             </div>
 

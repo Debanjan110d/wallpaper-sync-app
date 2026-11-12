@@ -19,6 +19,8 @@ import {
 import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
 import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI } from "./modules/modal.js";
+import { initQuickActions } from "./modules/quickActions.js";
+import { initControlPanel } from "./modules/controlPanel.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
     // Initial Setup and Lifecycles
@@ -87,6 +89,150 @@ document.addEventListener("DOMContentLoaded", async () => {
     initDrawer();
     initPlayer();
     initReviewModal();
+    initQuickActions();
+    initControlPanel();
+
+    // Setup Sidebar Tab Navigation
+    function setActiveNavTab(activeId) {
+        document.querySelectorAll(".sidebar-nav-section .nav-item").forEach(item => {
+            if (item.id === activeId) {
+                item.classList.add("active");
+            } else {
+                item.classList.remove("active");
+            }
+        });
+    }
+
+    const navHome = document.getElementById("navHome");
+    const navDiscover = document.getElementById("navDiscover");
+    const navCollections = document.getElementById("navCollections");
+    const navLibrary = document.getElementById("navLibrary");
+    const navFavorites = document.getElementById("navFavorites");
+    const navPlaylists = document.getElementById("navPlaylists");
+    const navHistory = document.getElementById("navHistory");
+
+    if (navHome) {
+        navHome.addEventListener("click", () => {
+            setActiveNavTab("navHome");
+            resetFiltersUI();
+            updateCollectionsDropdowns("", "");
+            renderCatalog();
+            document.getElementById("dashboardBody")?.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    }
+
+    if (navDiscover) {
+        navDiscover.addEventListener("click", () => {
+            setActiveNavTab("navDiscover");
+            resetFiltersUI();
+            updateCollectionsDropdowns("", "");
+            renderCatalog();
+            document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
+            const searchInput = document.getElementById("globalSearchInput");
+            if (searchInput) searchInput.focus();
+        });
+    }
+
+    if (navCollections) {
+        navCollections.addEventListener("click", () => {
+            setActiveNavTab("navCollections");
+            const catSection = document.getElementById("categoriesRowSection");
+            if (catSection) {
+                catSection.scrollIntoView({ behavior: "smooth" });
+            } else {
+                const btn = document.getElementById("viewAllCollectionsBtn");
+                if (btn) btn.click();
+            }
+        });
+    }
+
+    if (navLibrary) {
+        navLibrary.addEventListener("click", () => {
+            setActiveNavTab("navLibrary");
+            resetFiltersUI();
+            updateCollectionsDropdowns("", "");
+            renderCatalog();
+            document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
+        });
+    }
+
+    if (navFavorites) {
+        navFavorites.addEventListener("click", () => {
+            setActiveNavTab("navFavorites");
+            resetFiltersUI();
+            store.state.showFavoritesOnly = true;
+            renderCatalog();
+            document.getElementById("catalogSection")?.scrollIntoView({ behavior: "smooth" });
+            showToast(`Showing ${store.state.selectedSet.size} favorite wallpaper(s)`, "info");
+        });
+    }
+
+    if (navPlaylists) {
+        navPlaylists.addEventListener("click", () => {
+            setActiveNavTab("navPlaylists");
+            const panel = document.getElementById("slideshowSettingsPanel");
+            if (panel) {
+                panel.classList.remove("hidden");
+                panel.scrollIntoView({ behavior: "smooth" });
+            }
+        });
+    }
+
+    if (navHistory) {
+        navHistory.addEventListener("click", () => {
+            setActiveNavTab("navHistory");
+            const recent = document.getElementById("recentlyAddedSection");
+            if (recent) {
+                recent.scrollIntoView({ behavior: "smooth" });
+            }
+        });
+    }
+
+    // Sidebar Tools Section Triggers
+    const toolSlideshow = document.getElementById("toolSlideshow");
+    const toolSync = document.getElementById("toolSync");
+    const toolMaintenance = document.getElementById("toolMaintenance");
+    const toolSettings = document.getElementById("toolSettings");
+
+    if (toolSlideshow) {
+        toolSlideshow.addEventListener("click", () => {
+            const panel = document.getElementById("slideshowSettingsPanel");
+            if (panel) panel.classList.toggle("hidden");
+        });
+    }
+
+    if (toolSync) {
+        toolSync.addEventListener("click", () => {
+            const quickSync = document.getElementById("quickActionSync");
+            if (quickSync) quickSync.click();
+        });
+    }
+
+    if (toolMaintenance) {
+        toolMaintenance.addEventListener("click", () => {
+            const quickHealth = document.getElementById("quickActionHealth");
+            if (quickHealth) quickHealth.click();
+        });
+    }
+
+    if (toolSettings) {
+        toolSettings.addEventListener("click", () => {
+            const panel = document.getElementById("slideshowSettingsPanel");
+            if (panel) panel.classList.toggle("hidden");
+        });
+    }
+
+    // Global Ctrl+K Shortcut to focus search bar
+    document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            const searchInput = document.getElementById("globalSearchInput");
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+    });
 
     // Attach basic page event listeners
     const colFilter = document.getElementById("colFilter");
