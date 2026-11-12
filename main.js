@@ -1230,49 +1230,190 @@ ipcMain.handle("watchdog:verify-now", async () => {
   return await verifyAndRecoverNow();
 });
 
-// System Health Check Handler
+// System Health Check & Auto-Repair Engine
 ipcMain.handle("app:health-check", async () => {
-  const imagesDir = getTargetImagesDir();
+  const sourceDir = config.SOURCE_DIR;
+  const userDir = config.WALLPAPER_DIR;
   let totalFiles = 0;
   let readableFiles = 0;
   let corruptedFiles = 0;
   let totalBytes = 0;
+  const scannedPaths = new Set();
+  const corruptedList = [];
 
-  if (fs.existsSync(imagesDir)) {
+  const checkDir = (dirPath) => {
+    if (!dirPath || !fs.existsSync(dirPath)) return;
     try {
-      const files = fs.readdirSync(imagesDir);
+      const files = fs.readdirSync(dirPath);
       for (const file of files) {
         if (!file.match(/\.(jpg|jpeg|png|webp|bmp)$/i)) continue;
+        const fullPath = path.join(dirPath, file);
+        if (scannedPaths.has(fullPath)) continue;
+        scannedPaths.add(fullPath);
         totalFiles++;
-        const fullPath = path.join(imagesDir, file);
         try {
           const stats = fs.statSync(fullPath);
-          if (stats.size > 1024) { // larger than 1KB
+          if (stats.size >= 512) {
             readableFiles++;
             totalBytes += stats.size;
           } else {
             corruptedFiles++;
+            corruptedList.push(fullPath);
           }
         } catch {
           corruptedFiles++;
+          corruptedList.push(fullPath);
         }
       }
     } catch (err) {
-      console.error("Health check directory error:", err);
+      console.error("[HealthCheck] scan error for dir:", dirPath, err);
     }
-  }
+  };
+
+  checkDir(sourceDir);
+  checkDir(userDir);
 
   const watchdogStatus = getWatchdogStatus();
   const hasActiveWp = !!(settings.activeWallpaper && fs.existsSync(settings.activeWallpaper));
 
+  // Network Connectivity Check (ping API with timeout)
+  let networkOnline = false;
+  let pingMs = 0;
+  try {
+    const t0 = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const resp = await fetch(config.API_URL, { method: "HEAD", signal: controller.signal });
+    clearTimeout(timeoutId);
+    pingMs = Date.now() - t0;
+    networkOnline = resp.ok || resp.status < 500;
+  } catch {
+    networkOnline = false;
+  }
+
+  // Memory & Resource Usage
+  const memUsage = process.memoryUsage();
+  const memoryRssMB = Math.round((memUsage.rss / (1024 * 1024)) * 10) / 10;
+  const heapUsedMB = Math.round((memUsage.heapUsed / (1024 * 1024)) * 10) / 10;
+
+  // Auto-start at Windows login
+  let autoStartEnabled = false;
+  try {
+    autoStartEnabled = !!app.getLoginItemSettings().openAtLogin;
+  } catch {}
+
+  // Compile issues & suggestions
+  const issues = [];
+  if (corruptedFiles > 0) {
+    issues.push({
+      id: "corrupted_files",
+      severity: "warning",
+      title: `${corruptedFiles} Damaged File(s) Detected`,
+      description: "Found corrupted or zero-byte image files that cannot be decoded.",
+      actionLabel: "Clean Corrupted Files"
+    });
+  }
+  if (!hasActiveWp && totalFiles > 0) {
+    issues.push({
+      id: "active_wallpaper_missing",
+      severity: "critical",
+      title: "Active Wallpaper Unset or Missing",
+      description: "The currently designated desktop wallpaper does not exist on disk.",
+      actionLabel: "Reapply Default Wallpaper"
+    });
+  }
+  if (!watchdogStatus.enabled) {
+    issues.push({
+      id: "watchdog_disabled",
+      severity: "info",
+      title: "Recovery Watchdog Inactive",
+      description: "Watchdog is disabled; wallpapers won't auto-restore if overwritten by Windows.",
+      actionLabel: "Enable Watchdog"
+    });
+  }
+  if (!networkOnline) {
+    issues.push({
+      id: "cloud_offline",
+      severity: "info",
+      title: "Cloud Database Offline",
+      description: "Cannot connect to the cloud catalog. Local wallpapers remain fully functional.",
+      actionLabel: null
+    });
+  }
+
+  const healthy = corruptedFiles === 0 && (totalFiles === 0 || hasActiveWp);
+
   return {
-    healthy: corruptedFiles === 0 && hasActiveWp,
+    healthy,
     totalFiles,
     readableFiles,
     corruptedFiles,
-    diskUsageMB: Math.round(totalBytes / (1024 * 1024) * 10) / 10,
+    diskUsageMB: Math.round((totalBytes / (1024 * 1024)) * 10) / 10,
     activeWallpaperValid: hasActiveWp,
     activeWallpaper: settings.activeWallpaper || "None",
-    watchdogStatus
+    watchdogStatus,
+    networkOnline,
+    pingMs,
+    memoryRssMB,
+    heapUsedMB,
+    autoStartEnabled,
+    issues,
+    platform: process.platform,
+    version: config.VERSION
   };
+});
+
+ipcMain.handle("app:health-fix", async (event, action) => {
+  const results = { action, success: true, message: "" };
+  try {
+    if (action === "clean-corrupted" || action === "optimize-all") {
+      const userDir = config.WALLPAPER_DIR;
+      let removedCount = 0;
+      if (fs.existsSync(userDir)) {
+        for (const f of fs.readdirSync(userDir)) {
+          if (!f.match(/\.(jpg|jpeg|png|webp|bmp)$/i)) continue;
+          const fp = path.join(userDir, f);
+          try {
+            const st = fs.statSync(fp);
+            if (st.size < 512) {
+              fs.unlinkSync(fp);
+              removedCount++;
+            }
+          } catch {
+            try { fs.unlinkSync(fp); removedCount++; } catch {}
+          }
+        }
+      }
+      results.cleaned = removedCount;
+    }
+
+    if (action === "fix-active-wp" || action === "optimize-all") {
+      const all = getImages();
+      if (all.length > 0) {
+        const target = all[0];
+        await setDesktopWallpaper(target.path);
+        settings.activeWallpaper = target.path;
+        saveSettings(settings);
+        results.newActive = target.path;
+      }
+    }
+
+    if (action === "enable-watchdog" || action === "optimize-all") {
+      setWatchdogEnabled(true);
+      results.watchdogEnabled = true;
+    }
+
+    if (action === "enable-autostart" || action === "optimize-all") {
+      try {
+        app.setLoginItemSettings({ openAtLogin: true });
+        results.autoStart = true;
+      } catch {}
+    }
+
+    results.message = "System optimization complete.";
+    return results;
+  } catch (err) {
+    console.error("[HealthFix] error:", err);
+    return { action, success: false, message: err.message };
+  }
 });

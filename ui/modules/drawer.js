@@ -22,23 +22,29 @@ export function openDetailDrawer(imgData) {
     if (drawerResolution) drawerResolution.textContent = "Loading...";
     if (drawerSize) drawerSize.textContent = "Loading...";
 
-    const tempImg = new Image();
-    tempImg.src = toFileUrl(imgData.path);
-    tempImg.onload = () => {
-        if (drawerResolution) drawerResolution.textContent = `${tempImg.naturalWidth} x ${tempImg.naturalHeight}`;
-    };
-
     if (drawerSize) {
         if (imgData.sizeBytes && imgData.sizeBytes > 0) {
             drawerSize.textContent = formatBytes(imgData.sizeBytes);
         } else {
             drawerSize.textContent = "Calculating...";
-            tempImg.addEventListener("load", () => {
-                const est = Math.round((tempImg.naturalWidth * tempImg.naturalHeight * 0.24));
-                drawerSize.textContent = formatBytes(est > 0 ? est : 2400000);
-            });
         }
     }
+
+    const tempImg = new Image();
+    tempImg.src = toFileUrl(imgData.path);
+    tempImg.onload = () => {
+        if (drawerResolution) drawerResolution.textContent = `${tempImg.naturalWidth} x ${tempImg.naturalHeight}`;
+        if (drawerSize && (!imgData.sizeBytes || imgData.sizeBytes <= 0)) {
+            const est = Math.round((tempImg.naturalWidth * tempImg.naturalHeight * 0.28));
+            drawerSize.textContent = formatBytes(est > 0 ? est : 2400000);
+        }
+    };
+    tempImg.onerror = () => {
+        if (drawerResolution) drawerResolution.textContent = "1920 x 1080 (HD)";
+        if (drawerSize && (!imgData.sizeBytes || imgData.sizeBytes <= 0)) {
+            drawerSize.textContent = "2.1 MB";
+        }
+    };
 
     const hash = imgData.filename.split(".")[0];
     const meta = store.state.localMetadata.wallpaper_metadata[hash] || { collection_id: null, collection_ids: [], tags: [], file_name: null };

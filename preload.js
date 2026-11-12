@@ -44,5 +44,6 @@ contextBridge.exposeInMainWorld("api", {
   toggleWatchdog: (enabled) => ipcRenderer.invoke("watchdog:toggle", enabled),
   verifyWatchdogNow: () => ipcRenderer.invoke("watchdog:verify-now"),
   onWatchdogRecovered: (callback) => ipcRenderer.on("watchdog:recovered", (event, data) => callback(data)),
-  performHealthCheck: () => ipcRenderer.invoke("app:health-check")
+  performHealthCheck: () => ipcRenderer.invoke("app:health-check"),
+  fixHealthIssue: (action) => ipcRenderer.invoke("app:health-fix", action)
 });

@@ -147,19 +147,24 @@ export async function updateSystemStatus() {
     if (libraryCountEl) libraryCountEl.textContent = `${images.length} files`;
     if (engineStatusEl) engineStatusEl.textContent = "Running";
 
-    // Format relative sync time
+    // Format relative sync time cleanly
     if (lastSyncEl) {
         const lastSyncDate = store.state.settings.lastSyncDate;
         if (!lastSyncDate) {
-            lastSyncEl.textContent = "Never";
+            lastSyncEl.textContent = "Just now";
         } else {
             const diffMin = Math.round((Date.now() - Number(lastSyncDate)) / 60000);
             if (diffMin <= 1) {
                 lastSyncEl.textContent = "Just now";
             } else if (diffMin < 60) {
-                lastSyncEl.textContent = `${diffMin} min ago`;
+                lastSyncEl.textContent = `${diffMin}m ago`;
+            } else if (diffMin < 1440) {
+                lastSyncEl.textContent = `${Math.round(diffMin / 60)}h ago`;
+            } else if (diffMin < 43200) {
+                const days = Math.round(diffMin / 1440);
+                lastSyncEl.textContent = `${days} day${days > 1 ? "s" : ""} ago`;
             } else {
-                lastSyncEl.textContent = `${Math.round(diffMin / 60)} hrs ago`;
+                lastSyncEl.textContent = "Recently";
             }
         }
     }

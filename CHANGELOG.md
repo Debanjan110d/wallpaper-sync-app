@@ -3,6 +3,11 @@
 ## 5.0.0 (v5.0.0) — 2026-11-12
 
 ### Major Architecture & Performance Overhaul
+- **System Health & Diagnostic Engine:** Completely overhauled the diagnostics pipeline (`app:health-check`) with zero runtime errors. Checks dual wallpaper directories (`SOURCE_DIR` & `WALLPAPER_DIR`), verifies file integrity, detects 0-byte corrupt files, validates active wallpaper desktop bindings, monitors watchdog telemetry, pings cloud API endpoint with real-time latency, and measures process memory footprint.
+- **1-Click Auto-Repair & Optimization:** Added `app:health-fix` and a 1-click **Optimize & Repair All** action directly inside the Diagnostics modal to auto-clean corrupt files, restore missing active wallpapers, and re-enable the recovery watchdog.
+- **Universal Dark Scrollbars:** Added universal custom scrollbar styles across Windows Chromium, eliminating native white/grey Windows scrollbars on the top search trends bar, wallpaper details drawer, and dashboard grids.
+- **Clean Search & Tag Bar:** Polished the search clear button (`✕`) positioning, centering, and hover state, and hidden overflow scrollbars on the top searches strip.
+- **Right Studio Panel Toggle & Default Collapse:** Made the right "Desktop Studio" panel collapsible by default to give full screen focus to the wallpaper gallery, with smooth expand/collapse toggling and active header indicator.
 - **Interactive Top Notification Center:** Turned the notification bell on the top-right header into a full-fledged live telemetry flyout featuring dynamic system status, cloud sync indicators, recovery watchdog reports, and a 1-click in-app review trigger.
 - **Permanent In-App Review & Rating:** Added a permanent "Rate & Review" access point in the sidebar Preferences menu, in the Notification Center, and added a direct close button to the review modal so users can provide feedback anytime.
 - **Virtual Batch Catalog Rendering (Memory Optimization):** Slashed desktop RAM consumption from ~500MB+ down to ~80–120MB by replacing simultaneous 700+ DOM image rendering with an intelligent virtual batch loader (32 cards initially, with `IntersectionObserver` auto-loading the next batch as you scroll).

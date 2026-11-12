@@ -194,6 +194,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         const isCollapsed = layout.classList.contains("right-panel-collapsed");
         localStorage.setItem("ws_right_panel_collapsed", isCollapsed ? "1" : "0");
+        if (btnToggleControlPanel) {
+            btnToggleControlPanel.classList.toggle("active", !isCollapsed);
+        }
     }
 
     if (btnToggleControlPanel) {
@@ -202,8 +205,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (closeRightPanelBtn) {
         closeRightPanelBtn.addEventListener("click", () => toggleRightControlPanel(false));
     }
-    if (localStorage.getItem("ws_right_panel_collapsed") === "1") {
+    const savedRightPanelState = localStorage.getItem("ws_right_panel_collapsed");
+    // Collapse by default so it does not obstruct the gallery viewport
+    const shouldCollapseRight = savedRightPanelState !== null ? savedRightPanelState === "1" : true;
+    if (shouldCollapseRight) {
         document.getElementById("appLayout")?.classList.add("right-panel-collapsed");
+        if (btnToggleControlPanel) btnToggleControlPanel.classList.remove("active");
+    } else {
+        document.getElementById("appLayout")?.classList.remove("right-panel-collapsed");
+        if (btnToggleControlPanel) btnToggleControlPanel.classList.add("active");
     }
 
     // Common DOM Elements

@@ -683,12 +683,19 @@
     <!-- 1. Health Check Modal -->
     <div id="healthCheckModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="System Health">
         <div class="lightbox-backdrop" onclick="document.getElementById('healthCheckModal').classList.add('hidden')"></div>
-        <div class="creator-modal-content" style="max-width:440px; padding:24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 style="margin:0; font-size:16px;">System Health &amp; Diagnostics</h3>
-                <button class="close-drawer-btn" onclick="document.getElementById('healthCheckModal').classList.add('hidden')">✕</button>
+        <div class="creator-modal-content health-modal-content" style="max-width:540px; width:92%; padding:26px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <div style="display:flex; align-items:center; gap:9px;">
+                    <div style="width:28px; height:28px; border-radius:8px; background:rgba(120,56,245,0.18); color:var(--primary); display:flex; align-items:center; justify-content:center;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                    <h3 style="margin:0; font-size:16px; font-weight:700;">System Health &amp; Diagnostics</h3>
+                </div>
+                <button class="close-drawer-btn" onclick="document.getElementById('healthCheckModal').classList.add('hidden')" aria-label="Close Diagnostics">✕</button>
             </div>
-            <div id="healthCheckStatus" style="font-size:12px; margin-bottom:16px;"></div>
+            <div id="healthCheckStatus" style="margin-bottom:16px;"></div>
             <div id="healthCheckBody"></div>
         </div>
     </div>

@@ -117,11 +117,14 @@ export async function openHealthCheckModal() {
     const healthStatusEl = document.getElementById("healthCheckStatus");
     const healthBodyEl = document.getElementById("healthCheckBody");
 
-    if (healthStatusEl) healthStatusEl.textContent = "Scanning files and services...";
+    if (healthStatusEl) {
+        healthStatusEl.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">Running deep diagnostics across storage, desktop engine, watchdog and network...</span>`;
+    }
     if (healthBodyEl) {
         healthBodyEl.innerHTML = `
-            <div style="display:flex; justify-content:center; padding:30px;">
-                <div class="spinner" style="width:28px; height:28px; border:3px solid var(--border-subtle); border-top-color:var(--primary); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:36px 20px; gap:14px;">
+                <div class="spinner" style="width:32px; height:32px; border:3px solid rgba(255,255,255,0.08); border-top-color:var(--primary); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+                <span style="font-size:13px; color:var(--text-muted); font-weight:500;">Analyzing system health &amp; telemetry...</span>
             </div>
         `;
     }
@@ -130,9 +133,18 @@ export async function openHealthCheckModal() {
         const report = await window.api.performHealthCheck();
         renderHealthReport(report);
     } catch (err) {
-        if (healthStatusEl) healthStatusEl.textContent = "Health check failed";
+        if (healthStatusEl) {
+            healthStatusEl.innerHTML = `<span style="color:var(--danger); font-weight:600;">Diagnostic Scan Failed</span>`;
+        }
         if (healthBodyEl) {
-            healthBodyEl.innerHTML = `<p style="color:var(--danger); padding:16px;">Error: ${err.message}</p>`;
+            healthBodyEl.innerHTML = `
+                <div style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); border-radius:10px; padding:16px; margin-bottom:16px;">
+                    <p style="color:var(--danger); font-size:13px; margin:0; line-height:1.4;">${err.message}</p>
+                </div>
+                <div style="display:flex; justify-content:flex-end;">
+                    <button class="primary-btn" onclick="document.getElementById('healthCheckModal')?.classList.add('hidden')">Close</button>
+                </div>
+            `;
         }
     }
 }
@@ -143,48 +155,127 @@ function renderHealthReport(report) {
     if (!healthBodyEl) return;
 
     const isHealthy = report.healthy;
-    if (healthStatusEl) {
-        healthStatusEl.innerHTML = isHealthy
-            ? `<span style="color:var(--success); font-weight:600;">● System Healthy & Optimized</span>`
-            : `<span style="color:var(--warning); font-weight:600;">▲ Optimization Recommended</span>`;
-    }
-
+    const issues = report.issues || [];
     const watchdog = report.watchdogStatus || {};
     const activeWpName = report.activeWallpaper && report.activeWallpaper !== "None"
         ? report.activeWallpaper.split(/[\\/]/).pop()
-        : "None selected";
+        : "None configured";
+
+    if (healthStatusEl) {
+        healthStatusEl.innerHTML = isHealthy
+            ? `<div class="health-banner healthy">
+                <span class="health-dot healthy">●</span>
+                <div>
+                    <strong>All Systems Operational (100%)</strong>
+                    <div style="font-size:11px; opacity:0.85; margin-top:2px;">Local library, watchdog guard and desktop sync are verified.</div>
+                </div>
+               </div>`
+            : `<div class="health-banner warning">
+                <span class="health-dot warning">▲</span>
+                <div>
+                    <strong>${issues.length} Optimization(s) Recommended</strong>
+                    <div style="font-size:11px; opacity:0.85; margin-top:2px;">Some checks require attention. Use 1-Click Repair below.</div>
+                </div>
+               </div>`;
+    }
+
+    const issuesHtml = issues.length > 0 ? `
+        <div class="health-issues-section">
+            <span class="health-subheading">Detected Issues</span>
+            <div class="health-issues-list">
+                ${issues.map(iss => `
+                    <div class="health-issue-item ${iss.severity}">
+                        <div class="issue-icon">${iss.severity === "critical" ? "⚠️" : iss.severity === "warning" ? "⚡" : "ℹ️"}</div>
+                        <div class="issue-info">
+                            <span class="issue-title">${iss.title}</span>
+                            <span class="issue-desc">${iss.description}</span>
+                        </div>
+                    </div>
+                `).join("")}
+            </div>
+        </div>
+    ` : "";
 
     healthBodyEl.innerHTML = `
-        <div class="health-metrics-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
-            <div class="health-card" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:10px; padding:12px;">
-                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Local Wallpapers</div>
-                <div style="font-size:20px; font-weight:700; color:var(--text-main); margin-top:4px;">${report.totalFiles} files</div>
-                <div style="font-size:11px; color:var(--success); margin-top:2px;">${report.readableFiles} readable</div>
+        <div class="health-metrics-grid">
+            <div class="health-card">
+                <div class="health-card-header">
+                    <span class="health-card-label">📁 Storage &amp; Integrity</span>
+                    <span class="health-card-tag ${report.corruptedFiles === 0 ? "healthy" : "warning"}">
+                        ${report.corruptedFiles === 0 ? "Verified" : report.corruptedFiles + " corrupt"}
+                    </span>
+                </div>
+                <div class="health-card-metric">${report.totalFiles} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">wallpapers</span></div>
+                <div class="health-card-sub">${report.diskUsageMB} MB used • ${report.readableFiles} valid</div>
             </div>
-            <div class="health-card" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:10px; padding:12px;">
-                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Disk Space Used</div>
-                <div style="font-size:20px; font-weight:700; color:var(--text-main); margin-top:4px;">${report.diskUsageMB} MB</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Offline Cache</div>
+
+            <div class="health-card">
+                <div class="health-card-header">
+                    <span class="health-card-label">🖥️ Active Desktop</span>
+                    <span class="health-card-tag ${report.activeWallpaperValid ? "healthy" : "danger"}">
+                        ${report.activeWallpaperValid ? "Active" : "Unset"}
+                    </span>
+                </div>
+                <div class="health-card-metric" style="font-size:14px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${activeWpName}">
+                    ${activeWpName}
+                </div>
+                <div class="health-card-sub">${report.activeWallpaperValid ? "File verified on disk" : "Missing from library"}</div>
+            </div>
+
+            <div class="health-card">
+                <div class="health-card-header">
+                    <span class="health-card-label">🛡️ Recovery Watchdog</span>
+                    <span class="health-card-tag ${watchdog.enabled ? "healthy" : "muted"}">
+                        ${watchdog.enabled ? "Guarding" : "Disabled"}
+                    </span>
+                </div>
+                <div class="health-card-metric">${watchdog.recoveryCount || 0} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">auto-recoveries</span></div>
+                <div class="health-card-sub">Startup Login: ${report.autoStartEnabled ? "Enabled" : "Off"}</div>
+            </div>
+
+            <div class="health-card">
+                <div class="health-card-header">
+                    <span class="health-card-label">🌐 Cloud Network</span>
+                    <span class="health-card-tag ${report.networkOnline ? "healthy" : "muted"}">
+                        ${report.networkOnline ? "Online" : "Offline"}
+                    </span>
+                </div>
+                <div class="health-card-metric">
+                    ${report.networkOnline ? report.pingMs + " ms" : "Local Mode"}
+                </div>
+                <div class="health-card-sub">${report.networkOnline ? "Cloud catalog reachable" : "Offline library safe"}</div>
             </div>
         </div>
 
-        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:10px; padding:14px; margin-bottom:16px; font-size:12px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span style="color:var(--text-muted);">Active Wallpaper:</span>
-                <span style="font-weight:600; color:var(--text-main); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${activeWpName}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span style="color:var(--text-muted);">Recovery Watchdog:</span>
-                <span style="font-weight:600; color:${watchdog.enabled ? "var(--success)" : "var(--text-muted)"};">${watchdog.enabled ? "Active & Guarding" : "Disabled"}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between;">
-                <span style="color:var(--text-muted);">Auto-Recoveries:</span>
-                <span style="font-weight:600; color:var(--primary);">${watchdog.recoveryCount || 0} times</span>
-            </div>
+        <div class="health-telemetry-bar">
+            <span>RAM RSS: <strong>${report.memoryRssMB} MB</strong></span>
+            <span>Version: <strong>v${report.version || "5.0.0"}</strong></span>
+            <span>Platform: <strong>${report.platform === "win32" ? "Windows" : report.platform}</strong></span>
         </div>
 
-        <div style="display:flex; gap:10px; justify-content:flex-end;">
-            <button id="healthCloseBtn" class="primary-btn" style="padding:8px 18px; font-size:12px; border-radius:8px;">Done</button>
+        ${issuesHtml}
+
+        <div class="health-modal-actions">
+            <button id="healthRescanBtn" class="primary-btn btn-secondary" type="button" title="Re-scan system diagnostics">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>Re-scan</span>
+            </button>
+
+            <div style="display:flex; gap:8px;">
+                ${issues.length > 0 ? `
+                    <button id="healthFixAllBtn" class="primary-btn btn-repair" type="button">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span>Optimize &amp; Repair All</span>
+                    </button>
+                ` : ""}
+                <button id="healthCloseBtn" class="primary-btn" type="button" style="padding:8px 20px;">Done</button>
+            </div>
         </div>
     `;
 
@@ -192,6 +283,32 @@ function renderHealthReport(report) {
     if (closeBtn) {
         closeBtn.addEventListener("click", () => {
             document.getElementById("healthCheckModal")?.classList.add("hidden");
+        });
+    }
+
+    const rescanBtn = document.getElementById("healthRescanBtn");
+    if (rescanBtn) {
+        rescanBtn.addEventListener("click", async () => {
+            await openHealthCheckModal();
+        });
+    }
+
+    const fixAllBtn = document.getElementById("healthFixAllBtn");
+    if (fixAllBtn) {
+        fixAllBtn.addEventListener("click", async () => {
+            fixAllBtn.disabled = true;
+            fixAllBtn.innerHTML = `<span>Repairing...</span>`;
+            try {
+                if (window.api.fixHealthIssue) {
+                    await window.api.fixHealthIssue("optimize-all");
+                }
+                showToast("System optimization applied successfully!", "success");
+                await openHealthCheckModal();
+            } catch (err) {
+                showToast("Repair error: " + err.message, "error");
+                fixAllBtn.disabled = false;
+                fixAllBtn.innerHTML = `<span>Try Again</span>`;
+            }
         });
     }
 }
