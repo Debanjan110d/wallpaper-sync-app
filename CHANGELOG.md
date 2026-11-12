@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.2.0 (v4.2.0) — 2026-11-12
+
+### Admin Panel Overhaul — Multi-Collection Architecture
+
+#### Upload Form
+- **Multi-Collection Chip Picker:** Replaced the single collection `<select>` dropdown in the Upload form with a scrollable chip-toggle panel. Admins can now select **multiple collections** at once during upload. The selected count is shown below the picker. A `+ New` button still allows inline collection creation.
+- **Multi-Collection Upload API:** Updated `POST /api/upload` to accept a `collection_ids` JSON array in addition to the legacy `collection_id` field. All selected collections are batch-inserted into `wallpaper_collections` on upload.
+
+#### Bulk Edit — Add vs Replace Mode
+- **Add / Replace Toggle:** The floating Bulk Edit action bar now features a segmented **➕ Add / 🔄 Replace** mode toggle. In **Add** mode (default), selected collections and tags are merged with existing assignments using upsert (no data loss). In **Replace** mode, existing assignments are cleared first and replaced entirely.
+- **Backend Mode Support:** `POST /api/wallpapers/bulk-update` now accepts a `mode: "add" | "replace"` field. Add mode uses `upsert` with `ignoreDuplicates` to safely append; Replace mode deletes existing links then re-inserts.
+
+#### Code Cleanup
+- Removed dead `selectedCategoryForUpload`, `bulkCategoryId`, `bulkCollectionId` state variables and their associated `handleCreateCategory` function from the admin dashboard.
+- Removed unused `filteredUploadCollections` alias (direct `collections` state now used).
+
+---
+
 ## 4.1.1 (v4.1.1) — 2026-10-17
 
 ### Bug Fix

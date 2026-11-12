@@ -169,13 +169,10 @@ export default function Page() {
   const [selectedColorFilter, setSelectedColorFilter] = useState("");
 
   // Upload Form Metadata
-  const [selectedCategoryForUpload, setSelectedCategoryForUpload] = useState<string>("");
-  const [selectedCollectionForUpload, setSelectedCollectionForUpload] = useState<string>("");
+  const [selectedCollectionsForUpload, setSelectedCollectionsForUpload] = useState<number[]>([]);
   const [selectedTagsForUpload, setSelectedTagsForUpload] = useState<number[]>([]);
 
   // Inline Creation Fields
-  const [showNewCatInput, setShowNewCatInput] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
   const [showNewColInput, setShowNewColInput] = useState(false);
   const [newColName, setNewColName] = useState("");
   const [newTagName, setNewTagName] = useState("");
@@ -196,10 +193,9 @@ export default function Page() {
 
   // Bulk Edit Selection
   const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
-  const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
-  const [bulkCollectionId, setBulkCollectionId] = useState<string>("");
   const [bulkCollectionIds, setBulkCollectionIds] = useState<number[]>([]);
   const [bulkTags, setBulkTags] = useState<number[]>([]);
+  const [bulkMode, setBulkMode] = useState<"add" | "replace">("add");
 
   // Individual Wallpaper Edit Modal State
   const [editingWallpaper, setEditingWallpaper] = useState<any | null>(null);
@@ -541,11 +537,8 @@ export default function Page() {
       formData.append("file", file);
       formData.append("username", username);
 
-      if (selectedCollectionForUpload) {
-        formData.append("collection_id", selectedCollectionForUpload);
-      }
-      if (selectedCategoryForUpload) {
-        formData.append("category_id", selectedCategoryForUpload);
+      if (selectedCollectionsForUpload.length > 0) {
+        formData.append("collection_ids", JSON.stringify(selectedCollectionsForUpload));
       }
       if (selectedTagsForUpload.length > 0) {
         formData.append("tags", JSON.stringify(selectedTagsForUpload));
@@ -573,8 +566,7 @@ export default function Page() {
     setFiles((prev) => prev.filter((_, index) => !successfulUploads.includes(index)));
     setLoading(false);
     
-    setSelectedCategoryForUpload("");
-    setSelectedCollectionForUpload("");
+    setSelectedCollectionsForUpload([]);
     setSelectedTagsForUpload([]);
 
     fetchGallery(false);
@@ -600,28 +592,6 @@ export default function Page() {
     }
   };
 
-  const handleCreateCategory = async () => {
-    if (!newCatName.trim()) return;
-    try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCatName.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNewCatName("");
-        setShowNewCatInput(false);
-        await fetchMetadata();
-        setSelectedCategoryForUpload(String(data.category.id));
-      } else {
-        alert("Failed to create category: " + data.error);
-      }
-    } catch (e) {
-      alert("Error: " + e);
-    }
-  };
-
   const handleCreateCollection = async () => {
     if (!newColName.trim()) {
       alert("Please enter a collection name.");
@@ -633,7 +603,6 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newColName.trim(),
-          category_id: selectedCategoryForUpload ? Number(selectedCategoryForUpload) : null,
         }),
       });
       const data = await res.json();
@@ -641,7 +610,7 @@ export default function Page() {
         setNewColName("");
         setShowNewColInput(false);
         await fetchMetadata();
-        setSelectedCollectionForUpload(String(data.collection.id));
+        setSelectedCollectionsForUpload((prev) => [...prev, data.collection.id]);
       } else {
         alert("Failed to create collection: " + data.error);
       }
@@ -767,7 +736,7 @@ export default function Page() {
       const res = await fetch("/api/wallpapers/bulk-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, mode: bulkMode }),
       });
       const data = await res.json();
 
@@ -776,6 +745,7 @@ export default function Page() {
         setSelectedImageIds([]);
         setBulkCollectionIds([]);
         setBulkTags([]);
+        setBulkMode("add");
         fetchGallery(false);
       } else {
         alert("Bulk update failed: " + data.error);
@@ -823,7 +793,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.8rem", letterSpacing: "-0.5px" }}>{username}'s Dashboard</h1>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              Wallpaper Sync Administration Portal • v4.1.0 • 📊 <strong>{totalCount}</strong> Wallpapers
+              Wallpaper Sync Administration Portal • v4.2.0 • 📊 <strong>{totalCount}</strong> Wallpapers
             </p>
           </div>
         </div>
@@ -1079,7 +1049,7 @@ export default function Page() {
 
               <div className="form-group" style={{ flex: "1 1 250px" }}>
                 <label style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Collection (Series)</span>
+                  <span>Collections (Multi-Select)</span>
                   <button
                     type="button"
                     className="btn-secondary"
@@ -1102,17 +1072,25 @@ export default function Page() {
                     </button>
                   </div>
                 ) : (
-                  <select
-                    value={selectedCollectionForUpload}
-                    onChange={(e) => setSelectedCollectionForUpload(e.target.value)}
-                  >
-                    <option value="">-- Select Collection --</option>
-                    {filteredUploadCollections.map((col) => (
-                      <option key={col.id} value={col.id}>
-                        {col.name}
-                      </option>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "8px", border: "1px solid var(--border)", borderRadius: 6, background: "rgba(0,0,0,0.15)", maxHeight: "100px", overflowY: "auto" }}>
+                    {collections.length === 0 && <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No collections yet</span>}
+                    {collections.map((col) => (
+                      <button
+                        key={col.id}
+                        type="button"
+                        onClick={() => setSelectedCollectionsForUpload((prev) => prev.includes(col.id) ? prev.filter((id) => id !== col.id) : [...prev, col.id])}
+                        className={`tag-chip ${selectedCollectionsForUpload.includes(col.id) ? "active" : ""}`}
+                        style={{ fontSize: "0.78rem" }}
+                      >
+                        📁 {col.name}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                )}
+                {selectedCollectionsForUpload.length > 0 && (
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                    {selectedCollectionsForUpload.length} collection(s) selected
+                  </div>
                 )}
               </div>
             </div>
@@ -1626,11 +1604,46 @@ export default function Page() {
                 {selectedImageIds.length} Selected
               </span>
               <span style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
-                Assign multiple collections & tags to all selected wallpapers
+                Assign multiple collections &amp; tags to all selected wallpapers
               </span>
             </div>
 
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {/* Add / Replace mode toggle */}
+              <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
+                <button
+                  type="button"
+                  onClick={() => setBulkMode("add")}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    background: bulkMode === "add" ? "rgba(99, 102, 241, 0.4)" : "transparent",
+                    color: bulkMode === "add" ? "white" : "var(--text-muted)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  ➕ Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkMode("replace")}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    background: bulkMode === "replace" ? "rgba(239, 68, 68, 0.3)" : "transparent",
+                    color: bulkMode === "replace" ? "#fca5a5" : "var(--text-muted)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  🔄 Replace
+                </button>
+              </div>
               <button 
                 type="button" 
                 className="btn" 
@@ -1652,7 +1665,7 @@ export default function Page() {
               <button 
                 type="button" 
                 className="btn-secondary" 
-                onClick={() => { setSelectedImageIds([]); setBulkCollectionIds([]); setBulkTags([]); }}
+                onClick={() => { setSelectedImageIds([]); setBulkCollectionIds([]); setBulkTags([]); setBulkMode("add"); }}
                 style={{
                   background: "rgba(255, 255, 255, 0.08)",
                   color: "var(--text-muted)",

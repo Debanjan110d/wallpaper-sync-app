@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { items } = await request.json();
+    const { items, mode } = await request.json();
+    const bulkMode: "add" | "replace" = mode === "replace" ? "replace" : "add";
     if (!Array.isArray(items)) {
       return NextResponse.json({ error: "Invalid items format" }, { status: 400 });
     }
@@ -86,14 +87,15 @@ export async function POST(request: Request) {
 
         // 2. Many-to-many collection links
         if (effectiveCollectionIds !== undefined && Array.isArray(effectiveCollectionIds)) {
-          // Clear current assignments
-          const { error: delColErr } = await supabase
-            .from("wallpaper_collections")
-            .delete()
-            .eq("wallpaper_id", id);
-
-          if (delColErr) {
-            throw new Error(`Failed to clear collections: ${delColErr.message}`);
+          if (bulkMode === "replace") {
+            // Clear current assignments first
+            const { error: delColErr } = await supabase
+              .from("wallpaper_collections")
+              .delete()
+              .eq("wallpaper_id", id);
+            if (delColErr) {
+              throw new Error(`Failed to clear collections: ${delColErr.message}`);
+            }
           }
 
           if (effectiveCollectionIds.length > 0) {
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
 
             const { error: insColErr } = await supabase
               .from("wallpaper_collections")
-              .insert(insertRows);
+              .upsert(insertRows, { onConflict: "wallpaper_id,collection_id", ignoreDuplicates: true });
 
             if (insColErr) {
               throw new Error(`Failed to assign collections: ${insColErr.message}`);
@@ -114,13 +116,14 @@ export async function POST(request: Request) {
 
         // 3. Update tags
         if (tags !== undefined && Array.isArray(tags)) {
-          const { error: deleteErr } = await supabase
-            .from("wallpaper_tags")
-            .delete()
-            .eq("wallpaper_id", id);
-
-          if (deleteErr) {
-            throw new Error(`Failed to clear tags: ${deleteErr.message}`);
+          if (bulkMode === "replace") {
+            const { error: deleteErr } = await supabase
+              .from("wallpaper_tags")
+              .delete()
+              .eq("wallpaper_id", id);
+            if (deleteErr) {
+              throw new Error(`Failed to clear tags: ${deleteErr.message}`);
+            }
           }
 
           if (tags.length > 0) {
@@ -131,7 +134,7 @@ export async function POST(request: Request) {
 
             const { error: insertErr } = await supabase
               .from("wallpaper_tags")
-              .insert(insertRows);
+              .upsert(insertRows, { onConflict: "wallpaper_id,tag_id", ignoreDuplicates: true });
 
             if (insertErr) {
               throw new Error(`Failed to save tags: ${insertErr.message}`);

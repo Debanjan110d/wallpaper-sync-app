@@ -44,6 +44,19 @@ export async function POST(request: Request) {
     const collectionIdRaw = formData.get("collection_id");
     const collectionId = collectionIdRaw ? Number(collectionIdRaw) : null;
 
+    // Support multiple collections via collection_ids JSON array
+    const collectionIdsRaw = formData.get("collection_ids");
+    let collectionIds: number[] = [];
+    if (typeof collectionIdsRaw === "string" && collectionIdsRaw.trim()) {
+      try {
+        collectionIds = JSON.parse(collectionIdsRaw).map(Number).filter(Number.isFinite);
+      } catch {
+        collectionIds = [];
+      }
+    } else if (collectionId) {
+      collectionIds = [collectionId];
+    }
+
     const tagsRaw = formData.get("tags");
     let tagIds: number[] = [];
     if (typeof tagsRaw === "string" && tagsRaw.trim()) {
@@ -76,8 +89,6 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-
-    const finalCollectionId = collectionId;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -194,16 +205,16 @@ export async function POST(request: Request) {
       }
     }
 
-    if (row && finalCollectionId) {
+    if (row && collectionIds.length > 0) {
+      const colInsertRows = collectionIds.map((colId) => ({
+        wallpaper_id: row.id,
+        collection_id: colId,
+      }));
       const { error: colLinkErr } = await supabaseAdmin
         .from("wallpaper_collections")
-        .insert([{
-          wallpaper_id: row.id,
-          collection_id: finalCollectionId,
-        }]);
-
+        .insert(colInsertRows);
       if (colLinkErr) {
-        console.error("Failed to link wallpaper to collection on upload:", colLinkErr.message);
+        console.error("Failed to link wallpaper to collection(s) on upload:", colLinkErr.message);
       }
     }
 
