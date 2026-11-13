@@ -21,7 +21,8 @@ import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
 import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal } from "./modules/modal.js";
 import { initQuickActions } from "./modules/quickActions.js";
-import { initControlPanel } from "./modules/controlPanel.js";
+import { initControlPanel, syncRightControlPanelState } from "./modules/controlPanel.js";
+import { initShortcuts } from "./modules/shortcuts.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
     // Initial Setup and Lifecycles
@@ -29,10 +30,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         store.state.settings = await window.api.getSettings();
 
         // 1. Initial setup of slideshow intervals & controls
+        const currentInterval = store.state.settings.slideshowInterval || 1800000;
         const intervalDropdown = document.getElementById("intervalDropdown");
         if (intervalDropdown) {
-            intervalDropdown.value = store.state.settings.slideshowInterval || 10000;
+            intervalDropdown.value = currentInterval;
         }
+        syncRightControlPanelState();
 
         const slideshowSourceType = document.getElementById("slideshowSourceType");
         if (slideshowSourceType && store.state.settings.slideshowSource) {
@@ -92,6 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initReviewModal();
     initQuickActions();
     initControlPanel();
+    initShortcuts();
 
     // Setup Sidebar Tab Navigation
     function setActiveNavTab(activeId) {

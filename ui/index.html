@@ -806,6 +806,57 @@
         </div>
     </div>
 
+    <!-- 6. Keyboard Shortcuts Cheatsheet Modal -->
+    <div id="shortcutsModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle">
+        <div class="lightbox-backdrop" id="shortcutsModalBackdrop"></div>
+        <div class="creator-modal-content shortcuts-modal-content" style="max-width: 520px; width: 92%; padding: 24px 28px; border-radius: 20px;">
+            <div class="shortcuts-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(133, 57, 83, 0.25); display: flex; align-items: center; justify-content: center; font-size: 18px;">⌨️</div>
+                    <div>
+                        <h3 id="shortcutsModalTitle" style="font-size: 17px; font-weight: 700; color: var(--text-main); margin: 0;">Keyboard Shortcuts</h3>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Navigate and control Wallpaper Sync with your keyboard</p>
+                    </div>
+                </div>
+                <button id="closeShortcutsModalBtn" class="close-drawer-btn" type="button" aria-label="Close shortcuts">✕</button>
+            </div>
+            <div class="shortcuts-grid" style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Search Wallpapers</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Ctrl</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">K</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Play / Pause Slideshow</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Alt</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">S</kbd><span style="color:var(--text-muted); font-size: 11px; margin: 0 2px;">or</span><kbd class="shortcut-kbd">Space</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Skip to Next Wallpaper</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Alt</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">N</kbd><span style="color:var(--text-muted); font-size: 11px; margin: 0 2px;">or</span><kbd class="shortcut-kbd">→</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Apply Random Wallpaper</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Alt</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">R</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Favorite Current Wallpaper</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Alt</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">F</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Toggle Left Navigation Bar</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Ctrl</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">B</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Toggle Right Control Studio</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Ctrl</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">Shift</kbd><span style="color:var(--text-muted);">+</span><kbd class="shortcut-kbd">B</kbd></div>
+                </div>
+                <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                    <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Close Drawer / Modal</span>
+                    <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Esc</kbd></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="app.js"></script>
 </body>
 

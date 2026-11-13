@@ -217,43 +217,55 @@ export function attachHorizontalAutoScroll(container) {
 
     let isPaused = false;
     let resumeTimeout = null;
+    let accumulatedScroll = container.scrollLeft || 0;
 
     const pause = () => {
         isPaused = true;
         if (resumeTimeout) clearTimeout(resumeTimeout);
     };
 
-    const resume = () => {
+    const resume = (delay = 600) => {
         if (resumeTimeout) clearTimeout(resumeTimeout);
         resumeTimeout = setTimeout(() => {
             isPaused = false;
-        }, 1200);
+            accumulatedScroll = container.scrollLeft;
+        }, delay);
     };
 
     container.onmouseenter = pause;
-    container.onmouseleave = resume;
+    container.onmouseleave = () => resume(400);
     container.ontouchstart = pause;
-    container.ontouchend = resume;
-    container.onscroll = () => {
-        if (!isPaused) {
+    container.ontouchend = () => resume(800);
+
+    // Listen to wheel events on container to pause gently when user manually scrolls
+    if (!container.dataset.autoscrollWheelBound) {
+        container.dataset.autoscrollWheelBound = "true";
+        container.addEventListener("wheel", () => {
             pause();
-            resume();
-        }
-    };
+            accumulatedScroll = container.scrollLeft;
+            resume(1000);
+        }, { passive: true });
+    }
 
     let lastTime = performance.now();
-    const speed = 0.42; // gentle pixels per frame
+    const speed = 0.55; // Silky smooth ~33px/sec at 60fps
 
     function loop(now) {
-        const delta = Math.min(now - lastTime, 40);
+        const delta = Math.min(now - lastTime, 50);
         lastTime = now;
 
         if (!isPaused && container.scrollWidth > container.clientWidth) {
-            container.scrollLeft += speed * (delta / 16);
-            if (container.scrollLeft >= (container.scrollWidth - container.clientWidth - 2)) {
-                container.scrollLeft = 0;
+            accumulatedScroll += speed * (delta / 16.67);
+            const maxScroll = container.scrollWidth - container.clientWidth;
+            if (accumulatedScroll >= maxScroll - 1) {
+                accumulatedScroll = 0;
             }
+            container.scrollLeft = Math.round(accumulatedScroll);
+        } else if (!isPaused) {
+            // Keep accumulator in sync if container was scrolled externally
+            accumulatedScroll = container.scrollLeft;
         }
+
         const id = requestAnimationFrame(loop);
         activeScrollers.set(container, id);
     }

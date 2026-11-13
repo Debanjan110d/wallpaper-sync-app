@@ -37,6 +37,14 @@ function initRightSlideshowControls() {
         slideshowToggle.addEventListener("change", async () => {
             const isChecked = slideshowToggle.checked;
             try {
+                // Ensure UI interval matches backend before initiating slideshow
+                if (isChecked && intervalSelect) {
+                    const selectedMs = Number(intervalSelect.value) || 1800000;
+                    if (selectedMs !== store.state.settings.slideshowInterval) {
+                        await window.api.updateInterval(selectedMs);
+                        store.state.settings.slideshowInterval = selectedMs;
+                    }
+                }
                 await window.api.toggleSlideshow(isChecked);
                 store.state.settings.slideshow = isChecked;
                 setSlideshowPlaybackUI(isChecked);
@@ -129,6 +137,35 @@ function initRightSlideshowControls() {
                 setTimeout(() => { nextBtn.disabled = false; }, 600);
             }
         });
+    }
+}
+
+export function syncRightControlPanelState() {
+    const slideshowToggle = document.getElementById("rightSlideshowToggle");
+    const intervalSelect = document.getElementById("rightIntervalSelect");
+    const collectionSelect = document.getElementById("rightCollectionSelect");
+
+    if (slideshowToggle && store.state.settings) {
+        slideshowToggle.checked = !!store.state.settings.slideshow;
+    }
+
+    if (intervalSelect && store.state.settings) {
+        const raw = store.state.settings.slideshowInterval;
+        const valid = (raw && Number(raw) >= 10000) ? String(raw) : "1800000";
+        intervalSelect.value = valid;
+    }
+
+    if (collectionSelect && store.state.settings) {
+        const src = store.state.settings.slideshowSource || { type: "all" };
+        if (src.type === "favorites") {
+            collectionSelect.value = "favorites";
+        } else if (src.type === "recent") {
+            collectionSelect.value = src.count === 25 ? "recent_25" : "recent_10";
+        } else if (src.type === "collection" && src.id) {
+            collectionSelect.value = `col_${src.id}`;
+        } else {
+            collectionSelect.value = "all";
+        }
     }
 }
 

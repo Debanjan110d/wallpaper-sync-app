@@ -209,7 +209,7 @@ body {
    ========================================================================== */
 .app-shell {
     display: grid;
-    grid-template-columns: 240px 1fr 310px;
+    grid-template-columns: 252px 1fr 310px;
     width: 100vw;
     height: 100vh;
     background: var(--bg-app);
@@ -223,7 +223,7 @@ body {
 }
 
 .app-shell.right-panel-collapsed {
-    grid-template-columns: 240px 1fr 0px;
+    grid-template-columns: 252px 1fr 0px;
 }
 
 .app-shell.sidebar-collapsed.right-panel-collapsed {
@@ -241,22 +241,42 @@ body {
 }
 
 .sidebar-collapse-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #ffffff;
     cursor: pointer;
     width: 26px;
     height: 26px;
-    border-radius: var(--radius-sm);
-    display: flex;
+    min-width: 26px;
+    border-radius: 6px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: auto;
-    transition: all 0.2s ease;
+    margin-left: 6px;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    z-index: 5;
 }
 .sidebar-collapse-btn:hover {
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--primary);
+    border-color: rgba(255, 255, 255, 0.45);
+    transform: scale(1.08);
+}
+.sidebar-collapse-btn svg {
+    stroke: currentColor;
+    stroke-width: 2.8;
+}
+
+[data-theme="light"] .sidebar-collapse-btn {
+    background: rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    color: var(--text-main);
+}
+[data-theme="light"] .sidebar-collapse-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
 }
 
 .app-shell.sidebar-collapsed .brand-text-wrap,
@@ -333,10 +353,11 @@ body {
 .sidebar-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 4px 20px 4px;
+    gap: 8px;
+    padding: 0 2px 18px 2px;
     margin-bottom: 8px;
     border-bottom: 1px solid var(--border-subtle);
+    position: relative;
 }
 
 .brand-logo-wrap {
@@ -362,16 +383,18 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
 }
 
 .brand-title-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+    flex-wrap: nowrap;
 }
 
 .brand-name {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
     color: var(--text-main);
     letter-spacing: -0.3px;
@@ -379,13 +402,15 @@ body {
 }
 
 .version-badge {
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 700;
     color: #ffffff;
     background: linear-gradient(135deg, var(--primary), var(--secondary));
-    padding: 2px 6px;
-    border-radius: 8px;
+    padding: 1.5px 5px;
+    border-radius: 6px;
     text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .brand-subtitle {
@@ -2801,4 +2826,25 @@ body {
 .btn-repair:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 20px rgba(120, 56, 245, 0.6);
+}
+
+.shortcut-kbd {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: inline-block;
+    line-height: 1.4;
+}
+
+[data-theme="light"] .shortcut-kbd {
+    background: rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+    color: var(--text-main);
 }

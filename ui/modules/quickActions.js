@@ -52,11 +52,23 @@ export function initQuickActions() {
 
             try {
                 quickActionSlideshow.classList.add("anim-pulse");
+                if (nextState) {
+                    const rightInterval = document.getElementById("rightIntervalSelect");
+                    const selectedMs = Number(rightInterval?.value) || store.state.settings.slideshowInterval || 1800000;
+                    if (selectedMs !== store.state.settings.slideshowInterval) {
+                        await window.api.updateInterval(selectedMs);
+                        store.state.settings.slideshowInterval = selectedMs;
+                    }
+                }
                 await window.api.toggleSlideshow(nextState);
                 store.state.settings.slideshow = nextState;
                 setSlideshowPlaybackUI(nextState);
                 updatePlayerStatusText();
                 updateQuickActionSlideshowUI(nextState);
+
+                const rightToggle = document.getElementById("rightSlideshowToggle");
+                if (rightToggle) rightToggle.checked = nextState;
+
                 showToast(nextState ? "Slideshow started" : "Slideshow stopped", "info");
             } catch (err) {
                 showToast("Failed to toggle slideshow", "error");

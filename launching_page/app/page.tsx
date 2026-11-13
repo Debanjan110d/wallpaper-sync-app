@@ -1,6 +1,10 @@
 import BootTerminal from "./_components/BootTerminal";
 import Header from "./_components/Header";
 import HeroSection from "./_components/HeroSection";
+import KnownIssuesBulletin from "./_components/KnownIssuesBulletin";
+import WallpaperShowcase from "./_components/WallpaperShowcase";
+import WatchdogVisualizer from "./_components/WatchdogVisualizer";
+import ComparisonTable from "./_components/ComparisonTable";
 import FeaturesSection from "./_components/FeaturesSection";
 import DownloadSection from "./_components/DownloadSection";
 import UpdatesSection from "./_components/UpdatesSection";
@@ -33,6 +37,13 @@ export default async function HomePage() {
           latestReleaseAsset={latestReleaseAsset}
           releasesError={releasesError}
         />
+        <KnownIssuesBulletin />
+        <hr className="hr" />
+        <WallpaperShowcase />
+        <hr className="hr" />
+        <WatchdogVisualizer />
+        <hr className="hr" />
+        <ComparisonTable />
         <hr className="hr" />
         <FeaturesSection />
         <hr className="hr" />
