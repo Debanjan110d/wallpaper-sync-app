@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("api", {
   downloadUpdate: () => ipcRenderer.invoke("updater:download"),
   installUpdate: () => ipcRenderer.invoke("updater:install"),
   onSyncComplete: (callback) => ipcRenderer.on("sync-complete", () => callback()),
+  onWallpaperChanged: (callback) => ipcRenderer.on("wallpaper:changed", (event, data) => callback(data)),
   onDownloadProgress: (callback) => ipcRenderer.on("download-progress", (event, percent) => callback(percent)),
   onAppError: (callback) => ipcRenderer.on("app-error", (event, message) => callback(message)),
   onUpdateState: (callback) => ipcRenderer.on("updater:state", (event, state) => callback(state)),
@@ -45,5 +46,6 @@ contextBridge.exposeInMainWorld("api", {
   verifyWatchdogNow: () => ipcRenderer.invoke("watchdog:verify-now"),
   onWatchdogRecovered: (callback) => ipcRenderer.on("watchdog:recovered", (event, data) => callback(data)),
   performHealthCheck: () => ipcRenderer.invoke("app:health-check"),
-  fixHealthIssue: (action) => ipcRenderer.invoke("app:health-fix", action)
+  fixHealthIssue: (action) => ipcRenderer.invoke("app:health-fix", action),
+  trimMemory: () => ipcRenderer.invoke("app:trim-memory")
 });

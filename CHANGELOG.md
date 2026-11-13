@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.1.0 (v5.1.0) — 2026-11-13
+
+### Slideshow Engine, Dual Themes, UI Polish & RAM Optimization
+- **Search Auto-Suggestions Anchored Glass Dropdown:** Fixed unstyled raw text floating on top-right by anchoring `.search-suggestions-dropdown` beneath the search bar with blurred glassmorphism, flex layout, category badges (`Collection`, `Tag`, `Wallpaper`), highlighted query matching, and click-to-select.
+- **Collapsed Sidebar Alignment & Contrast Overhaul:** Redesigned `.sidebar-brand` in collapsed mode to stack vertically, eliminating crooked squeezed chevrons. Replaced dim icons with crisp high-contrast icons (`#CBD5E1`) and glowing hover states.
+- **Removed Logo Purple Box:** Removed the harsh purple tile background around the app logo in `.brand-logo-wrap`, letting the native logo artwork render cleanly.
+- **Horizontal Rows Continuous Auto-Scroll:** Implemented smooth continuous auto-pan animation using `requestAnimationFrame` for Recently Added, Browse Collections, and Random Discoveries, with instant pause on mouse hover / touch.
+- **Slideshow Engine & Sources Overhaul:**
+  - Fixed stuck 10-second timer bug by normalizing intervals (defaulting to 30 minutes, minimum 5 seconds).
+  - Eliminated rotation lag by sending `wallpaper:changed` only instead of broadcasting `sync-complete` (which was triggering full catalog re-reads on every tick).
+  - Restored full collection selection (dynamically populated `optgroup`), Recent Uploads (Last 10 / 25), and Favorites Only with normalized path matching.
+- **Light & Dark Mode Dual Theme System:**
+  - Implemented exact user color palettes:
+    - **Light Mode:** Canvas `#FFEAD3`, Mint `#BFE7EA`, Terracotta `#E89B5B`, Deep Rust `#D46743`.
+    - **Dark Mode:** Canvas `#2C2C2C`, Plum `#612D53`, Rich Rose `#853953`, Platinum `#F3F4F4`.
+  - Added header Theme Toggle button with live state icon and persistence in `localStorage`.
+- **Memory & Process Optimization:**
+  - Added V8 max heap ceiling (`--max-old-space-size=128`) and disabled site isolation trials for single-origin renderer.
+  - Added `app:trim-memory` cache purging on window blur.
+  - Reduced batch size to 24 with `IntersectionObserver` lazy decoding, cutting renderer RAM consumption significantly.
+
+---
+
 ## 5.0.0 (v5.0.0) — 2026-11-12
 
 ### Major Architecture & Performance Overhaul

@@ -205,6 +205,63 @@ function getCollectionStatsMap() {
     return colMap;
 }
 
+// Auto-scrolling horizontal rows engine (Recently Added, Collections, Random Discoveries)
+const activeScrollers = new WeakMap();
+
+export function attachHorizontalAutoScroll(container) {
+    if (!container) return;
+    if (activeScrollers.has(container)) {
+        cancelAnimationFrame(activeScrollers.get(container));
+        activeScrollers.delete(container);
+    }
+
+    let isPaused = false;
+    let resumeTimeout = null;
+
+    const pause = () => {
+        isPaused = true;
+        if (resumeTimeout) clearTimeout(resumeTimeout);
+    };
+
+    const resume = () => {
+        if (resumeTimeout) clearTimeout(resumeTimeout);
+        resumeTimeout = setTimeout(() => {
+            isPaused = false;
+        }, 1200);
+    };
+
+    container.onmouseenter = pause;
+    container.onmouseleave = resume;
+    container.ontouchstart = pause;
+    container.ontouchend = resume;
+    container.onscroll = () => {
+        if (!isPaused) {
+            pause();
+            resume();
+        }
+    };
+
+    let lastTime = performance.now();
+    const speed = 0.42; // gentle pixels per frame
+
+    function loop(now) {
+        const delta = Math.min(now - lastTime, 40);
+        lastTime = now;
+
+        if (!isPaused && container.scrollWidth > container.clientWidth) {
+            container.scrollLeft += speed * (delta / 16);
+            if (container.scrollLeft >= (container.scrollWidth - container.clientWidth - 2)) {
+                container.scrollLeft = 0;
+            }
+        }
+        const id = requestAnimationFrame(loop);
+        activeScrollers.set(container, id);
+    }
+
+    const id = requestAnimationFrame(loop);
+    activeScrollers.set(container, id);
+}
+
 // 2. Render Overhauled Collections Horizontal Section
 export function renderCategorySection() {
     const grid = document.getElementById("categoriesGrid");
@@ -244,6 +301,8 @@ export function renderCategorySection() {
             grid.scrollLeft += e.deltaY * 1.5;
         }, { passive: false });
     }
+
+    attachHorizontalAutoScroll(grid);
 }
 
 // Helper: Create a standard overhauled collection card DOM element
@@ -449,6 +508,7 @@ export function renderRecentlyAdded() {
             document.getElementById("recentlyAddedPrevBtn"),
             document.getElementById("recentlyAddedNextBtn")
         );
+        attachHorizontalAutoScroll(container);
     }, 100);
 }
 
@@ -525,6 +585,7 @@ export function renderRandomDiscoveries() {
             document.getElementById("randomPrevBtn"),
             document.getElementById("randomNextBtn")
         );
+        attachHorizontalAutoScroll(container);
     }, 100);
 }
 
@@ -650,7 +711,7 @@ export function renderCatalog() {
         window._catalogObserver = null;
     }
 
-    const BATCH_SIZE = 32;
+    const BATCH_SIZE = 24;
     let currentRenderIndex = 0;
     let sentinelEl = null;
 

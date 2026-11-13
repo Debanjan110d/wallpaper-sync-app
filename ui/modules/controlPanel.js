@@ -50,13 +50,66 @@ function initRightSlideshowControls() {
         });
     }
 
+    // Populate collections into rightCollectionSelect
+    const collectionsGroup = document.getElementById("rightSelectCollectionsGroup");
+    if (collectionsGroup) {
+        collectionsGroup.innerHTML = "";
+        const collections = store.state.localMetadata.collections || [];
+        collections.forEach(col => {
+            const opt = document.createElement("option");
+            opt.value = `col_${col.id}`;
+            opt.textContent = `${col.name} (${col.wallpaper_count || 0})`;
+            collectionsGroup.appendChild(opt);
+        });
+    }
+
+    if (collectionSelect) {
+        // Reflect current source
+        const src = store.state.settings.slideshowSource || { type: "all" };
+        if (src.type === "favorites") {
+            collectionSelect.value = "favorites";
+        } else if (src.type === "recent") {
+            collectionSelect.value = src.count === 25 ? "recent_25" : "recent_10";
+        } else if (src.type === "collection" && src.id) {
+            collectionSelect.value = `col_${src.id}`;
+        } else {
+            collectionSelect.value = "all";
+        }
+
+        collectionSelect.addEventListener("change", async () => {
+            const val = collectionSelect.value;
+            let sourcePayload = { type: "all" };
+            if (val === "favorites") {
+                sourcePayload = { type: "favorites" };
+            } else if (val === "recent_10") {
+                sourcePayload = { type: "recent", count: 10 };
+            } else if (val === "recent_25") {
+                sourcePayload = { type: "recent", count: 25 };
+            } else if (val.startsWith("col_")) {
+                const colId = Number(val.replace("col_", ""));
+                sourcePayload = { type: "collection", id: colId };
+            }
+            try {
+                await window.api.updateSlideshowSource(sourcePayload);
+                store.state.settings.slideshowSource = sourcePayload;
+                updatePlayerStatusText();
+                showToast(`Slideshow source: ${collectionSelect.options[collectionSelect.selectedIndex].text}`, "info");
+            } catch (err) {
+                showToast("Failed to update source", "error");
+            }
+        });
+    }
+
     if (intervalSelect) {
-        intervalSelect.value = String(store.state.settings.slideshowInterval || 1800000);
+        const savedInterval = store.state.settings.slideshowInterval;
+        const validInterval = (savedInterval && Number(savedInterval) >= 10000) ? String(savedInterval) : "1800000";
+        intervalSelect.value = validInterval;
         intervalSelect.addEventListener("change", async () => {
             const ms = Number(intervalSelect.value);
             try {
                 await window.api.updateInterval(ms);
                 store.state.settings.slideshowInterval = ms;
+                updatePlayerStatusText();
                 showToast(`Interval set to ${intervalSelect.options[intervalSelect.selectedIndex].text}`, "success");
             } catch (err) {
                 showToast("Failed to update interval", "error");
@@ -64,30 +117,17 @@ function initRightSlideshowControls() {
         });
     }
 
-    if (collectionSelect) {
-        collectionSelect.addEventListener("change", async () => {
-            const val = collectionSelect.value;
-            let sourcePayload = { type: "all" };
-            if (val === "favorites") {
-                sourcePayload = { type: "favorites" };
-            } else if (val) {
-                sourcePayload = { type: "collection", id: Number(val) };
-            }
-            try {
-                await window.api.updateSlideshowSource(sourcePayload);
-                store.state.settings.slideshowSource = sourcePayload;
-                updatePlayerStatusText();
-                showToast("Slideshow source updated", "info");
-            } catch (err) {
-                showToast("Failed to update source", "error");
-            }
-        });
-    }
-
     if (nextBtn) {
-        nextBtn.addEventListener("click", () => {
-            const mainNextBtn = document.getElementById("playerNextBtn");
-            if (mainNextBtn) mainNextBtn.click();
+        nextBtn.addEventListener("click", async () => {
+            nextBtn.disabled = true;
+            try {
+                await window.api.syncNow();
+                showToast("Advanced to next wallpaper", "success");
+            } catch (err) {
+                showToast("Error advancing wallpaper", "error");
+            } finally {
+                setTimeout(() => { nextBtn.disabled = false; }, 600);
+            }
         });
     }
 }

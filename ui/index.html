@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallpaper Sync v5.0.0 - Desktop Wallpaper Manager</title>
+    <title>Wallpaper Sync v5.1.0 - Desktop Wallpaper Manager</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -36,7 +36,7 @@
                 <div class="brand-text-wrap">
                     <div class="brand-title-row">
                         <span class="brand-name">Wallpaper Sync</span>
-                        <span class="version-badge">v5.0.0</span>
+                        <span class="version-badge">v5.1.0</span>
                     </div>
                     <span class="brand-subtitle">Desktop Wallpaper Manager</span>
                 </div>
@@ -190,6 +190,23 @@
 
                 <!-- Top Right Quick Controls -->
                 <div class="top-actions-group">
+                    <button class="top-action-btn" id="btnThemeToggle" title="Toggle Light / Dark Theme" type="button" aria-label="Toggle Theme">
+                        <svg class="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                        <svg class="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:none;">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </button>
+
                     <button class="top-action-btn" id="btnToggleControlPanel" title="Toggle Control Studio (Slideshow & Watchdog)" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -462,8 +479,11 @@
                         <label class="panel-label">Collection</label>
                         <div class="panel-select-wrap">
                             <select id="rightCollectionSelect">
-                                <option value="">All Wallpapers</option>
-                                <option value="favorites">Favorites Only</option>
+                                <option value="all">All Wallpapers</option>
+                                <option value="favorites">⭐ Favorites Only</option>
+                                <option value="recent_10">🕒 Recent Uploads (Last 10)</option>
+                                <option value="recent_25">🕒 Recent Uploads (Last 25)</option>
+                                <optgroup label="Collections" id="rightSelectCollectionsGroup"></optgroup>
                             </select>
                         </div>
                     </div>
@@ -471,13 +491,13 @@
                         <label class="panel-label">Interval</label>
                         <div class="panel-select-wrap">
                             <select id="rightIntervalSelect">
-                                <option value="10000">10 Seconds</option>
                                 <option value="60000">1 Minute</option>
                                 <option value="300000">5 Minutes</option>
                                 <option value="600000">10 Minutes</option>
                                 <option value="1800000">30 Minutes</option>
                                 <option value="3600000">1 Hour</option>
                                 <option value="86400000">1 Day</option>
+                                <option value="10000">10 Seconds (Test)</option>
                             </select>
                         </div>
                     </div>

@@ -216,6 +216,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (btnToggleControlPanel) btnToggleControlPanel.classList.add("active");
     }
 
+    // Light / Dark Theme Management
+    const btnThemeToggle = document.getElementById("btnThemeToggle");
+    const savedTheme = localStorage.getItem("ws_theme") || "dark";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    updateThemeIcon(savedTheme);
+
+    if (btnThemeToggle) {
+        btnThemeToggle.addEventListener("click", () => {
+            const current = document.documentElement.getAttribute("data-theme") || "dark";
+            const next = current === "dark" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", next);
+            localStorage.setItem("ws_theme", next);
+            updateThemeIcon(next);
+            showToast(`Theme: ${next === "light" ? "Light Mode" : "Dark Mode"}`, "info");
+        });
+    }
+
+    function updateThemeIcon(theme) {
+        const darkIcon = document.querySelector(".theme-icon-dark");
+        const lightIcon = document.querySelector(".theme-icon-light");
+        if (darkIcon && lightIcon) {
+            darkIcon.style.display = theme === "dark" ? "block" : "none";
+            lightIcon.style.display = theme === "light" ? "block" : "none";
+        }
+    }
+
     // Common DOM Elements
     const globalSearchInput = document.getElementById("globalSearchInput");
     const clearSearchBtn = document.getElementById("clearSearchBtn");
@@ -654,12 +680,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.api.onDownloadProgress) {
         window.api.onDownloadProgress((percent) => store.setSyncProgress(percent));
     }
-    if (window.api.onSyncComplete) {
-        window.api.onSyncComplete(async () => {
-            await store.refreshMetadata();
-            await store.loadWallpapers();
-            const { startProgressRingCountdown } = await import("./modules/player.js");
-            startProgressRingCountdown();
+    if (window.api.onWallpaperChanged) {
+        window.api.onWallpaperChanged((data) => {
+            store.state.settings.activeWallpaper = data.path;
+            import("./modules/controlPanel.js").then((m) => {
+                m.updateNowPlayingCard({ path: data.path, filename: data.filename });
+            });
+            // Update active ring on matching card in DOM in-place
+            document.querySelectorAll(".wallpaper-card").forEach((card) => {
+                if (card.dataset.path === data.path) {
+                    card.classList.add("active-applied");
+                } else {
+                    card.classList.remove("active-applied");
+                }
+            });
         });
     }
     if (window.api.onAppError) {

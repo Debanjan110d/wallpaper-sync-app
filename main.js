@@ -7,6 +7,11 @@ if (!gotSingleInstanceLock) {
   app.exit(0);
 }
 
+// High-efficiency memory optimizations: limit heap growth & trim background renderer bloat
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
+app.commandLine.appendSwitch("disable-site-isolation-trials");
+app.commandLine.appendSwitch("disable-features", "TranslateUI");
+
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -531,27 +536,46 @@ async function nextSlideshowImage() {
   // 1. Filter by slideshowSource
   const source = settings.slideshowSource || { type: "all" };
   if (source.type === "favorites") {
-    if (settings.selectedImages && settings.selectedImages.length > 0) {
-      images = images.filter((img) => settings.selectedImages.includes(img.path));
-    }
+    const favSet = new Set(
+      (settings.selectedImages || []).map((p) => path.normalize(String(p)).toLowerCase())
+    );
+    images = images.filter((img) => {
+      const norm = path.normalize(img.path).toLowerCase();
+      const fn = img.filename.toLowerCase();
+      return favSet.has(norm) || Array.from(favSet).some((f) => f.endsWith(fn));
+    });
+  } else if (source.type === "recent") {
+    const count = Number(source.count) || 10;
+    images = images
+      .map((img) => {
+        let mtimeMs = 0;
+        try { mtimeMs = fs.statSync(img.path).mtimeMs; } catch {}
+        return { ...img, mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(0, count);
   } else if (source.type === "collection" && source.id) {
     const metadata = loadLocalMetadata();
     const colId = Number(source.id);
     images = images.filter((img) => {
       const hash = path.basename(img.filename, path.extname(img.filename));
-      const meta = metadata.wallpaper_metadata[hash];
-      return meta && Number(meta.collection_id) === colId;
+      const meta = metadata.wallpaper_metadata && metadata.wallpaper_metadata[hash];
+      if (!meta) return false;
+      const ids = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
+      return ids.map(Number).includes(colId);
     });
   } else if (source.type === "category" && source.id) {
     const metadata = loadLocalMetadata();
     const catId = Number(source.id);
-    const matchedCols = metadata.collections
-      .filter((c) => c.category_id === catId)
-      .map((c) => c.id);
+    const matchedCols = (metadata.collections || [])
+      .filter((c) => Number(c.category_id) === catId)
+      .map((c) => Number(c.id));
     images = images.filter((img) => {
       const hash = path.basename(img.filename, path.extname(img.filename));
-      const meta = metadata.wallpaper_metadata[hash];
-      return meta && matchedCols.includes(Number(meta.collection_id));
+      const meta = metadata.wallpaper_metadata && metadata.wallpaper_metadata[hash];
+      if (!meta) return false;
+      const ids = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
+      return ids.some((cid) => matchedCols.includes(Number(cid)));
     });
   }
 
@@ -603,27 +627,32 @@ async function nextSlideshowImage() {
   const image = images[currentImageIndex];
 
   try {
-    // Add a small delay to ensure file is ready
-    await new Promise((resolve) => setTimeout(resolve, 100));
     await setWallpaper(image.path);
     settings.activeWallpaper = image.path;
     saveSettings(settings);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("sync-complete");
+      // Rotate active state in-place; do NOT broadcast sync-complete to avoid heavy re-scans!
       mainWindow.webContents.send("wallpaper:changed", { path: image.path, filename: image.filename });
     }
   } catch (err) {
     console.error("Slideshow error:", err.message);
     console.error("Full error:", err);
-    if (mainWindow) mainWindow.webContents.send("app-error", `Failed to set wallpaper: ${err.message}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("app-error", `Failed to set wallpaper: ${err.message}`);
+    }
   }
 }
 
 function startSlideshow() {
-  if (slideshowTimer) clearInterval(slideshowTimer);
+  if (slideshowTimer) {
+    clearInterval(slideshowTimer);
+    slideshowTimer = null;
+  }
   if (settings.slideshow) {
-    const interval = settings.slideshowInterval || 10000;
+    const rawInterval = Number(settings.slideshowInterval);
+    const interval = (!isNaN(rawInterval) && rawInterval >= 5000) ? rawInterval : 1800000;
     slideshowTimer = setInterval(nextSlideshowImage, interval);
+    console.log(`[Slideshow] Started timer loop with interval: ${interval} ms`);
   }
 }
 
@@ -1005,9 +1034,12 @@ ipcMain.handle("toggle-random", (event, state) => {
 });
 
 ipcMain.handle("update-interval", (event, ms) => {
-  settings.slideshowInterval = ms;
+  const parsed = Number(ms);
+  settings.slideshowInterval = (!isNaN(parsed) && parsed >= 5000) ? parsed : 1800000;
   saveSettings(settings);
   startSlideshow();
+  console.log(`[Slideshow] Interval updated to: ${settings.slideshowInterval} ms`);
+  return { success: true, interval: settings.slideshowInterval };
 });
 
 ipcMain.handle("sync-now", async () => {
@@ -1215,6 +1247,18 @@ ipcMain.handle("submit-review", async (event, rating, comment, reviewerName) => 
 
 ipcMain.handle("is-packaged", () => {
   return app.isPackaged;
+});
+
+ipcMain.handle("app:trim-memory", async () => {
+  try {
+    if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+      await mainWindow.webContents.session.clearCache();
+      if (typeof global.gc === "function") global.gc();
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
 
 // Recovery Watchdog IPC Handlers

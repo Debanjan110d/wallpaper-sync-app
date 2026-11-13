@@ -27,7 +27,7 @@ function loadSettings() {
     autoSync: false,
     slideshow: false,
     slideshowRandom: false,
-    slideshowInterval: 10000,
+    slideshowInterval: 1800000,
     lastSyncDate: now,
     // ISO timestamp of the newest wallpaper we've seen from the server (db created_at).
     lastSyncCursor: "",
