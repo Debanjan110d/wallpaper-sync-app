@@ -212,10 +212,10 @@ body {
     grid-template-columns: 252px 1fr 310px;
     width: 100vw;
     height: 100vh;
-    background: var(--bg-app);
+    background: radial-gradient(circle at 60% 0%, var(--ambient-glow, rgba(133, 57, 83, 0.2)) 0%, transparent 65%), var(--bg-app);
     overflow: hidden;
     position: relative;
-    transition: grid-template-columns 0.25s cubic-bezier(0.2, 0, 0, 1);
+    transition: grid-template-columns 0.25s cubic-bezier(0.2, 0, 0, 1), background 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .app-shell.sidebar-collapsed {
@@ -569,7 +569,8 @@ body {
     height: 100vh;
     min-width: 0;
     overflow: hidden;
-    background: var(--bg-app);
+    background: radial-gradient(ellipse at 50% 12%, var(--ambient-glow, rgba(133, 57, 83, 0.16)) 0%, transparent 70%), var(--bg-app);
+    transition: background 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Top Navigation Bar */
@@ -696,14 +697,17 @@ body {
     top: calc(100% + 8px);
     left: 0;
     width: 100%;
-    background: var(--bg-surface-elevated, #18223F);
+    min-width: 420px;
+    background: #1c141d;
+    background: linear-gradient(180deg, #2a1826 0%, #170d18 100%);
     backdrop-filter: blur(24px);
-    border: 1px solid var(--border-active, rgba(120, 56, 245, 0.45));
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--ambient-border, rgba(133, 57, 83, 0.45));
     border-radius: var(--radius-md, 12px);
     padding: 8px 0;
     max-height: 380px;
     overflow-y: auto;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(120, 56, 245, 0.15);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px var(--ambient-glow, rgba(133, 57, 83, 0.2));
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -714,27 +718,30 @@ body {
 }
 
 .suggestion-group-title {
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--text-dim, #8E9BB5);
+    color: var(--text-dim, #a78b9b);
     letter-spacing: 0.8px;
-    padding: 8px 16px 4px 16px;
+    padding: 10px 16px 4px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .suggestion-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 16px;
+    padding: 8px 16px;
     cursor: pointer;
-    transition: background 0.18s ease;
+    transition: background 0.15s ease;
     user-select: none;
 }
 
 .suggestion-item:hover,
 .suggestion-item.active {
-    background: rgba(120, 56, 245, 0.22);
+    background: rgba(133, 57, 83, 0.3);
 }
 
 .suggestion-icon {
@@ -746,16 +753,16 @@ body {
 
 .suggestion-text {
     flex: 1;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 500;
-    color: var(--text-main, #FFFFFF);
+    color: var(--text-main, #F3F4F4);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .suggestion-highlight {
-    color: var(--primary, #7838F5);
+    color: var(--primary, #E89B5B);
     font-weight: 700;
     text-decoration: underline;
 }
@@ -763,11 +770,13 @@ body {
 .suggestion-badge {
     font-size: 10px;
     font-weight: 600;
-    color: var(--text-muted, #8E9BB5);
+    color: var(--text-muted, #a78b9b);
     background: rgba(255, 255, 255, 0.08);
-    padding: 2px 7px;
-    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 2px 8px;
+    border-radius: 999px;
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .top-actions-group {
@@ -2040,7 +2049,9 @@ body {
     border-radius: var(--radius-md);
     overflow: hidden;
     position: relative;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--ambient-border, var(--border-subtle));
+    box-shadow: 0 4px 20px var(--ambient-glow, rgba(133, 57, 83, 0.25));
+    transition: box-shadow 0.8s ease, border-color 0.8s ease;
 }
 
 .now-playing-thumb-wrap img {

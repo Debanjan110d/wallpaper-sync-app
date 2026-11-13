@@ -169,6 +169,45 @@ export function syncRightControlPanelState() {
     }
 }
 
+// Dynamic Adaptive Ambient Hue following the currently playing wallpaper
+export function applyAdaptiveAmbientHue(imageSrc) {
+    if (!imageSrc) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        try {
+            const canvas = document.createElement("canvas");
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, 16, 16);
+            const data = ctx.getImageData(0, 0, 16, 16).data;
+            let totalR = 0, totalG = 0, totalB = 0, count = 0;
+            for (let i = 0; i < data.length; i += 16) {
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                if (brightness > 20 && brightness < 235) {
+                    totalR += r;
+                    totalG += g;
+                    totalB += b;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                const avgR = Math.round(totalR / count);
+                const avgG = Math.round(totalG / count);
+                const avgB = Math.round(totalB / count);
+                document.documentElement.style.setProperty("--ambient-glow", `rgba(${avgR}, ${avgG}, ${avgB}, 0.24)`);
+                document.documentElement.style.setProperty("--ambient-tint", `rgba(${avgR}, ${avgG}, ${avgB}, 0.12)`);
+                document.documentElement.style.setProperty("--ambient-border", `rgba(${avgR}, ${avgG}, ${avgB}, 0.5)`);
+            }
+        } catch (e) {
+            // Silently fallback if canvas read is blocked
+        }
+    };
+    img.src = imageSrc;
+}
+
 // 2. Now Playing / Currently Applied Wallpaper Card
 export function updateNowPlayingCard(explicitImg = null) {
     const cardImg = document.getElementById("nowPlayingImg");
@@ -196,7 +235,9 @@ export function updateNowPlayingCard(explicitImg = null) {
     if (cardContent) cardContent.style.display = "flex";
 
     if (cardImg) {
-        cardImg.src = toFileUrl(activePath);
+        const fileUrl = toFileUrl(activePath);
+        cardImg.src = fileUrl;
+        applyAdaptiveAmbientHue(fileUrl);
     }
     if (cardTitle) {
         cardTitle.textContent = cleanName;

@@ -2,6 +2,18 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["geist"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "ik.imagekit.io",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

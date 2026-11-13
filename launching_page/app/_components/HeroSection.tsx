@@ -1,6 +1,6 @@
 import HeroDecryptedText from "./HeroDecryptedText";
 import TrackLink from "./TrackLink";
-import DesktopSimulator from "./DesktopSimulator";
+import AppStudioPreview from "./AppStudioPreview";
 import {
   GitHubRelease,
   GitHubReleaseAsset,
@@ -107,9 +107,9 @@ export default function HeroSection({
             </div>
           </div>
 
-          {/* Right Column: Live Interactive Desktop Simulator */}
+          {/* Right Column: Live Wallpaper Sync Application Studio Preview */}
           <div className="heroCards">
-            <DesktopSimulator />
+            <AppStudioPreview />
           </div>
         </div>
       </div>

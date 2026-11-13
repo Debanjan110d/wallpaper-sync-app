@@ -14,13 +14,12 @@ export default function Header() {
           </Link>
 
           <nav className="nav navDesktop" aria-label="Primary">
-            <a href="#tour-showcase">4K Showcase</a>
-            <a href="#tour-watchdog">Watchdog</a>
-            <a href="#features">Features</a>
-            <a href="#download">Download</a>
+            <a href="/#tour-showcase">4K Showcase</a>
+            <a href="/#tour-watchdog">Watchdog</a>
+            <a href="/#features">Features</a>
             <Link href="/reviews">Reviews</Link>
             <Link href="/docs">Docs</Link>
-            <a href="#tour-bulletin" style={{ color: "#fca5a5" }} title="Report Bug or View Active Quirks">
+            <a href="/#tour-bulletin" style={{ color: "#fca5a5" }} title="Report Bug or View Active Quirks">
               🐛 Report Bug
             </a>
             <a
@@ -36,13 +35,13 @@ export default function Header() {
           <details className="navMobile">
             <summary className="navMobileSummary">Menu</summary>
             <div className="navMobilePanel" role="navigation" aria-label="Primary">
-              <a href="#tour-showcase">4K Showcase</a>
-              <a href="#tour-watchdog">Watchdog</a>
-              <a href="#features">Features</a>
-              <a href="#download">Download</a>
+              <a href="/#tour-showcase">4K Showcase</a>
+              <a href="/#tour-watchdog">Watchdog</a>
+              <a href="/#features">Features</a>
+              <a href="/#download">Download</a>
               <Link href="/reviews">Reviews</Link>
               <Link href="/docs">Docs</Link>
-              <a href="#tour-bulletin" style={{ color: "#fca5a5" }}>
+              <a href="/#tour-bulletin" style={{ color: "#fca5a5" }}>
                 🐛 Report Bug
               </a>
               <a
