@@ -455,3 +455,4 @@ export default function DesktopSimulator() {
     </div>
   );
 }
+

@@ -381,3 +381,4 @@ ${steps || "1. Open app\n2. Trigger issue"}
     </div>
   );
 }
+
