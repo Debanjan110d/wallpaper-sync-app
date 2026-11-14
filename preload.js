@@ -38,7 +38,12 @@ contextBridge.exposeInMainWorld("api", {
   saveConnectionSettings: (apiUrl, syncToken) => ipcRenderer.invoke("save-connection-settings", apiUrl, syncToken),
   isPackaged: () => ipcRenderer.invoke("is-packaged"),
   onWindowShown: (callback) => ipcRenderer.on("app:window-shown", () => callback()),
+  onWindowHidden: (callback) => ipcRenderer.on("app:window-hidden", () => callback()),
   onMetadataSyncProgress: (callback) => ipcRenderer.on("metadata-sync-progress", (event, data) => callback(data)),
+
+  // Dynamic Ambient Hue & Lossless Image Rotation APIs
+  getDominantColor: (filePath) => ipcRenderer.invoke("image:get-dominant-color", filePath),
+  rotateWallpaper: (filePath, degrees = 90) => ipcRenderer.invoke("image:rotate", filePath, degrees),
 
   // Recovery Watchdog & System Health APIs
   getWatchdogStatus: () => ipcRenderer.invoke("watchdog:get-status"),

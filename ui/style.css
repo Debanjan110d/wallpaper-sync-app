@@ -1613,6 +1613,38 @@ body {
     transform: scale(1.15);
 }
 
+/* Quick Rotate Button on Wallpaper Cards */
+.card-rotate-btn {
+    position: absolute;
+    top: 8px;
+    right: 38px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.wallpaper-card:hover .card-rotate-btn,
+.horizontal-card:hover .card-rotate-btn {
+    opacity: 1;
+}
+
+.card-rotate-btn:hover {
+    color: #38bdf8;
+    background: rgba(0, 0, 0, 0.85);
+    transform: scale(1.15);
+}
+
 /* Category Collection Cards */
 .category-card {
     flex: 0 0 170px;
@@ -2459,6 +2491,28 @@ body {
     border-radius: var(--radius-md);
     object-fit: contain;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+}
+
+.lightbox-action-btn {
+    position: absolute;
+    top: -40px;
+    right: 44px;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+
+.lightbox-action-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #38bdf8;
+    transform: scale(1.1);
 }
 
 .lightbox-close {

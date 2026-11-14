@@ -790,6 +790,40 @@ export function renderCatalog() {
                     showToast(isSelected ? "Added to favorites" : "Removed from favorites", "success");
                 });
                 card.appendChild(favBtn);
+
+                const rotateBtn = document.createElement("button");
+                rotateBtn.className = "card-rotate-btn";
+                rotateBtn.type = "button";
+                rotateBtn.title = "Rotate 90° Clockwise";
+                rotateBtn.innerHTML = `
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                `;
+                rotateBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    rotateBtn.disabled = true;
+                    try {
+                        const res = await window.api.rotateWallpaper(imgData.path, 90);
+                        if (res && res.success) {
+                            const cacheBuster = `?t=${Date.now()}`;
+                            const newUrl = toFileUrl(imgData.path) + cacheBuster;
+                            img.src = newUrl;
+
+                            // Update active wallpaper card & ambient hue if this card is currently set
+                            if (store.state.settings && store.state.settings.activeWallpaper === imgData.path) {
+                                import("./controlPanel.js").then(m => m.updateNowPlayingCard(imgData));
+                            }
+                            showToast("Wallpaper rotated 90°", "success");
+                        }
+                    } catch (err) {
+                        showToast("Failed to rotate wallpaper", "error");
+                    } finally {
+                        rotateBtn.disabled = false;
+                    }
+                });
+                card.appendChild(rotateBtn);
             }
 
             const hash = imgData.filename.split(".")[0];

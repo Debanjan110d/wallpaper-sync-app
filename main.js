@@ -408,6 +408,21 @@ function createMainWindow() {
       mainWindow.webContents.send("app:window-shown");
     }
   });
+  mainWindow.on("hide", () => {
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("app:window-hidden");
+    }
+  });
+  mainWindow.on("minimize", () => {
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("app:window-hidden");
+    }
+  });
+  mainWindow.on("restore", () => {
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("app:window-shown");
+    }
+  });
 
   let fullscreenSyncInterval = null;
 
@@ -587,6 +602,186 @@ function scheduleThumbnailGeneration(filesList) {
   }
 
   setTimeout(processNext, 1200);
+}
+
+// In-memory cache for dominant colors: filePath -> { r, g, b, hex }
+const dominantColorCache = new Map();
+
+function extractDominantColor(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    if (dominantColorCache.has(filePath)) {
+      return dominantColorCache.get(filePath);
+    }
+    const img = nativeImage.createFromPath(filePath);
+    if (img.isEmpty()) return null;
+
+    // Fast downsample to 16x16: 256 pixels in native C++ (no canvas/CORS taint)
+    const thumb = img.resize({ width: 16, height: 16, quality: "good" });
+    const raw = thumb.toBitmap(); // 1024 bytes: [B, G, R, A]
+    let totalR = 0, totalG = 0, totalB = 0, count = 0;
+
+    for (let i = 0; i < raw.length; i += 4) {
+      const b = raw[i];
+      const g = raw[i + 1];
+      const r = raw[i + 2];
+      const br = (r * 299 + g * 587 + b * 114) / 1000;
+      // Filter out pure black / extreme dark or blown-out white to get the vibrant dominant hue
+      if (br > 25 && br < 235) {
+        totalR += r;
+        totalG += g;
+        totalB += b;
+        count++;
+      }
+    }
+
+    if (count === 0) {
+      for (let i = 0; i < raw.length; i += 4) {
+        totalB += raw[i];
+        totalG += raw[i + 1];
+        totalR += raw[i + 2];
+        count++;
+      }
+    }
+
+    const avgR = Math.round(totalR / count);
+    const avgG = Math.round(totalG / count);
+    const avgB = Math.round(totalB / count);
+    const hex = `#${((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1)}`;
+    const result = { r: avgR, g: avgG, b: avgB, hex };
+    dominantColorCache.set(filePath, result);
+    return result;
+  } catch (err) {
+    console.error("extractDominantColor error:", err);
+    return null;
+  }
+}
+
+async function rotateWallpaperFile(filePath, degrees = 90) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    const img = nativeImage.createFromPath(filePath);
+    if (img.isEmpty()) {
+      throw new Error(`Invalid or empty image: ${filePath}`);
+    }
+
+    const size = img.getSize();
+    const W = size.width;
+    const H = size.height;
+    const raw = img.toBitmap();
+
+    const normalizedDegrees = ((degrees % 360) + 360) % 360;
+    let newW, newH, rotated;
+
+    if (normalizedDegrees === 90) {
+      // 90 degrees Clockwise
+      newW = H;
+      newH = W;
+      rotated = Buffer.alloc(newW * newH * 4);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const srcIdx = (y * W + x) * 4;
+          const newX = H - 1 - y;
+          const newY = x;
+          const destIdx = (newY * newW + newX) * 4;
+          rotated[destIdx] = raw[srcIdx];
+          rotated[destIdx + 1] = raw[srcIdx + 1];
+          rotated[destIdx + 2] = raw[srcIdx + 2];
+          rotated[destIdx + 3] = raw[srcIdx + 3];
+        }
+      }
+    } else if (normalizedDegrees === 270) {
+      // 90 degrees Counter-Clockwise (270 CW)
+      newW = H;
+      newH = W;
+      rotated = Buffer.alloc(newW * newH * 4);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const srcIdx = (y * W + x) * 4;
+          const newX = y;
+          const newY = W - 1 - x;
+          const destIdx = (newY * newW + newX) * 4;
+          rotated[destIdx] = raw[srcIdx];
+          rotated[destIdx + 1] = raw[srcIdx + 1];
+          rotated[destIdx + 2] = raw[srcIdx + 2];
+          rotated[destIdx + 3] = raw[srcIdx + 3];
+        }
+      }
+    } else if (normalizedDegrees === 180) {
+      // 180 degrees
+      newW = W;
+      newH = H;
+      rotated = Buffer.alloc(newW * newH * 4);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const srcIdx = (y * W + x) * 4;
+          const newX = W - 1 - x;
+          const newY = H - 1 - y;
+          const destIdx = (newY * newW + newX) * 4;
+          rotated[destIdx] = raw[srcIdx];
+          rotated[destIdx + 1] = raw[srcIdx + 1];
+          rotated[destIdx + 2] = raw[srcIdx + 2];
+          rotated[destIdx + 3] = raw[srcIdx + 3];
+        }
+      }
+    } else {
+      return { success: true, width: W, height: H, filePath };
+    }
+
+    const rotatedImg = nativeImage.createFromBitmap(rotated, { width: newW, height: newH });
+    const ext = path.extname(filePath).toLowerCase();
+    const outBuf = ext === ".png" ? rotatedImg.toPNG() : rotatedImg.toJPEG(92);
+
+    // Atomic write to prevent partial file corruption on crash / power failure
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath);
+    const tmpPath = path.join(dir, `.${base}.${process.pid}.${Date.now()}.rot.tmp`);
+
+    try {
+      fs.writeFileSync(tmpPath, outBuf);
+      fs.renameSync(tmpPath, filePath);
+    } catch (writeErr) {
+      try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch {}
+      throw writeErr;
+    }
+
+    // Update thumbnail in cache
+    try {
+      const thumbDir = config.THUMBNAIL_DIR;
+      if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+      const thumbPath = path.join(thumbDir, `thumb_${base}`);
+      const thumb = rotatedImg.resize({ width: 380, quality: "good" });
+      fs.writeFileSync(thumbPath, thumb.toJPEG(75));
+    } catch (thumbErr) {
+      console.warn("Failed to update rotated thumbnail:", thumbErr);
+    }
+
+    // Invalidate cached dominant color
+    dominantColorCache.delete(filePath);
+
+    // If active desktop wallpaper is the rotated image, refresh it on the desktop
+    if (settings && settings.activeWallpaper === filePath) {
+      try {
+        await setWallpaper(filePath);
+      } catch (e) {
+        console.warn("Failed to re-apply active rotated wallpaper:", e);
+      }
+    }
+
+    return {
+      success: true,
+      width: newW,
+      height: newH,
+      path: filePath,
+      filename: base,
+    };
+  } catch (err) {
+    console.error("rotateWallpaperFile error:", err);
+    throw err;
+  }
 }
 
 function getImages() {
@@ -1736,6 +1931,15 @@ ipcMain.handle("set-wallpaper", async (event, absolutePath) => {
     if (mainWindow) mainWindow.webContents.send("app-error", "Failed to set desktop wallpaper. File might be invalid.");
     throw err; // Throw so the renderer knows it failed
   }
+});
+
+// Dynamic Ambient Hue and 1-Click Lossless Rotation IPC Handlers
+ipcMain.handle("image:get-dominant-color", async (event, filePath) => {
+  return extractDominantColor(filePath);
+});
+
+ipcMain.handle("image:rotate", async (event, filePath, degrees = 90) => {
+  return rotateWallpaperFile(filePath, degrees);
 });
 
 // Offline-First Metadata Cache Handlers

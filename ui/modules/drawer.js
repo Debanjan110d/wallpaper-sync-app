@@ -134,9 +134,68 @@ function formatBytes(bytes, decimals = 2) {
 // Bind action events
 export function initDrawer() {
     const drawerApplyBtn = document.getElementById("drawerApplyBtn");
+    const drawerRotateBtn = document.getElementById("drawerRotateBtn");
     const drawerFavBtn = document.getElementById("drawerFavBtn");
     const drawerDeleteBtn = document.getElementById("drawerDeleteBtn");
     const closeDrawerBtn = document.getElementById("closeDrawerBtn");
+
+    if (drawerRotateBtn) {
+        drawerRotateBtn.addEventListener("click", async () => {
+            if (!store.state.currentSelectedImage) return;
+            const currentImg = store.state.currentSelectedImage;
+            drawerRotateBtn.disabled = true;
+            const origContent = drawerRotateBtn.innerHTML;
+            drawerRotateBtn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+                <span>Rotating...</span>
+            `;
+
+            try {
+                const res = await window.api.rotateWallpaper(currentImg.path, 90);
+                if (res && res.success) {
+                    const cacheBuster = `?t=${Date.now()}`;
+                    const newUrl = toFileUrl(currentImg.path) + cacheBuster;
+
+                    // Update drawer preview image and dimensions
+                    const drawerImage = document.getElementById("drawerImage");
+                    const drawerResolution = document.getElementById("drawerResolution");
+                    if (drawerImage) drawerImage.src = newUrl;
+                    if (drawerResolution && res.width && res.height) {
+                        drawerResolution.textContent = `${res.width} x ${res.height}`;
+                    }
+
+                    // Refresh image everywhere in DOM (catalog cards, thumbnails)
+                    const encName = encodeURIComponent(currentImg.filename);
+                    document.querySelectorAll("img").forEach(imgEl => {
+                        if (imgEl.src && (imgEl.src.includes(encName) || imgEl.src.includes(currentImg.filename))) {
+                            imgEl.src = newUrl;
+                        }
+                    });
+
+                    // If active wallpaper, update Now Playing card & dynamic ambient hue
+                    if (store.state.settings && store.state.settings.activeWallpaper === currentImg.path) {
+                        import("./controlPanel.js").then(m => m.updateNowPlayingCard(currentImg));
+                    }
+
+                    showToast("Wallpaper rotated 90° clockwise", "success");
+                }
+            } catch (err) {
+                showToast("Failed to rotate wallpaper: " + (err.message || "Unknown error"), "error");
+            } finally {
+                drawerRotateBtn.disabled = false;
+                drawerRotateBtn.innerHTML = origContent;
+            }
+        });
+    }
 
     if (drawerApplyBtn) {
         drawerApplyBtn.addEventListener("click", async () => {

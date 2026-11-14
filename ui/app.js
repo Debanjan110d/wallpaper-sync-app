@@ -21,7 +21,7 @@ import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
 import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal, initSettingsModal, openSettingsModal } from "./modules/modal.js";
 import { initQuickActions } from "./modules/quickActions.js";
-import { initControlPanel, syncRightControlPanelState } from "./modules/controlPanel.js";
+import { initControlPanel, syncRightControlPanelState, handleAppVisibilityChange } from "./modules/controlPanel.js";
 import { initShortcuts } from "./modules/shortcuts.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -848,11 +848,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Lightbox Modal Controls
     const lightboxBackdrop = document.getElementById("lightboxBackdrop");
     const lightboxClose = document.getElementById("lightboxClose");
+    const lightboxRotateBtn = document.getElementById("lightboxRotateBtn");
     const lightboxPrev = document.getElementById("lightboxPrev");
     const lightboxNext = document.getElementById("lightboxNext");
 
     if (lightboxBackdrop) lightboxBackdrop.addEventListener("click", closeLightbox);
     if (lightboxClose) lightboxClose.addEventListener("click", closeLightbox);
+    if (lightboxRotateBtn) {
+        lightboxRotateBtn.addEventListener("click", async () => {
+            const currentImages = store.state.currentImages || [];
+            const idx = store.state.lightboxIndex;
+            if (idx === undefined || idx < 0 || idx >= currentImages.length) return;
+            const currentImg = currentImages[idx];
+            lightboxRotateBtn.disabled = true;
+            try {
+                const res = await window.api.rotateWallpaper(currentImg.path, 90);
+                if (res && res.success) {
+                    const cacheBuster = `?t=${Date.now()}`;
+                    const newUrl = toFileUrl(currentImg.path) + cacheBuster;
+                    const lightboxImage = document.getElementById("lightboxImage");
+                    if (lightboxImage) lightboxImage.src = newUrl;
+
+                    // Refresh image everywhere in DOM (catalog cards, thumbnails)
+                    const encName = encodeURIComponent(currentImg.filename);
+                    document.querySelectorAll("img").forEach(imgEl => {
+                        if (imgEl.src && (imgEl.src.includes(encName) || imgEl.src.includes(currentImg.filename))) {
+                            imgEl.src = newUrl;
+                        }
+                    });
+
+                    // If active wallpaper, update Now Playing card & dynamic ambient hue
+                    if (store.state.settings && store.state.settings.activeWallpaper === currentImg.path) {
+                        import("./modules/controlPanel.js").then(m => m.updateNowPlayingCard(currentImg));
+                    }
+                    showToast("Wallpaper rotated 90° clockwise", "success");
+                }
+            } catch (err) {
+                showToast("Failed to rotate wallpaper: " + (err.message || "Unknown error"), "error");
+            } finally {
+                lightboxRotateBtn.disabled = false;
+            }
+        });
+    }
     if (lightboxPrev) {
         lightboxPrev.addEventListener("click", () => {
             const currentImages = store.state.currentImages || [];
@@ -1044,10 +1081,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.api.onUpdateState) {
         window.api.onUpdateState((state) => renderUpdateUI(state));
     }
+    // App Hibernation & Ambient Hue Lifecycle Listeners
+    document.addEventListener("visibilitychange", () => {
+        handleAppVisibilityChange(document.visibilityState === "visible");
+    });
     if (window.api.onWindowShown) {
         window.api.onWindowShown(async () => {
+            handleAppVisibilityChange(true);
             console.log("App window shown from tray. Executing server connection reachability check...");
             await store.triggerBackgroundSync();
+        });
+    }
+    if (window.api.onWindowHidden) {
+        window.api.onWindowHidden(() => {
+            handleAppVisibilityChange(false);
         });
     }
 

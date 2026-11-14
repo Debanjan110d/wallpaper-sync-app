@@ -209,43 +209,74 @@ export function initCloudSyncCard() {
     }
 }
 
-// Dynamic Adaptive Ambient Hue following the currently playing wallpaper
-export function applyAdaptiveAmbientHue(imageSrc) {
-    if (!imageSrc) return;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-        try {
-            const canvas = document.createElement("canvas");
-            canvas.width = 16;
-            canvas.height = 16;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, 16, 16);
-            const data = ctx.getImageData(0, 0, 16, 16).data;
-            let totalR = 0, totalG = 0, totalB = 0, count = 0;
-            for (let i = 0; i < data.length; i += 16) {
-                const r = data[i], g = data[i + 1], b = data[i + 2];
-                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                if (brightness > 20 && brightness < 235) {
-                    totalR += r;
-                    totalG += g;
-                    totalB += b;
-                    count++;
-                }
-            }
-            if (count > 0) {
-                const avgR = Math.round(totalR / count);
-                const avgG = Math.round(totalG / count);
-                const avgB = Math.round(totalB / count);
-                document.documentElement.style.setProperty("--ambient-glow", `rgba(${avgR}, ${avgG}, ${avgB}, 0.24)`);
-                document.documentElement.style.setProperty("--ambient-tint", `rgba(${avgR}, ${avgG}, ${avgB}, 0.12)`);
-                document.documentElement.style.setProperty("--ambient-border", `rgba(${avgR}, ${avgG}, ${avgB}, 0.5)`);
-            }
-        } catch (e) {
-            // Silently fallback if canvas read is blocked
-        }
+// Dynamic Adaptive Ambient Hue following the currently playing wallpaper (Hibernation-Aware)
+let isAppWindowVisible = true;
+let pendingAmbientWallpaper = null;
+
+export function handleAppVisibilityChange(visible) {
+    isAppWindowVisible = !!visible;
+    if (isAppWindowVisible && pendingAmbientWallpaper) {
+        const target = pendingAmbientWallpaper;
+        pendingAmbientWallpaper = null;
+        updateNowPlayingCard(target);
+    }
+}
+
+function hexToRgb(hex) {
+    if (!hex) return null;
+    let clean = String(hex).replace("#", "").trim();
+    if (clean.length === 3) clean = clean.split("").map(c => c + c).join("");
+    if (clean.length !== 6) return null;
+    const num = parseInt(clean, 16);
+    if (isNaN(num)) return null;
+    return {
+        r: (num >> 16) & 255,
+        g: (num >> 8) & 255,
+        b: num & 255
     };
-    img.src = imageSrc;
+}
+
+export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
+    if (!activePath) return;
+
+    // Hibernation guard: 0 CPU & 0 DOM operations when running in tray/background
+    if (!isAppWindowVisible) {
+        pendingAmbientWallpaper = currentImg || { path: activePath };
+        return;
+    }
+
+    let rgb = null;
+    const filename = currentImg ? currentImg.filename : activePath.split(/[\\/]/).pop();
+    const hash = filename ? filename.split(".")[0] : "";
+    const meta = (hash && store.state.localMetadata && store.state.localMetadata.wallpaper_metadata)
+        ? store.state.localMetadata.wallpaper_metadata[hash]
+        : null;
+
+    // 1. Fast Path: Use pre-computed color from metadata cache if present
+    if (meta && meta.primary_color) {
+        rgb = hexToRgb(meta.primary_color);
+    }
+
+    // 2. High-Performance Fallback: Extract dominant hue via native Electron C++ runtime
+    if (!rgb && window.api && window.api.getDominantColor) {
+        try {
+            const res = await window.api.getDominantColor(activePath);
+            if (res && typeof res.r === "number") {
+                rgb = { r: res.r, g: res.g, b: res.b };
+            }
+        } catch {
+            // Fallback silently if extraction fails
+        }
+    }
+
+    // 3. Smoothly apply CSS variables across the app shell with 1.2s ambient transition
+    if (rgb) {
+        const root = document.documentElement;
+        root.style.setProperty("--ambient-glow", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28)`);
+        root.style.setProperty("--ambient-tint", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
+        root.style.setProperty("--ambient-border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45)`);
+        root.style.setProperty("--ambient-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    }
 }
 
 // 2. Now Playing / Currently Applied Wallpaper Card
@@ -267,6 +298,12 @@ export function updateNowPlayingCard(explicitImg = null) {
         return;
     }
 
+    // Hibernation guard: defer heavy DOM painting when minimized to system tray
+    if (!isAppWindowVisible) {
+        pendingAmbientWallpaper = explicitImg || (activePath ? { path: activePath } : null);
+        return;
+    }
+
     const currentImg = explicitImg || images.find(img => img.path === activePath);
     const filename = currentImg ? currentImg.filename : activePath.split(/[\\/]/).pop();
     const cleanName = filename ? filename.split(".")[0] : "Desktop Wallpaper";
@@ -277,8 +314,9 @@ export function updateNowPlayingCard(explicitImg = null) {
     if (cardImg) {
         const fileUrl = toFileUrl(activePath);
         cardImg.src = fileUrl;
-        applyAdaptiveAmbientHue(fileUrl);
     }
+    applyAdaptiveAmbientHue(activePath, currentImg);
+
     if (cardTitle) {
         cardTitle.textContent = cleanName;
         cardTitle.title = cleanName;
