@@ -22,9 +22,12 @@ function loadSettings() {
   const firstUsedAt = savedSettings.firstUsedAt || now;
 
   const merged = {
-    // When enabled, the app performs a lightweight server check on startup
-    // (no periodic polling in the background).
-    autoSync: false,
+    // When enabled, the app automatically checks and syncs wallpapers in the background
+    autoSync: true,
+    autoSyncInterval: 21600000, // 6 hours (6 * 60 * 60 * 1000)
+    syncOnStartup: true,
+    notifyNewWallpapers: true,
+    notifyAppUpdates: true,
     slideshow: false,
     slideshowRandom: false,
     slideshowInterval: 1800000,
@@ -36,7 +39,7 @@ function loadSettings() {
     selectedImages: [],
     apiUrl: "",
     syncToken: "",
-    appVersion: "5.0.0",
+    appVersion: "5.1.0",
     alreadyReviewed: false,
     firstUsedAt,
     reviewRemindAfter: 0,

@@ -84,32 +84,31 @@ export async function updateWallpaperInfo() {
 
 export async function triggerBackgroundSync(isManual = false) {
     updateConnectionDot("offline", "Syncing...");
-    if (isManual) showToast("Syncing library metadata...", "info");
+    if (isManual) showToast("Synchronizing cloud library & wallpapers...", "info");
     try {
-        const syncRes = await window.api.syncMetadataNow();
-        if (syncRes && !syncRes.error) {
-            const pendingCount =
-                (state.localMetadata.sync_queue?.categories?.length || 0) +
-                (state.localMetadata.sync_queue?.collections?.length || 0) +
-                (state.localMetadata.sync_queue?.tags?.length || 0) +
-                (state.localMetadata.sync_queue?.wallpapers?.length || 0);
+        const syncRes = window.api.syncFullLibrary
+            ? await window.api.syncFullLibrary(isManual)
+            : await window.api.syncMetadataNow();
 
-            if (pendingCount > 0) {
-                updateConnectionDot("offline", `Offline (${pendingCount} pending)`);
-                if (isManual) showToast(`Synced! ${pendingCount} updates cached offline.`, "info");
-            } else {
-                updateConnectionDot("online", "Connected");
-                if (isManual) showToast("Library metadata synced successfully!", "success");
+        if (syncRes && !syncRes.error) {
+            updateConnectionDot("online", "Connected");
+            if (isManual) {
+                if (syncRes.downloadCount > 0) {
+                    showToast(`Synced! Downloaded ${syncRes.downloadCount} new 4K wallpaper(s).`, "success");
+                } else {
+                    showToast("Library is fully synchronized & up to date!", "success");
+                }
             }
             await refreshMetadata();
+            await updateWallpaperInfo();
             await loadWallpapers();
         } else {
-            updateConnectionDot("unreachable", syncRes.error || "Server offline");
-            if (isManual) showToast("Sync failed: " + (syncRes.error || "Server offline"), "error");
+            updateConnectionDot("unreachable", syncRes?.error || "Server offline");
+            if (isManual) showToast("Sync failed: " + (syncRes?.error || "Server offline"), "error");
         }
     } catch (err) {
         updateConnectionDot("unreachable", "Sync failed");
-        if (isManual) showToast("Sync failed: Connection lost", "error");
+        if (isManual) showToast("Sync failed: " + err.message, "error");
     }
 }
 

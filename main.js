@@ -7,6 +7,17 @@ if (!gotSingleInstanceLock) {
   app.exit(0);
 }
 
+// Windows Toast Notification & Action Center Registration (AUMID)
+// Windows requires a matching AppUserModelID so toast notifications work reliably in both packaged and dev environments
+const APP_ID = "com.wallpaper.syncapp";
+if (process.platform === "win32") {
+  try {
+    app.setAppUserModelId(app.isPackaged ? APP_ID : process.execPath);
+  } catch (err) {
+    console.warn("Failed to set appUserModelId:", err);
+  }
+}
+
 // High-efficiency memory optimizations: limit heap growth & trim background renderer bloat
 app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
 app.commandLine.appendSwitch("disable-site-isolation-trials");
@@ -394,12 +405,8 @@ function createMainWindow() {
 
   async function runFullscreenSync() {
     try {
-      const syncConfig = getSyncConfig();
-      // Silently sync in background when fullscreen
-      await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN);
-      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
-        mainWindow.webContents.send("sync-complete");
-      }
+      // Silently sync library and wallpapers in background when fullscreen
+      await runFullLibrarySync(false, false);
     } catch (err) {
       console.error("Fullscreen auto-sync error:", err);
     }
@@ -682,50 +689,156 @@ function getSyncConfig() {
   };
 }
 
-async function checkForNewWallpapersOnce() {
-  if (didStartupNewCheck) return;
-  didStartupNewCheck = true;
+// In-App Notification Center State
+let inAppNotifications = [];
 
+function broadcastInAppNotification(notifItem) {
+  const existingIdx = inAppNotifications.findIndex(
+    n => n.id === notifItem.id || (n.type === notifItem.type && n.type === "updates")
+  );
+  if (existingIdx !== -1) {
+    inAppNotifications[existingIdx] = { ...inAppNotifications[existingIdx], ...notifItem };
+  } else {
+    inAppNotifications.unshift(notifItem);
+  }
+  if (inAppNotifications.length > 20) {
+    inAppNotifications = inAppNotifications.slice(0, 20);
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("notifications:update", inAppNotifications);
+  }
+}
+
+// Native Windows Toast Notification Helper with user preference checks
+function showNativeNotification({ title, body, icon, onClick, type = "general" }) {
+  if (type === "wallpapers" && settings && settings.notifyNewWallpapers === false) return;
+  if (type === "updates" && settings && settings.notifyAppUpdates === false) return;
+
+  if (Notification.isSupported()) {
+    try {
+      const notifIcon = icon || path.join(__dirname, "icon.png");
+      const notif = new Notification({
+        title: title || "Wallpaper Sync",
+        body: body || "",
+        icon: fs.existsSync(notifIcon) ? notifIcon : undefined,
+        silent: false,
+      });
+
+      const activateApp = () => {
+        if (typeof onClick === "function") {
+          try { onClick(); } catch {}
+        }
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          createMainWindow();
+        } else {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      };
+
+      notif.on("click", activateApp);
+      notif.show();
+    } catch (err) {
+      console.warn("[main] Failed to display native toast notification:", err.message);
+    }
+  }
+}
+
+// Periodic Background Sync Timer
+let autoSyncIntervalTimer = null;
+
+function setupPeriodicAutoSync() {
+  if (autoSyncIntervalTimer) {
+    clearInterval(autoSyncIntervalTimer);
+    autoSyncIntervalTimer = null;
+  }
+
+  // Periodic check interval (default: 6 hours, min: 15 mins)
+  const intervalMs = Math.max(15 * 60 * 1000, Number(settings?.autoSyncInterval) || 21600000);
+
+  autoSyncIntervalTimer = setInterval(async () => {
+    if (settings?.autoSync) {
+      console.log("[main] Scheduled background check: checking for new wallpapers & updates...");
+      await checkCloudForNewWallpapers();
+      await checkForUpdates({ userInitiated: false });
+    }
+  }, intervalMs);
+}
+
+// Check Cloud for New Wallpapers
+async function checkCloudForNewWallpapers() {
   try {
     const syncConfig = getSyncConfig();
     const cursor = (syncConfig.LAST_SYNC_CURSOR || "").trim();
-    if (!cursor) return;
 
     const headers = {};
     if (syncConfig.SYNC_TOKEN) headers["x-sync-token"] = syncConfig.SYNC_TOKEN;
 
     const url = new URL(syncConfig.API_URL);
-    url.searchParams.set("since", cursor);
+    if (cursor) {
+      url.searchParams.set("since", cursor);
+    }
     url.searchParams.set("countOnly", "1");
 
     const res = await axios.get(url.toString(), { headers, timeout: 15_000 });
     const count = Number(res?.data?.count || 0);
     if (!Number.isFinite(count) || count <= 0) return;
 
-    if (Notification.isSupported()) {
-      new Notification({
-        title: "New wallpapers available",
-        body: count === 1 ? "1 new wallpaper is available." : `${count} new wallpapers are available.`,
-      }).show();
-    }
+    if (settings?.autoSync) {
+      console.log(`[main] Detected ${count} new wallpaper(s) in cloud. Automatically downloading...`);
+      await runFullLibrarySync(false, false);
+    } else {
+      showNativeNotification({
+        title: "New 4K Wallpapers Available",
+        body: count === 1 ? "1 new 4K wallpaper is ready in the cloud." : `${count} new 4K wallpapers are ready in the cloud.`,
+        type: "wallpapers",
+        onClick: () => {
+          createMainWindow();
+        }
+      });
 
-    // Optional: renderer can surface a lightweight hint (no polling).
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("app-error", count === 1
-        ? "1 new wallpaper is available on the server."
-        : `${count} new wallpapers are available on the server.`);
+      broadcastInAppNotification({
+        id: "cloud-wallpapers-" + Date.now(),
+        type: "wallpapers",
+        title: "New Wallpapers in Cloud",
+        body: `${count} new wallpaper(s) ready to download. Click 'Sync Library' to get them.`,
+        time: "Just now",
+        action: "sync-library"
+      });
     }
   } catch (err) {
-    // Silent failure: we keep startup lightweight and avoid noisy errors.
+    // Silent fail on network glitches
   }
 }
 
-async function runAutoSync(promptUser = false, notifyOnError = false) {
+// Complete Unified 2-Stage Synchronization (Metadata + Wallpaper Images)
+async function runFullLibrarySync(promptUser = false, notifyOnError = false) {
   try {
     const syncConfig = getSyncConfig();
-    if (mainWindow) mainWindow.webContents.send("download-progress", 0);
 
-    // "Fetch from Server" should be a full reconcile; background sync should be incremental.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("sync:status", { phase: "metadata", message: "Synchronizing collections, tags & AI data..." });
+    }
+
+    // Stage 1: Synchronize Metadata Cache (Collections, Tags, AI Descriptions)
+    let metaRes = null;
+    try {
+      metaRes = await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN, (status, percent) => {
+        if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.send("metadata-sync-progress", { status, percent });
+        }
+      });
+    } catch (metaErr) {
+      console.warn("[main] Metadata sync notice:", metaErr.message);
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("sync:status", { phase: "wallpapers", message: "Fetching and downloading 4K wallpapers..." });
+      mainWindow.webContents.send("download-progress", 0);
+    }
+
+    // Stage 2: Synchronize and Download 4K Wallpaper Files
     const fullSync = !!promptUser || !(syncConfig.LAST_SYNC_CURSOR && String(syncConfig.LAST_SYNC_CURSOR).trim());
 
     const {
@@ -737,16 +850,21 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
     } = await syncWallpapers(
       { ...syncConfig, FULL_SYNC: fullSync },
       (percent) => {
-      if (mainWindow) mainWindow.webContents.send("download-progress", percent);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("download-progress", percent);
+        }
       }
     );
-    if (mainWindow) mainWindow.webContents.send("download-progress", 100);
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("download-progress", 100);
+    }
 
     if (error) {
-      if (notifyOnError && mainWindow) {
-        mainWindow.webContents.send("app-error", `Sync failed: ${error}`);
+      if (notifyOnError && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("app-error", `Sync encountered issues: ${error}`);
       }
-      return { downloadCount: 0, orphanedCount: 0, error };
+      return { downloadCount: 0, serverDeletedCount: 0, error, metadataSynced: !!metaRes };
     }
 
     let serverDeletedCount = 0;
@@ -756,7 +874,6 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
         .filter((f) => f.match(/\.(jpg|jpeg|png|webp)$/i));
       for (const local of localFiles) {
         if (!serverFiles.includes(local)) {
-          // Non-blocking UX: keep local copies; just report count.
           serverDeletedCount++;
         }
       }
@@ -771,19 +888,45 @@ async function runAutoSync(promptUser = false, notifyOnError = false) {
 
     settings.lastSyncDate = Date.now();
     saveSettings(settings);
-    if (mainWindow) {
-      mainWindow.webContents.send("sync-complete");
+
+    // Notify user if new wallpapers arrived
+    if (downloadCount > 0) {
+      showNativeNotification({
+        title: "New 4K Wallpapers Synced",
+        body: downloadCount === 1 ? "1 new wallpaper added to your collection." : `${downloadCount} new wallpapers added to your collection.`,
+        type: "wallpapers",
+        onClick: () => {
+          createMainWindow();
+        }
+      });
+
+      broadcastInAppNotification({
+        id: "new-wallpapers-" + Date.now(),
+        type: "wallpapers",
+        title: "New Wallpapers Downloaded",
+        body: `${downloadCount} new 4K wallpaper(s) synchronized to your local library.`,
+        time: "Just now"
+      });
     }
 
-    return { downloadCount, orphanedCount: 0, serverDeletedCount, error: null };
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("sync-complete", { downloadCount, serverDeletedCount });
+    }
+
+    return { downloadCount, serverDeletedCount, error: null, metadataSynced: true };
   } catch (err) {
-    console.error("Auto Sync Error:", err.message);
+    console.error("[main] Full Library Sync Error:", err.message);
     const message = err && err.message ? err.message : String(err);
-    if (notifyOnError && mainWindow) {
+    if (notifyOnError && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("app-error", `Sync failed: ${message}`);
     }
-    return { downloadCount: 0, orphanedCount: 0, serverDeletedCount: 0, error: message };
+    return { downloadCount: 0, serverDeletedCount: 0, error: message, metadataSynced: false };
   }
+}
+
+// Backward-compatible alias for auto-sync callers
+async function runAutoSync(promptUser = false, notifyOnError = false) {
+  return await runFullLibrarySync(promptUser, notifyOnError);
 }
 
 function setupTray() {
@@ -895,6 +1038,29 @@ async function checkGithubReleasesDirectly({ userInitiated }) {
       updateState.available = true;
       updateState.version = tag.replace(/^v/i, "");
       updateState.notes = summarizeReleaseNotes(data.body);
+
+      // Trigger native OS toast notification for new release
+      showNativeNotification({
+        title: `Wallpaper Sync v${updateState.version} Released`,
+        body: `A new version is available! ${updateState.notes ? updateState.notes.slice(0, 90) + "..." : "Click to view and download."}`,
+        type: "updates",
+        onClick: () => {
+          createMainWindow();
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("app:open-update-modal");
+          }
+        }
+      });
+
+      // Broadcast to in-app notification center
+      broadcastInAppNotification({
+        id: "update-available-" + updateState.version,
+        type: "updates",
+        title: `Update v${updateState.version} Available`,
+        body: `A new version of Wallpaper Sync is available. Click to download installer.`,
+        time: "Just now",
+        action: "download-update"
+      });
     } else {
       updateState.checking = false;
       updateState.available = false;
@@ -953,8 +1119,19 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
     }
   });
 
-  // Cold launch wallpaper update check (runs exactly once on startup)
-  checkForNewWallpapersOnce();
+  // Initialize periodic background cloud check & update timer
+  setupPeriodicAutoSync();
+
+  // Cold launch wallpaper & update check
+  if (settings.autoSync || settings.syncOnStartup) {
+    setTimeout(() => {
+      checkCloudForNewWallpapers();
+    }, 2000);
+  }
+
+  setTimeout(() => {
+    checkForUpdates({ userInitiated: false });
+  }, 4000);
 
   registerWindowsStartupOnce();
 
@@ -1043,13 +1220,68 @@ ipcMain.handle("update-interval", (event, ms) => {
 });
 
 ipcMain.handle("sync-now", async () => {
-  const result = await runAutoSync(false, true);
+  const result = await runFullLibrarySync(false, true);
   await nextSlideshowImage();
   return result;
 });
 
 ipcMain.handle("fetch-server", async () => {
-  return await runAutoSync(true, true);
+  return await runFullLibrarySync(true, true);
+});
+
+ipcMain.handle("sync-library-full", async (event, fullReconcile = false) => {
+  return await runFullLibrarySync(fullReconcile, true);
+});
+
+ipcMain.handle("toggle-auto-sync", (event, enabled) => {
+  settings.autoSync = !!enabled;
+  saveSettings(settings);
+  setupPeriodicAutoSync();
+  return { success: true, autoSync: settings.autoSync };
+});
+
+ipcMain.handle("update-sync-interval", (event, intervalMs) => {
+  const parsed = Number(intervalMs);
+  if (!isNaN(parsed) && parsed >= 60000) {
+    settings.autoSyncInterval = parsed;
+    saveSettings(settings);
+    setupPeriodicAutoSync();
+  }
+  return { success: true, autoSyncInterval: settings.autoSyncInterval };
+});
+
+ipcMain.handle("toggle-notify-wallpapers", (event, enabled) => {
+  settings.notifyNewWallpapers = !!enabled;
+  saveSettings(settings);
+  return { success: true, notifyNewWallpapers: settings.notifyNewWallpapers };
+});
+
+ipcMain.handle("toggle-notify-updates", (event, enabled) => {
+  settings.notifyAppUpdates = !!enabled;
+  saveSettings(settings);
+  return { success: true, notifyAppUpdates: settings.notifyAppUpdates };
+});
+
+ipcMain.handle("open-wallpaper-dir", () => {
+  const dir = config.WALLPAPER_DIR;
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  shell.openPath(dir);
+  return { success: true, path: dir };
+});
+
+ipcMain.handle("get-wallpaper-dir", () => {
+  return config.WALLPAPER_DIR;
+});
+
+ipcMain.handle("notifications:get", () => {
+  return inAppNotifications;
+});
+
+ipcMain.handle("notifications:clear", () => {
+  inAppNotifications = [];
+  return { success: true };
 });
 
 ipcMain.handle("get-wallpapers", () => {
@@ -1191,12 +1423,7 @@ ipcMain.handle("update-wallpaper-metadata-local", (event, hash, collectionId, ta
 });
 
 ipcMain.handle("sync-metadata-now", async () => {
-  const syncConfig = getSyncConfig();
-  return await syncMetadataWithServer(syncConfig.API_URL, syncConfig.SYNC_TOKEN, (status, percent) => {
-    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.send("metadata-sync-progress", { status, percent });
-    }
-  });
+  return await runFullLibrarySync(false, true);
 });
 
 ipcMain.handle("update-slideshow-source", (event, source) => {

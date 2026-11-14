@@ -1,6 +1,58 @@
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
+const https = require("https");
+const stream = require("stream");
+const { promisify } = require("util");
 const axios = require("axios");
+
+const finishedStream = promisify(stream.finished);
+
+// High-performance Connection Pooling with Keep-Alive Agents
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 5,
+  maxFreeSockets: 5,
+  timeout: 60_000,
+});
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 5,
+  maxFreeSockets: 5,
+  timeout: 60_000,
+});
+
+const downloadClient = axios.create({
+  httpAgent,
+  httpsAgent,
+  timeout: 45_000,
+});
+
+/**
+ * Worker Pool pattern for bounded concurrency without overloading memory or socket descriptors.
+ */
+async function concurrentPool(items, concurrencyLimit, taskHandler) {
+  let index = 0;
+  const results = new Array(items.length);
+
+  async function worker() {
+    while (index < items.length) {
+      const currentIndex = index++;
+      const item = items[currentIndex];
+      try {
+        results[currentIndex] = await taskHandler(item, currentIndex);
+      } catch (err) {
+        results[currentIndex] = { error: err };
+      }
+    }
+  }
+
+  const workerCount = Math.min(concurrencyLimit, items.length);
+  const workers = Array.from({ length: workerCount }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
 
 async function syncWallpapers(config, onProgress) {
   if (!fs.existsSync(config.WALLPAPER_DIR)) {
@@ -26,13 +78,12 @@ async function syncWallpapers(config, onProgress) {
       apiUrl.searchParams.set("since", since);
     }
 
-    const response = await axios.get(apiUrl.toString(), {
+    const response = await downloadClient.get(apiUrl.toString(), {
       headers,
       timeout: 30_000
     });
-    const wallpapers = response.data.wallpapers || [];
-
-    const maxCreatedAt = response.data.max_created_at || null;
+    const wallpapers = response.data?.wallpapers || [];
+    const maxCreatedAt = response.data?.max_created_at || null;
 
     const eligible = wallpapers
       .map((wp) => {
@@ -62,15 +113,17 @@ async function syncWallpapers(config, onProgress) {
     const serverFiles = wallpapers.map(wp => String(wp?.storage_path || wp?.name || "")).filter(Boolean);
     const failedIndices = new Set();
     const downloadErrors = [];
+    let completedCount = 0;
 
-    for (let index = 0; index < eligible.length; index++) {
-      const wp = eligible[index];
+    // Concurrency limit: 3 parallel downloads optimal for 4K images on standard home broadband
+    const CONCURRENCY_LIMIT = 3;
 
+    await concurrentPool(eligible, CONCURRENCY_LIMIT, async (wp, index) => {
       const fileKey = String(wp.__key);
       const filename = path.basename(fileKey);
       const destPath = path.join(config.WALLPAPER_DIR, filename);
 
-      // Check if file exists but is corrupted (0 bytes) and delete it
+      // Check if existing file is corrupted (0 bytes) and clean it up
       let isGlitched = false;
       if (fs.existsSync(destPath)) {
         try {
@@ -82,62 +135,47 @@ async function syncWallpapers(config, onProgress) {
           isGlitched = true;
         }
       }
+
       if (isGlitched) {
         try {
           fs.unlinkSync(destPath);
-          console.log("Deleted glitched/0-byte wallpaper file:", filename);
+          console.log("[Downloader] Removed corrupted 0-byte wallpaper:", filename);
         } catch (err) {
-          console.warn("Failed to delete 0-byte file:", filename, err.message);
+          console.warn("[Downloader] Failed to remove 0-byte file:", filename, err.message);
         }
       }
 
-      // Download if we don't already have it
+      // Only download if we don't already have it
       if (!fs.existsSync(destPath)) {
-        console.log("Downloading from API:", filename);
+        console.log(`[Downloader] Fetching 4K wallpaper [${index + 1}/${total}]:`, filename);
         const tempPath = destPath + ".tmp";
-        
+
+        // Clean stale temp file
         try {
-          // Clean up any stale temp file first
           if (fs.existsSync(tempPath)) {
             fs.unlinkSync(tempPath);
           }
-        } catch {}
+        } catch { }
 
+        let writer = null;
         try {
-          const imgRes = await axios({
+          const imgRes = await downloadClient({
             url: wp.url,
             method: "GET",
-            responseType: "stream"
+            responseType: "stream",
+            timeout: 60_000,
           });
 
-          const writer = fs.createWriteStream(tempPath);
-          
-          await new Promise((resolve, reject) => {
-            let settled = false;
-            imgRes.data.pipe(writer);
-            imgRes.data.on("error", (err) => {
-              if (settled) return;
-              settled = true;
-              writer.destroy();
-              reject(err);
-            });
-            writer.on("error", (err) => {
-              if (settled) return;
-              settled = true;
-              writer.destroy();
-              reject(err);
-            });
-            writer.on("close", () => {
-              if (settled) return;
-              settled = true;
-              resolve();
-            });
-          });
+          writer = fs.createWriteStream(tempPath);
+          imgRes.data.pipe(writer);
 
-          // Rename temp file to final destination
+          // Wait until fully flushed and written to disk
+          await finishedStream(writer);
+
+          // Atomic rename from temp to destination
           fs.renameSync(tempPath, destPath);
 
-          // Preserve server ordering: apply server created_at as local modified time (best-effort).
+          // Apply server created_at as local modified time
           try {
             const createdAt = wp.created_at ? new Date(wp.created_at) : null;
             if (createdAt && !Number.isNaN(createdAt.getTime())) {
@@ -148,24 +186,29 @@ async function syncWallpapers(config, onProgress) {
           latestFile = destPath;
           downloadCount++;
         } catch (err) {
-          console.warn("Notice: Skipped unavailable wallpaper:", filename, err.message);
+          console.warn(`[Downloader] Skipped unavailable wallpaper "${filename}":`, err.message);
           failedIndices.add(index);
           downloadErrors.push(`${filename}: ${err.message}`);
+
+          if (writer && !writer.destroyed) {
+            writer.destroy();
+          }
           try {
             if (fs.existsSync(tempPath)) {
               fs.unlinkSync(tempPath);
             }
-          } catch {}
+          } catch { }
         }
       }
 
+      completedCount++;
       if (typeof onProgress === "function" && total > 0) {
-        const percent = Math.round(((index + 1) / total) * 100);
+        const percent = Math.round((completedCount / total) * 100);
         try {
           onProgress(percent);
         } catch { }
       }
-    }
+    });
 
     if (typeof onProgress === "function") {
       try {
@@ -198,7 +241,7 @@ async function syncWallpapers(config, onProgress) {
         ? `HTTP ${status}${statusText ? ` ${statusText}` : ""}`
         : error?.message || "Unknown error";
 
-    console.error("Error syncing wallpapers from API:", message);
+    console.error("[Downloader] Error syncing wallpapers from API:", message);
     return { latestFile: null, downloadCount: 0, serverFiles: [], maxCreatedAt: null, error: message };
   }
 }

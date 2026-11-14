@@ -47,5 +47,18 @@ contextBridge.exposeInMainWorld("api", {
   onWatchdogRecovered: (callback) => ipcRenderer.on("watchdog:recovered", (event, data) => callback(data)),
   performHealthCheck: () => ipcRenderer.invoke("app:health-check"),
   fixHealthIssue: (action) => ipcRenderer.invoke("app:health-fix", action),
-  trimMemory: () => ipcRenderer.invoke("app:trim-memory")
+  trimMemory: () => ipcRenderer.invoke("app:trim-memory"),
+
+  // Cloud Synchronization, Storage & Notification Control APIs
+  syncFullLibrary: (fullReconcile = false) => ipcRenderer.invoke("sync-library-full", fullReconcile),
+  toggleAutoSync: (enabled) => ipcRenderer.invoke("toggle-auto-sync", enabled),
+  updateSyncInterval: (intervalMs) => ipcRenderer.invoke("update-sync-interval", intervalMs),
+  toggleNotifyWallpapers: (enabled) => ipcRenderer.invoke("toggle-notify-wallpapers", enabled),
+  toggleNotifyUpdates: (enabled) => ipcRenderer.invoke("toggle-notify-updates", enabled),
+  openWallpaperDir: () => ipcRenderer.invoke("open-wallpaper-dir"),
+  getWallpaperDir: () => ipcRenderer.invoke("get-wallpaper-dir"),
+  getNotifications: () => ipcRenderer.invoke("notifications:get"),
+  clearNotifications: () => ipcRenderer.invoke("notifications:clear"),
+  onNotificationsUpdate: (callback) => ipcRenderer.on("notifications:update", (event, data) => callback(data)),
+  onSyncStatus: (callback) => ipcRenderer.on("sync:status", (event, data) => callback(data))
 });

@@ -619,6 +619,49 @@
                     <span style="color:var(--success);">✓ No issues detected</span>
                 </div>
             </div>
+
+            <!-- E. Cloud Synchronization Card -->
+            <div class="panel-card-v5" id="panelCloudSyncCard">
+                <div class="panel-card-header">
+                    <div class="panel-header-left">
+                        <div class="panel-icon-circle icon-sync" style="background: rgba(43, 123, 255, 0.2); color: #60a5fa;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="panel-title">Cloud Auto-Sync</h4>
+                            <p class="panel-subtitle">Auto-download newly published 4K wallpapers</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="rightAutoSyncToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="panel-settings-body" style="margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
+                        <span>Sync Status:</span>
+                        <span id="rightSyncStatusText" style="color: var(--success); font-weight: 600;">Up to date</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="panel-btn-next" id="rightSyncNowBtn" type="button" style="flex: 1; padding: 7px 10px; font-size: 11.5px;">
+                            <span>Sync Library &amp; Wallpapers</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </button>
+                        <button class="primary-btn btn-secondary" id="rightOpenSettingsBtn" type="button" style="padding: 7px 12px; font-size: 11.5px; border-radius: 8px;" title="Preferences &amp; Cloud Settings">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- 4. RIGHT SLIDE-OUT DETAIL DRAWER (Inspection & Metadata Tagging) -->
@@ -852,6 +895,134 @@
                 <div class="shortcut-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-subtle);">
                     <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">Close Drawer / Modal</span>
                     <div style="display: flex; gap: 4px;"><kbd class="shortcut-kbd">Esc</kbd></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. Settings & Cloud Sync Preferences Modal -->
+    <div id="settingsModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+        <div class="lightbox-backdrop" id="settingsModalBackdrop"></div>
+        <div class="creator-modal-content settings-modal-content" style="max-width: 580px; width: 92%; padding: 24px 28px; border-radius: 20px; max-height: 88vh; overflow-y: auto;">
+            <div class="settings-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(43, 123, 255, 0.2); color: #60a5fa; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚙️</div>
+                    <div>
+                        <h3 id="settingsModalTitle" style="font-size: 17px; font-weight: 700; color: var(--text-main); margin: 0;">Settings &amp; Cloud Sync</h3>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Manage wallpaper synchronization, notifications &amp; local storage</p>
+                    </div>
+                </div>
+                <button id="closeSettingsModalBtn" class="close-drawer-btn" type="button" aria-label="Close settings">✕</button>
+            </div>
+
+            <div class="settings-modal-sections" style="display: flex; flex-direction: column; gap: 18px;">
+                <!-- Section 1: Cloud Wallpaper Synchronization -->
+                <div class="settings-group-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 16px;">
+                    <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+                        <span>🔄</span> Cloud Wallpaper Synchronization
+                    </h4>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">Auto-Sync Wallpapers</div>
+                                <div style="font-size: 11.5px; color: var(--text-muted);">Automatically download newly published 4K wallpapers in the background</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="settingAutoSyncToggle" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">Sync on App Launch</div>
+                                <div style="font-size: 11.5px; color: var(--text-muted);">Check cloud library immediately when the app starts up</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="settingSyncStartupToggle" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">Sync Frequency</div>
+                                <div style="font-size: 11.5px; color: var(--text-muted);">How often to check for newly published wallpapers</div>
+                            </div>
+                            <div class="panel-select-wrap" style="width: 150px;">
+                                <select id="settingSyncIntervalSelect" style="padding: 5px 8px; font-size: 12px;">
+                                    <option value="3600000">Every 1 Hour</option>
+                                    <option value="21600000">Every 6 Hours</option>
+                                    <option value="43200000">Every 12 Hours</option>
+                                    <option value="86400000">Every 24 Hours</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="border-top: 1px solid var(--border-subtle); padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <span id="settingLastSyncLabel" style="font-size: 11.5px; color: var(--text-muted);">Last sync: Just now</span>
+                            <button id="settingSyncNowActionBtn" class="primary-btn" type="button" style="padding: 7px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+                                <span>Sync All Wallpapers Now</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Notifications -->
+                <div class="settings-group-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 16px;">
+                    <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+                        <span>🔔</span> Windows Desktop &amp; Action Center Notifications
+                    </h4>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">New Wallpapers Notification</div>
+                                <div style="font-size: 11.5px; color: var(--text-muted);">Show Windows toast notification when new wallpapers are published</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="settingNotifyWallpapersToggle" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">App Version Updates</div>
+                                <div style="font-size: 11.5px; color: var(--text-muted);">Show Windows toast notification when a new version of Wallpaper Sync is available</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="settingNotifyUpdatesToggle" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Local Storage & Wallpaper Directory -->
+                <div class="settings-group-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 16px;">
+                    <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+                        <span>📁</span> Wallpaper Storage &amp; Cache
+                    </h4>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Local Wallpapers Folder:</div>
+                            <div id="settingWallpaperDirPath" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 12px; font-size: 11.5px; color: var(--text-main); word-break: break-all; font-family: monospace;">
+                                .../AppData/Roaming/Wallpaper Sync App/wallpapers
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 4px;">
+                            <button id="settingOpenFolderBtn" class="primary-btn btn-secondary" type="button" style="flex: 1; padding: 8px 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>📂 Open Folder in Explorer</span>
+                            </button>
+                            <button id="settingForceResyncBtn" class="primary-btn btn-secondary" type="button" style="flex: 1; padding: 8px 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>⚡ Force Cloud Re-Sync</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

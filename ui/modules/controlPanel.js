@@ -3,12 +3,14 @@ import { store } from "../store.js";
 import { toFileUrl, showToast } from "./utils.js";
 import { setSlideshowPlaybackUI, updatePlayerStatusText } from "./player.js";
 import { updateQuickActionSlideshowUI } from "./quickActions.js";
+import { openSettingsModal } from "./modal.js";
 
 let statusUpdateTimer = null;
 
 export function initControlPanel() {
     initRightSlideshowControls();
     initWatchdogCard();
+    initCloudSyncCard();
     updateNowPlayingCard();
     updateSystemStatus();
 
@@ -166,6 +168,44 @@ export function syncRightControlPanelState() {
         } else {
             collectionSelect.value = "all";
         }
+    }
+
+    const rightAutoSyncToggle = document.getElementById("rightAutoSyncToggle");
+    if (rightAutoSyncToggle && store.state.settings) {
+        rightAutoSyncToggle.checked = store.state.settings.autoSync !== false;
+    }
+}
+
+export function initCloudSyncCard() {
+    const rightAutoSyncToggle = document.getElementById("rightAutoSyncToggle");
+    const rightSyncNowBtn = document.getElementById("rightSyncNowBtn");
+    const rightOpenSettingsBtn = document.getElementById("rightOpenSettingsBtn");
+
+    if (rightAutoSyncToggle) {
+        rightAutoSyncToggle.checked = store.state.settings?.autoSync !== false;
+        rightAutoSyncToggle.addEventListener("change", async (e) => {
+            await window.api.toggleAutoSync(e.target.checked);
+            const modalSwitch = document.getElementById("settingAutoSyncToggle");
+            if (modalSwitch) modalSwitch.checked = e.target.checked;
+            showToast(e.target.checked ? "Cloud auto-sync enabled!" : "Cloud auto-sync disabled", "info");
+        });
+    }
+
+    if (rightSyncNowBtn) {
+        rightSyncNowBtn.addEventListener("click", async () => {
+            rightSyncNowBtn.disabled = true;
+            try {
+                await store.triggerBackgroundSync(true);
+            } finally {
+                setTimeout(() => { rightSyncNowBtn.disabled = false; }, 800);
+            }
+        });
+    }
+
+    if (rightOpenSettingsBtn) {
+        rightOpenSettingsBtn.addEventListener("click", () => {
+            openSettingsModal();
+        });
     }
 }
 

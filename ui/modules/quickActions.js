@@ -78,14 +78,12 @@ export function initQuickActions() {
         });
     }
 
-    // 3. Sync Library
+    // 3. Sync Library & 4K Wallpapers
     if (quickActionSync) {
         quickActionSync.addEventListener("click", async () => {
             quickActionSync.classList.add("anim-spin");
-            showToast("Syncing library metadata...", "info");
             try {
-                await store.triggerBackgroundSync();
-                showToast("Library is up to date!", "success");
+                await store.triggerBackgroundSync(true);
             } catch (err) {
                 showToast("Sync error: " + err.message, "error");
             } finally {

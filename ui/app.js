@@ -19,7 +19,7 @@ import {
 } from "./modules/gallery.js";
 import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
-import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal } from "./modules/modal.js";
+import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal, initSettingsModal, openSettingsModal } from "./modules/modal.js";
 import { initQuickActions } from "./modules/quickActions.js";
 import { initControlPanel, syncRightControlPanelState } from "./modules/controlPanel.js";
 import { initShortcuts } from "./modules/shortcuts.js";
@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Initial Setup and Lifecycles
     async function init() {
         store.state.settings = await window.api.getSettings();
+        initSettingsModal();
 
         // 1. Initial setup of slideshow intervals & controls
         const currentInterval = store.state.settings.slideshowInterval || 1800000;
@@ -274,7 +275,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (toolSettings) {
         toolSettings.addEventListener("click", () => {
-            toggleRightControlPanel(true);
+            openSettingsModal();
         });
     }
 
@@ -286,7 +287,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Interactive Notification Center Flyout
+    // Interactive Notification Center Flyout with Live Dynamic Data
     const btnNotifications = document.getElementById("btnNotifications");
     const notificationsFlyout = document.getElementById("notificationsFlyout");
     const notifDot = document.getElementById("notifDot");
@@ -294,6 +295,94 @@ document.addEventListener("DOMContentLoaded", async () => {
     const notifOpenReviewBtn = document.getElementById("notifOpenReviewBtn");
     const notifOpenSettingsBtn = document.getElementById("notifOpenSettingsBtn");
     const btnHelp = document.getElementById("btnHelp");
+
+    function renderNotificationsList(notifications = []) {
+        const notifList = document.getElementById("notifList");
+        const notifCountBadge = document.getElementById("notifCountBadge");
+        if (!notifList) return;
+
+        const count = notifications.length;
+        if (notifCountBadge) {
+            notifCountBadge.textContent = String(count);
+            notifCountBadge.style.display = count > 0 ? "inline-block" : "none";
+        }
+        if (notifDot) {
+            if (count > 0) notifDot.classList.remove("hidden");
+            else notifDot.classList.add("hidden");
+        }
+
+        notifList.innerHTML = "";
+
+        if (count === 0) {
+            notifList.innerHTML = `
+                <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">✓</div>
+                    <div>You're all caught up!</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">No new notifications or update alerts.</div>
+                </div>
+            `;
+            return;
+        }
+
+        notifications.forEach((item) => {
+            const card = document.createElement("div");
+            card.className = "notif-item highlight";
+
+            const iconMap = {
+                updates: "🚀",
+                wallpapers: "🖼️",
+                watchdog: "🛡️",
+                review: "⭐",
+            };
+            const icon = iconMap[item.type] || "🔔";
+
+            let actionHtml = "";
+            if (item.action === "download-update") {
+                actionHtml = `<button class="notif-action-btn" type="button">⬇️ Download Update</button>`;
+            } else if (item.action === "sync-library" || item.type === "wallpapers") {
+                actionHtml = `<button class="notif-action-btn" type="button">🔄 Sync Now</button>`;
+            } else if (item.action === "review" || item.type === "review") {
+                actionHtml = `<button class="notif-action-btn" type="button">★ Write Review</button>`;
+            }
+
+            card.innerHTML = `
+                <div class="notif-icon-circle">${icon}</div>
+                <div class="notif-body">
+                    <div class="notif-item-title">${item.title}</div>
+                    <div class="notif-item-text">${item.body}</div>
+                    ${actionHtml}
+                </div>
+            `;
+
+            const actionBtn = card.querySelector(".notif-action-btn");
+            if (actionBtn) {
+                actionBtn.addEventListener("click", async () => {
+                    notificationsFlyout?.classList.add("hidden");
+                    if (item.action === "download-update") {
+                        await window.api.downloadUpdate();
+                    } else if (item.action === "sync-library" || item.type === "wallpapers") {
+                        await store.triggerBackgroundSync(true);
+                    } else if (item.action === "review" || item.type === "review") {
+                        openReviewModal();
+                    }
+                });
+            }
+
+            notifList.appendChild(card);
+        });
+    }
+
+    if (window.api && window.api.getNotifications) {
+        window.api.getNotifications().then(items => {
+            if (Array.isArray(items)) renderNotificationsList(items);
+        }).catch(() => {});
+    }
+
+    if (window.api && window.api.onNotificationsUpdate) {
+        window.api.onNotificationsUpdate((items) => {
+            if (Array.isArray(items)) renderNotificationsList(items);
+        });
+    }
 
     if (btnNotifications && notificationsFlyout) {
         btnNotifications.addEventListener("click", (e) => {
@@ -324,10 +413,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (notifMarkReadBtn) {
-        notifMarkReadBtn.addEventListener("click", () => {
+        notifMarkReadBtn.addEventListener("click", async () => {
             if (notifDot) notifDot.classList.add("hidden");
             const countBadge = document.getElementById("notifCountBadge");
             if (countBadge) countBadge.textContent = "0";
+            if (window.api && window.api.clearNotifications) {
+                await window.api.clearNotifications();
+            }
+            renderNotificationsList([]);
             notificationsFlyout?.classList.add("hidden");
             showToast("Notifications marked as read", "info");
         });
@@ -343,7 +436,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (notifOpenSettingsBtn) {
         notifOpenSettingsBtn.addEventListener("click", () => {
             notificationsFlyout?.classList.add("hidden");
-            toggleRightControlPanel(true);
+            openSettingsModal();
         });
     }
 
