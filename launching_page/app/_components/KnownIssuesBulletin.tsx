@@ -48,9 +48,9 @@ export default function KnownIssuesBulletin() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
-                  background: "rgba(232, 155, 91, 0.25)",
-                  color: "#E89B5B",
-                  border: "1px solid rgba(232, 155, 91, 0.4)",
+                  background: "rgba(34, 197, 94, 0.2)",
+                  color: "#4ade80",
+                  border: "1px solid rgba(34, 197, 94, 0.4)",
                   padding: "4px 12px",
                   borderRadius: "100px",
                   fontSize: "0.82rem",
@@ -58,7 +58,7 @@ export default function KnownIssuesBulletin() {
                   textTransform: "uppercase",
                 }}
               >
-                <AlertTriangle size={14} /> Active Notice & Known Quirks
+                <CheckCircle size={14} /> Resolved in v5.1.0
               </span>
               <span style={{ fontSize: "0.85rem", color: "rgba(233, 238, 252, 0.6)" }}>
                 Updated for v5.1.0

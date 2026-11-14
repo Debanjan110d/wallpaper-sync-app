@@ -59,6 +59,13 @@ contextBridge.exposeInMainWorld("api", {
   getWallpaperDir: () => ipcRenderer.invoke("get-wallpaper-dir"),
   getNotifications: () => ipcRenderer.invoke("notifications:get"),
   clearNotifications: () => ipcRenderer.invoke("notifications:clear"),
+  dismissNotification: (id) => ipcRenderer.invoke("notifications:dismiss", id),
   onNotificationsUpdate: (callback) => ipcRenderer.on("notifications:update", (event, data) => callback(data)),
-  onSyncStatus: (callback) => ipcRenderer.on("sync:status", (event, data) => callback(data))
+  onSyncStatus: (callback) => ipcRenderer.on("sync:status", (event, data) => callback(data)),
+
+  // Live OTA Remote Configuration & Directives
+  getRemoteConfig: () => ipcRenderer.invoke("remote-config:get"),
+  checkRemoteConfig: () => ipcRenderer.invoke("remote-config:check"),
+  onRemoteConfigUpdated: (callback) => ipcRenderer.on("remote-config:updated", (event, config) => callback(config)),
+  openExternalUrl: (url) => ipcRenderer.invoke("open-external-url", url)
 });

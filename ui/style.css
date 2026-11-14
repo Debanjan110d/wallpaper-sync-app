@@ -241,13 +241,13 @@ body {
 }
 
 .sidebar-collapse-btn {
-    background: rgba(255, 255, 255, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.32);
     color: #ffffff;
     cursor: pointer;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
@@ -281,6 +281,7 @@ body {
 }
 
 .app-shell.sidebar-collapsed .brand-text-wrap,
+.app-shell.sidebar-collapsed .brand-left,
 .app-shell.sidebar-collapsed .nav-label,
 .app-shell.sidebar-collapsed .nav-badge,
 .app-shell.sidebar-collapsed .sidebar-section-heading,
@@ -362,6 +363,14 @@ body {
     position: relative;
 }
 
+.brand-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    flex: 1;
+}
+
 .brand-logo-wrap {
     width: 34px;
     height: 34px;
@@ -385,26 +394,32 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    flex: 1;
 }
 
 .brand-title-row {
     display: flex;
     align-items: center;
     gap: 5px;
-    flex-wrap: nowrap;
+    line-height: 1.2;
 }
 
 .brand-name {
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 700;
     color: var(--text-main);
     letter-spacing: -0.2px;
     white-space: nowrap;
 }
 
+.brand-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
 .version-badge {
-    font-size: 8px;
+    font-size: 8.5px;
     font-weight: 700;
     color: #ffffff;
     background: linear-gradient(135deg, var(--primary), var(--secondary));
@@ -2860,4 +2875,142 @@ body {
     border: 1px solid rgba(0, 0, 0, 0.15);
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
     color: var(--text-main);
+}
+
+/* ==========================================================================
+   Live OTA Dynamic Remote Banner & Broadcast Cards
+   ========================================================================== */
+.remote-app-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 18px;
+    margin-bottom: 18px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(133, 57, 83, 0.25) 0%, rgba(97, 45, 83, 0.4) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    animation: bannerSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.3s ease;
+}
+
+.remote-app-banner.hidden {
+    display: none !important;
+}
+
+.remote-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.remote-banner-badge {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #ffffff;
+    box-shadow: 0 2px 8px var(--primary-glow);
+    white-space: nowrap;
+}
+
+.remote-banner-badge.type-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.remote-banner-badge.type-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.remote-banner-badge.type-purple {
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
+.remote-banner-text {
+    font-size: 13px;
+    color: var(--text-main);
+    font-weight: 500;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.remote-banner-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.remote-banner-btn:hover {
+    background: var(--primary);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 12px var(--primary-glow);
+    transform: translateY(-1px);
+}
+
+.remote-banner-btn.hidden {
+    display: none !important;
+}
+
+.remote-banner-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background 0.2s;
+}
+
+.remote-banner-close-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] .remote-app-banner {
+    background: linear-gradient(135deg, #FFF9F3 0%, #FFEAD3 100%);
+    border-color: rgba(212, 103, 67, 0.25);
+    box-shadow: 0 4px 18px rgba(212, 103, 67, 0.1);
+}
+
+[data-theme="light"] .remote-banner-btn {
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.18);
+    color: var(--text-main);
+}
+
+[data-theme="light"] .remote-banner-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+@keyframes bannerSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

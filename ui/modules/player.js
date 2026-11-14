@@ -5,7 +5,7 @@ import { renderCatalog } from "./gallery.js";
 
 let slideshowTimerInterval = null;
 let currentRemainingMs = 0;
-let totalIntervalMs = 10000;
+let totalIntervalMs = 1800000;
 
 export function startProgressRingCountdown() {
     stopProgressRingCountdown();
@@ -13,7 +13,7 @@ export function startProgressRingCountdown() {
     const settings = store.state.settings;
     if (!settings.slideshow) return;
     
-    totalIntervalMs = settings.slideshowInterval || 10000;
+    totalIntervalMs = settings.slideshowInterval || 1800000;
     currentRemainingMs = totalIntervalMs;
     
     const progressCircle = document.getElementById("playerProgressCircle");
@@ -86,7 +86,7 @@ export function updatePlayerStatusText() {
             sourceLabel = col ? col.name : "Collection";
         }
 
-        const intervalMs = settings.slideshowInterval || 10000;
+        const intervalMs = settings.slideshowInterval || 1800000;
         const intervalSec = intervalMs >= 60000 ? `${intervalMs / 60000}m` : `${intervalMs / 1000}s`;
 
         playerStatus.textContent = `Slideshow Active: ${sourceLabel} (${intervalSec})`;

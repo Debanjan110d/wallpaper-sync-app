@@ -333,14 +333,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                 wallpapers: "🖼️",
                 watchdog: "🛡️",
                 review: "⭐",
+                announcement: "📢",
+                alert: "⚠️",
+                tip: "💡"
             };
             const icon = iconMap[item.type] || "🔔";
 
             let actionHtml = "";
             if (item.action === "download-update") {
                 actionHtml = `<button class="notif-action-btn" type="button">⬇️ Download Update</button>`;
-            } else if (item.action === "sync-library" || item.type === "wallpapers") {
-                actionHtml = `<button class="notif-action-btn" type="button">🔄 Sync Now</button>`;
+            } else if (item.action === "sync-library" || item.type === "wallpapers" || item.actionType === "sync") {
+                actionHtml = `<button class="notif-action-btn" type="button">${item.actionLabel || '🔄 Sync Now'}</button>`;
+            } else if (item.actionType === "link" && item.actionUrl) {
+                actionHtml = `<button class="notif-action-btn" type="button">${item.actionLabel || '🔗 View Details'}</button>`;
             } else if (item.action === "review" || item.type === "review") {
                 actionHtml = `<button class="notif-action-btn" type="button">★ Write Review</button>`;
             }
@@ -348,11 +353,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             card.innerHTML = `
                 <div class="notif-icon-circle">${icon}</div>
                 <div class="notif-body">
-                    <div class="notif-item-title">${item.title}</div>
-                    <div class="notif-item-text">${item.body}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+                        <div class="notif-item-title">${item.title}</div>
+                        <button class="notif-card-dismiss" type="button" title="Dismiss" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; padding:0 2px;">✕</button>
+                    </div>
+                    <div class="notif-item-text">${item.body || item.message}</div>
                     ${actionHtml}
                 </div>
             `;
+
+            const dismissBtn = card.querySelector(".notif-card-dismiss");
+            if (dismissBtn) {
+                dismissBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    if (window.api && window.api.dismissNotification) {
+                        await window.api.dismissNotification(item.id);
+                    }
+                    card.remove();
+                });
+            }
 
             const actionBtn = card.querySelector(".notif-action-btn");
             if (actionBtn) {
@@ -360,8 +379,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                     notificationsFlyout?.classList.add("hidden");
                     if (item.action === "download-update") {
                         await window.api.downloadUpdate();
-                    } else if (item.action === "sync-library" || item.type === "wallpapers") {
+                    } else if (item.action === "sync-library" || item.type === "wallpapers" || item.actionType === "sync") {
                         await store.triggerBackgroundSync(true);
+                    } else if (item.actionType === "link" && item.actionUrl) {
+                        if (window.api && window.api.openExternalUrl) {
+                            window.api.openExternalUrl(item.actionUrl);
+                        } else {
+                            window.open(item.actionUrl, "_blank");
+                        }
                     } else if (item.action === "review" || item.type === "review") {
                         openReviewModal();
                     }
@@ -446,13 +471,195 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Global Ctrl+K Shortcut to focus search bar
+    // Live OTA Dynamic Remote Configuration Handler
+    function applyRemoteConfig(config) {
+        if (!config || typeof config !== "object") return;
+
+        const bannerEl = document.getElementById("remoteAppBanner");
+        const badgeEl = document.getElementById("remoteBannerBadge");
+        const textEl = document.getElementById("remoteBannerText");
+        const actionBtn = document.getElementById("remoteBannerActionBtn");
+        const closeBtn = document.getElementById("closeRemoteBannerBtn");
+
+        if (bannerEl && config.banner) {
+            const b = config.banner;
+            const dismissedKey = "dismissed_remote_banner_" + (b.id || "default");
+            const isDismissed = sessionStorage.getItem(dismissedKey) === "true";
+
+            if (b.enabled && b.text && !isDismissed) {
+                bannerEl.classList.remove("hidden");
+                if (textEl) textEl.textContent = b.text;
+
+                if (badgeEl) {
+                    badgeEl.className = "remote-banner-badge";
+                    if (b.type === "warning") {
+                        badgeEl.classList.add("type-warning");
+                        badgeEl.textContent = "⚠️ NOTICE";
+                    } else if (b.type === "success") {
+                        badgeEl.classList.add("type-success");
+                        badgeEl.textContent = "🎉 NEW";
+                    } else if (b.type === "purple") {
+                        badgeEl.classList.add("type-purple");
+                        badgeEl.textContent = "✨ HIGHLIGHT";
+                    } else {
+                        badgeEl.textContent = "📢 ANNOUNCEMENT";
+                    }
+                }
+
+                if (actionBtn) {
+                    if (b.actionUrl) {
+                        actionBtn.classList.remove("hidden");
+                        actionBtn.textContent = b.actionLabel || "View Details";
+                        actionBtn.onclick = () => {
+                            if (window.api && window.api.openExternalUrl) {
+                                window.api.openExternalUrl(b.actionUrl);
+                            } else {
+                                window.open(b.actionUrl, "_blank");
+                            }
+                        };
+                    } else {
+                        actionBtn.classList.add("hidden");
+                    }
+                }
+
+                if (closeBtn) {
+                    closeBtn.onclick = () => {
+                        bannerEl.classList.add("hidden");
+                        sessionStorage.setItem(dismissedKey, "true");
+                    };
+                }
+            } else {
+                bannerEl.classList.add("hidden");
+            }
+        }
+
+        // Apply seasonal theme tint if enabled
+        if (config.seasonalTheme && config.seasonalTheme.enabled && config.seasonalTheme.primary) {
+            document.documentElement.style.setProperty("--primary", config.seasonalTheme.primary);
+            if (config.seasonalTheme.glow) {
+                document.documentElement.style.setProperty("--primary-glow", config.seasonalTheme.glow);
+            }
+        }
+    }
+
+    if (window.api && window.api.getRemoteConfig) {
+        window.api.getRemoteConfig().then(cfg => {
+            if (cfg) applyRemoteConfig(cfg);
+        }).catch(() => {});
+    }
+
+    if (window.api && window.api.onRemoteConfigUpdated) {
+        window.api.onRemoteConfigUpdated(cfg => {
+            if (cfg) applyRemoteConfig(cfg);
+        });
+    }
+
+    // Shortcuts Modal Controls
+    const shortcutsModal = document.getElementById("shortcutsModal");
+    const closeShortcutsModalBtn = document.getElementById("closeShortcutsModalBtn");
+    const shortcutsModalBackdrop = document.getElementById("shortcutsModalBackdrop");
+    const toolShortcuts = document.getElementById("toolShortcuts");
+
+    function openShortcutsModal() {
+        if (shortcutsModal) shortcutsModal.classList.remove("hidden");
+    }
+    function closeShortcutsModal() {
+        if (shortcutsModal) shortcutsModal.classList.add("hidden");
+    }
+
+    if (toolShortcuts) toolShortcuts.addEventListener("click", openShortcutsModal);
+    if (closeShortcutsModalBtn) closeShortcutsModalBtn.addEventListener("click", closeShortcutsModal);
+    if (shortcutsModalBackdrop) shortcutsModalBackdrop.addEventListener("click", closeShortcutsModal);
+
+    // Global Power-User Keyboard Shortcuts
     document.addEventListener("keydown", (e) => {
+        const activeTag = document.activeElement ? document.activeElement.tagName : "";
+        const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA" || (document.activeElement && document.activeElement.isContentEditable);
+
+        // Escape closes open modals
+        if (e.key === "Escape") {
+            if (shortcutsModal && !shortcutsModal.classList.contains("hidden")) {
+                closeShortcutsModal();
+                return;
+            }
+        }
+
+        // Ctrl+K to focus search
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
             e.preventDefault();
             if (globalSearchInput) {
                 globalSearchInput.focus();
                 globalSearchInput.select();
+            }
+            return;
+        }
+
+        // Ctrl+B (Toggle Left Sidebar)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "b") {
+            e.preventDefault();
+            const layout = document.getElementById("appLayout");
+            if (layout) {
+                layout.classList.toggle("sidebar-collapsed");
+                const isCollapsed = layout.classList.contains("sidebar-collapsed");
+                localStorage.setItem("ws_sidebar_collapsed", isCollapsed ? "1" : "0");
+            }
+            return;
+        }
+
+        // Ctrl+Shift+B (Toggle Right Control Studio)
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "b") {
+            e.preventDefault();
+            toggleRightControlPanel();
+            return;
+        }
+
+        // Ctrl+, (Open Settings)
+        if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+            e.preventDefault();
+            const toolSettings = document.getElementById("toolSettings");
+            if (toolSettings) toolSettings.click();
+            return;
+        }
+
+        // ? or F1 (Open Shortcuts Cheatsheet)
+        if (!isTyping && (e.key === "?" || e.key === "F1")) {
+            e.preventDefault();
+            openShortcutsModal();
+            return;
+        }
+
+        // Slideshow controls when not typing
+        if (!isTyping) {
+            // Space or Alt+S: Play / Pause Slideshow
+            if (e.code === "Space" || ((e.altKey || e.metaKey) && e.key.toLowerCase() === "s")) {
+                e.preventDefault();
+                const toggleBtn = document.getElementById("rightToggleSlideshow");
+                if (toggleBtn) toggleBtn.click();
+                return;
+            }
+
+            // Alt+N: Next Wallpaper
+            if ((e.altKey || e.metaKey) && e.key.toLowerCase() === "n") {
+                e.preventDefault();
+                const nextBtn = document.getElementById("rightNextWallpaperBtn");
+                if (nextBtn) nextBtn.click();
+                return;
+            }
+
+            // Alt+R: Random Wallpaper
+            if ((e.altKey || e.metaKey) && e.key.toLowerCase() === "r") {
+                e.preventDefault();
+                const randBtn = document.getElementById("rightApplyRandomBtn") || document.getElementById("btnApplyRandom");
+                if (randBtn) randBtn.click();
+                return;
+            }
+
+            // Alt+F: Favorite Current Wallpaper
+            if ((e.altKey || e.metaKey) && e.key.toLowerCase() === "f") {
+                e.preventDefault();
+                const favBtn = document.getElementById("rightFavoriteBtn") || document.getElementById("btnFavoriteActive");
+                if (favBtn) favBtn.click();
+                return;
             }
         }
     });

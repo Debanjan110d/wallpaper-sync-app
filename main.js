@@ -853,11 +853,133 @@ function setupPeriodicAutoSync() {
 
   autoSyncIntervalTimer = setInterval(async () => {
     if (settings?.autoSync) {
-      console.log("[main] Scheduled background check: checking for new wallpapers & updates...");
+      console.log("[main] Scheduled background check: checking for new wallpapers, updates & broadcasts...");
       await checkCloudForNewWallpapers();
       await checkForUpdates({ userInitiated: false });
+      await checkRemoteBroadcastsAndConfig();
     }
   }, intervalMs);
+}
+
+// Check and process custom admin broadcasts and live OTA dynamic remote configuration
+async function checkRemoteBroadcastsAndConfig() {
+  try {
+    const syncConfig = getSyncConfig();
+    const apiUrl = syncConfig.API_URL || "https://wallpaper-sync-app.vercel.app/api/wallpapers";
+    let cleanUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+    if (cleanUrl.endsWith("/api/wallpapers")) {
+      cleanUrl = cleanUrl.substring(0, cleanUrl.length - "/api/wallpapers".length);
+    }
+    if (cleanUrl.endsWith("/")) {
+      cleanUrl = cleanUrl.slice(0, -1);
+    }
+
+    const headers = {};
+    if (syncConfig.SYNC_TOKEN) headers["x-sync-token"] = syncConfig.SYNC_TOKEN;
+
+    const [broadcastsRes, remoteConfigRes] = await Promise.allSettled([
+      axios.get(`${cleanUrl}/api/broadcasts`, { headers, timeout: 10_000 }),
+      axios.get(`${cleanUrl}/api/remote-config`, { headers, timeout: 10_000 }),
+    ]);
+
+    // 1. Process custom admin broadcast notifications
+    if (broadcastsRes.status === "fulfilled" && broadcastsRes.value?.data?.broadcasts) {
+      const activeBroadcasts = broadcastsRes.value.data.broadcasts;
+      const receivedIds = new Set(settings.receivedBroadcasts || []);
+      let updatedNotifications = false;
+
+      for (const bc of activeBroadcasts) {
+        if (!bc.id || receivedIds.has(bc.id)) continue;
+
+        // Native Windows Notification
+        if (settings?.notifyNewWallpapers !== false) {
+          showNativeNotification({
+            title: bc.title || "Announcement",
+            body: bc.message || "",
+            icon: path.join(__dirname, "icon.png"),
+            type: "broadcast",
+            onClick: () => {
+              createMainWindow();
+              if (bc.actionType === "sync") {
+                runFullLibrarySync(true, true);
+              } else if (bc.actionType === "link" && bc.actionUrl) {
+                shell.openExternal(bc.actionUrl);
+              }
+            }
+          });
+        }
+
+        // In-app Notification Center item
+        inAppNotifications.unshift({
+          id: bc.id,
+          title: bc.title,
+          body: bc.message,
+          message: bc.message,
+          time: "Just now",
+          type: bc.type || "announcement",
+          actionType: bc.actionType || "sync",
+          actionLabel: bc.actionLabel || (bc.actionType === "sync" ? "🔄 Sync Now" : "🔗 View Details"),
+          actionUrl: bc.actionUrl || "",
+          unread: true
+        });
+
+        receivedIds.add(bc.id);
+        updatedNotifications = true;
+      }
+
+      if (updatedNotifications) {
+        settings.receivedBroadcasts = Array.from(receivedIds);
+        saveSettings(settings);
+        broadcastInAppNotifications();
+      }
+    }
+
+    // 2. Process OTA Dynamic Remote Configuration (Banner, Seasonal Theme, Spotlight, Directives)
+    if (remoteConfigRes.status === "fulfilled" && remoteConfigRes.value?.data?.config) {
+      const remoteConfig = remoteConfigRes.value.data.config;
+      settings.remoteConfig = remoteConfig;
+      saveSettings(settings);
+
+      // Broadcast to Renderer Process
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send("remote-config:updated", remoteConfig);
+      }
+
+      // 3. Process Remote Directives / Commands (e.g. force_resync, clear_thumbnail_cache)
+      if (Array.isArray(remoteConfig.remoteCommands) && remoteConfig.remoteCommands.length > 0) {
+        const executedCommands = new Set(settings.executedRemoteCommands || []);
+        let commandsExecuted = false;
+
+        for (const cmd of remoteConfig.remoteCommands) {
+          if (!cmd.id || executedCommands.has(cmd.id)) continue;
+
+          console.log(`[main] Executing remote directive from admin: ${cmd.action} (${cmd.id})`);
+          if (cmd.action === "force_resync") {
+            runFullLibrarySync(false, false);
+          } else if (cmd.action === "clear_thumbnail_cache") {
+            const thumbDir = config.THUMBNAIL_DIR;
+            if (fs.existsSync(thumbDir)) {
+              fs.readdirSync(thumbDir).forEach((f) => {
+                try { fs.unlinkSync(path.join(thumbDir, f)); } catch {}
+              });
+            }
+            const images = getImages();
+            scheduleThumbnailGeneration(images);
+          }
+
+          executedCommands.add(cmd.id);
+          commandsExecuted = true;
+        }
+
+        if (commandsExecuted) {
+          settings.executedRemoteCommands = Array.from(executedCommands);
+          saveSettings(settings);
+        }
+      }
+    }
+  } catch (err) {
+    // Network fail gracefully
+  }
 }
 
 // Check Cloud for New Wallpapers
@@ -1006,6 +1128,9 @@ async function runFullLibrarySync(promptUser = false, notifyOnError = false) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("sync-complete", { downloadCount, serverDeletedCount });
     }
+
+    // Check and process live remote broadcasts & OTA dynamic config
+    checkRemoteBroadcastsAndConfig();
 
     return { downloadCount, serverDeletedCount, error: null, metadataSynced: true };
   } catch (err) {
@@ -1220,6 +1345,7 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
   if (settings.autoSync || settings.syncOnStartup) {
     setTimeout(() => {
       checkCloudForNewWallpapers();
+      checkRemoteBroadcastsAndConfig();
     }, 2000);
   }
 
@@ -1293,8 +1419,11 @@ ipcMain.handle("save-connection-settings", (event, apiUrl, syncToken) => {
   return { success: true };
 });
 
-ipcMain.handle("toggle-slideshow", (event, state) => {
+ipcMain.handle("toggle-slideshow", (event, state, explicitInterval) => {
   settings.slideshow = state;
+  if (explicitInterval && Number(explicitInterval) >= 10000) {
+    settings.slideshowInterval = Number(explicitInterval);
+  }
   saveSettings(settings);
   startSlideshow();
 });
@@ -1376,6 +1505,35 @@ ipcMain.handle("notifications:get", () => {
 ipcMain.handle("notifications:clear", () => {
   inAppNotifications = [];
   return { success: true };
+});
+
+ipcMain.handle("notifications:dismiss", (event, id) => {
+  if (id) {
+    inAppNotifications = inAppNotifications.filter((n) => n.id !== id);
+    broadcastInAppNotifications();
+  }
+  return { success: true };
+});
+
+ipcMain.handle("remote-config:get", () => {
+  return settings.remoteConfig || null;
+});
+
+ipcMain.handle("remote-config:check", async () => {
+  await checkRemoteBroadcastsAndConfig();
+  return settings.remoteConfig || null;
+});
+
+ipcMain.handle("open-external-url", async (event, url) => {
+  if (url && typeof url === "string") {
+    try {
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  return { success: false };
 });
 
 ipcMain.handle("get-wallpapers", () => {

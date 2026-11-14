@@ -30,18 +30,22 @@
         <!-- 1. LEFT SIDEBAR: Iconic Navigation & Tools -->
         <aside class="sidebar-v5" id="sidebar">
             <div class="sidebar-brand">
-                <div class="brand-logo-wrap">
-                    <img src="../icon.png" alt="Wallpaper Sync" class="brand-logo">
-                </div>
-                <div class="brand-text-wrap">
-                    <div class="brand-title-row">
-                        <span class="brand-name">Wallpaper Sync</span>
-                        <span class="version-badge">v5.1.0</span>
+                <div class="brand-left">
+                    <div class="brand-logo-wrap">
+                        <img src="../icon.png" alt="Wallpaper Sync" class="brand-logo">
                     </div>
-                    <span class="brand-subtitle">Desktop Wallpaper Manager</span>
+                    <div class="brand-text-wrap">
+                        <div class="brand-title-row">
+                            <span class="brand-name">Wallpaper Sync</span>
+                        </div>
+                        <div class="brand-meta-row">
+                            <span class="version-badge">v5.1.0</span>
+                            <span class="brand-subtitle">Manager</span>
+                        </div>
+                    </div>
                 </div>
-                <button class="sidebar-collapse-btn" id="collapseSidebarBtn" title="Collapse Sidebar" type="button">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <button class="sidebar-collapse-btn" id="collapseSidebarBtn" title="Collapse Sidebar (Ctrl+B)" type="button" aria-label="Collapse Sidebar">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="15 18 9 12 15 6"></polyline>
                     </svg>
                 </button>
@@ -119,6 +123,21 @@
                             </svg>
                         </div>
                         <span class="nav-label">Rate &amp; Review</span>
+                    </li>
+                    <li class="nav-item tool-item" id="toolShortcuts" title="Keyboard Shortcuts (?)">
+                        <div class="nav-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                                <line x1="6" y1="8" x2="6" y2="8"></line>
+                                <line x1="10" y1="8" x2="10" y2="8"></line>
+                                <line x1="14" y1="8" x2="14" y2="8"></line>
+                                <line x1="18" y1="8" x2="18" y2="8"></line>
+                                <line x1="6" y1="12" x2="6" y2="12"></line>
+                                <line x1="18" y1="12" x2="18" y2="12"></line>
+                                <line x1="7" y1="16" x2="17" y2="16"></line>
+                            </svg>
+                        </div>
+                        <span class="nav-label">Shortcuts</span>
                     </li>
                 </ul>
             </div>
@@ -301,6 +320,16 @@
 
             <!-- Scrollable Viewport Body -->
             <div class="dashboard-scrollable-body" id="dashboardBody">
+
+                <!-- Live OTA Dynamic Remote Announcement Banner -->
+                <div id="remoteAppBanner" class="remote-app-banner hidden" role="alert">
+                    <div class="remote-banner-content">
+                        <span class="remote-banner-badge" id="remoteBannerBadge">📢 ANNOUNCEMENT</span>
+                        <span class="remote-banner-text" id="remoteBannerText"></span>
+                        <button id="remoteBannerActionBtn" class="remote-banner-btn hidden" type="button">View Details</button>
+                    </div>
+                    <button id="closeRemoteBannerBtn" class="remote-banner-close-btn" type="button" aria-label="Dismiss banner">✕</button>
+                </div>
 
                 <!-- 1. Featured Hero Carousel Banner -->
                 <section class="hero-carousel-v5" id="heroSliderSection">
@@ -491,10 +520,10 @@
                         <label class="panel-label">Interval</label>
                         <div class="panel-select-wrap">
                             <select id="rightIntervalSelect">
+                                <option value="1800000" selected>30 Minutes (Recommended)</option>
                                 <option value="60000">1 Minute</option>
                                 <option value="300000">5 Minutes</option>
                                 <option value="600000">10 Minutes</option>
-                                <option value="1800000">30 Minutes</option>
                                 <option value="3600000">1 Hour</option>
                                 <option value="86400000">1 Day</option>
                                 <option value="10000">10 Seconds (Test)</option>

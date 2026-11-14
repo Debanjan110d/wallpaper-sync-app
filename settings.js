@@ -13,6 +13,10 @@ function loadSettings() {
     try {
       const data = fs.readFileSync(settingsPath, "utf-8");
       savedSettings = JSON.parse(data);
+      // Migrate legacy test interval (10s) to standard 30 minutes
+      if (savedSettings && savedSettings.slideshowInterval === 10000) {
+        savedSettings.slideshowInterval = 1800000;
+      }
     } catch (err) {
       console.error("Error reading settings:", err);
     }
@@ -44,6 +48,9 @@ function loadSettings() {
     firstUsedAt,
     reviewRemindAfter: 0,
     recoveryWatchdog: true,
+    receivedBroadcasts: [],
+    executedRemoteCommands: [],
+    remoteConfig: null,
     ...savedSettings,
     firstUsedAt
   };

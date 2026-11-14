@@ -221,6 +221,185 @@ export default function Page() {
   // Recommendation Engine State
   const [recommendations, setRecommendations] = useState<any[]>([]);
 
+  // Remote Broadcasts & Live OTA Directives State
+  const [broadcastTab, setBroadcastTab] = useState<"broadcasts" | "remote_config">("broadcasts");
+  const [broadcastsList, setBroadcastsList] = useState<any[]>([]);
+  const [bcTitle, setBcTitle] = useState("");
+  const [bcMessage, setBcMessage] = useState("");
+  const [bcType, setBcType] = useState<"announcement" | "update" | "alert" | "tip">("announcement");
+  const [bcPriority, setBcPriority] = useState<"normal" | "high" | "urgent">("normal");
+  const [bcActionType, setBcActionType] = useState<"sync" | "link" | "dismiss">("sync");
+  const [bcActionLabel, setBcActionLabel] = useState("Sync 4K Library");
+  const [bcActionUrl, setBcActionUrl] = useState("");
+  const [bcLoading, setBcLoading] = useState(false);
+  const [bcStatusMsg, setBcStatusMsg] = useState<{ text: string; isError: boolean } | null>(null);
+
+  // Live Dynamic Remote Config states
+  const [remoteConfig, setRemoteConfig] = useState<any>(null);
+  const [bannerEnabled, setBannerEnabled] = useState(true);
+  const [bannerText, setBannerText] = useState("");
+  const [bannerType, setBannerType] = useState<"info" | "warning" | "success" | "purple">("info");
+  const [bannerActionLabel, setBannerActionLabel] = useState("View Details");
+  const [bannerActionUrl, setBannerActionUrl] = useState("");
+  const [spotlightCol, setSpotlightCol] = useState("Anime Art");
+  const [seasonalEnabled, setSeasonalEnabled] = useState(false);
+  const [seasonalName, setSeasonalName] = useState("Holiday Neon");
+  const [seasonalPrimary, setSeasonalPrimary] = useState("#ff2d55");
+  const [seasonalGlow, setSeasonalGlow] = useState("rgba(255, 45, 85, 0.4)");
+  const [cfgSaving, setCfgSaving] = useState(false);
+  const [cfgStatusMsg, setCfgStatusMsg] = useState<{ text: string; isError: boolean } | null>(null);
+
+  const fetchBroadcasts = async () => {
+    try {
+      const res = await fetch("/api/broadcasts?includeInactive=true");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.broadcasts)) setBroadcastsList(data.broadcasts);
+      }
+    } catch (e) {
+      console.error("Failed to fetch broadcasts:", e);
+    }
+  };
+
+  const fetchRemoteConfig = async () => {
+    try {
+      const res = await fetch("/api/remote-config");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) {
+          setRemoteConfig(data.config);
+          if (data.config.banner) {
+            setBannerEnabled(!!data.config.banner.enabled);
+            setBannerText(data.config.banner.text || "");
+            setBannerType(data.config.banner.type || "info");
+            setBannerActionLabel(data.config.banner.actionLabel || "");
+            setBannerActionUrl(data.config.banner.actionUrl || "");
+          }
+          if (data.config.spotlightCollection) {
+            setSpotlightCol(data.config.spotlightCollection);
+          }
+          if (data.config.seasonalTheme) {
+            setSeasonalEnabled(!!data.config.seasonalTheme.enabled);
+            setSeasonalName(data.config.seasonalTheme.name || "");
+            setSeasonalPrimary(data.config.seasonalTheme.primary || "#ff2d55");
+            setSeasonalGlow(data.config.seasonalTheme.glow || "rgba(255, 45, 85, 0.4)");
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch remote config:", e);
+    }
+  };
+
+  const handleCreateBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bcTitle.trim() || !bcMessage.trim()) {
+      setBcStatusMsg({ text: "Title and message are required", isError: true });
+      return;
+    }
+    setBcLoading(true);
+    setBcStatusMsg(null);
+    try {
+      const res = await fetch("/api/broadcasts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: bcTitle.trim(),
+          message: bcMessage.trim(),
+          type: bcType,
+          priority: bcPriority,
+          actionType: bcActionType,
+          actionLabel: bcActionLabel.trim() || (bcActionType === "sync" ? "Sync Library Now" : "View Details"),
+          actionUrl: bcActionUrl.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBcStatusMsg({ text: "Broadcast notification dispatched to all desktop apps!", isError: false });
+        setBcTitle("");
+        setBcMessage("");
+        setBcActionUrl("");
+        fetchBroadcasts();
+      } else {
+        setBcStatusMsg({ text: data.error || "Failed to dispatch broadcast", isError: true });
+      }
+    } catch (err: any) {
+      setBcStatusMsg({ text: err.message || "Failed to dispatch broadcast", isError: true });
+    } finally {
+      setBcLoading(false);
+    }
+  };
+
+  const handleDeleteBroadcast = async (id: string) => {
+    if (!confirm("Are you sure you want to recall and delete this broadcast notification?")) return;
+    try {
+      const res = await fetch(`/api/broadcasts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) {
+        setBroadcastsList((prev) => prev.filter((b) => b.id !== id));
+      }
+    } catch (e) {
+      console.error("Failed to delete broadcast:", e);
+    }
+  };
+
+  const handleSaveRemoteConfig = async () => {
+    setCfgSaving(true);
+    setCfgStatusMsg(null);
+    try {
+      const res = await fetch("/api/remote-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          banner: {
+            enabled: bannerEnabled,
+            id: `banner-${Date.now()}`,
+            text: bannerText.trim(),
+            type: bannerType,
+            actionLabel: bannerActionLabel.trim(),
+            actionUrl: bannerActionUrl.trim(),
+            dismissible: true,
+          },
+          spotlightCollection: spotlightCol,
+          seasonalTheme: {
+            enabled: seasonalEnabled,
+            name: seasonalName.trim(),
+            primary: seasonalPrimary.trim(),
+            glow: seasonalGlow.trim(),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCfgStatusMsg({ text: "Remote configuration saved! Connected desktop apps will update dynamically.", isError: false });
+        setRemoteConfig(data.config);
+      } else {
+        setCfgStatusMsg({ text: data.error || "Failed to save remote config", isError: true });
+      }
+    } catch (err: any) {
+      setCfgStatusMsg({ text: err.message || "Failed to save remote config", isError: true });
+    } finally {
+      setCfgSaving(false);
+    }
+  };
+
+  const handleDispatchCommand = async (actionCmd: string, label: string) => {
+    if (!confirm(`Dispatch command "${label}" to all connected desktop apps?`)) return;
+    try {
+      const res = await fetch("/api/remote-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newCommand: actionCmd }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(`Command "${label}" issued successfully! Desktop apps will execute it on their next check.`);
+        fetchRemoteConfig();
+      }
+    } catch (e) {
+      alert("Failed to issue remote command");
+    }
+  };
+
 
 
   const fetchMetadata = async () => {
@@ -422,6 +601,8 @@ export default function Page() {
     fetchMetadata();
     fetchReviews();
     fetchReleases();
+    fetchBroadcasts();
+    fetchRemoteConfig();
   }, []);
 
   useEffect(() => {
@@ -937,6 +1118,430 @@ export default function Page() {
           </div>
         </section>
       )}
+
+      {/* App Broadcast Notifications & Dynamic Remote Control (OTA) */}
+      <div className="card" style={{ marginBottom: "2rem", padding: "1.5rem", border: "1px solid rgba(138, 92, 246, 0.3)", background: "linear-gradient(180deg, rgba(20, 22, 35, 0.8) 0%, rgba(15, 17, 28, 0.95) 100%)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1.25rem" }}>
+          <div>
+            <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", color: "#c084fc", fontSize: "1.2rem" }}>
+              📡 <span>Desktop App Remote Broadcasts & Live OTA Directives</span>
+            </h3>
+            <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              Send broadcast notifications and change live dynamic configurations across connected desktop apps without releasing an update.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "8px", background: "rgba(0,0,0,0.3)", padding: "4px", borderRadius: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setBroadcastTab("broadcasts")}
+              style={{
+                padding: "6px 14px",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                background: broadcastTab === "broadcasts" ? "linear-gradient(135deg, #7c3aed, #4f46e5)" : "transparent",
+                color: broadcastTab === "broadcasts" ? "#ffffff" : "var(--text-muted)",
+                transition: "all 0.2s ease"
+              }}
+            >
+              📢 Broadcasts ({broadcastsList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBroadcastTab("remote_config")}
+              style={{
+                padding: "6px 14px",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                background: broadcastTab === "remote_config" ? "linear-gradient(135deg, #7c3aed, #4f46e5)" : "transparent",
+                color: broadcastTab === "remote_config" ? "#ffffff" : "var(--text-muted)",
+                transition: "all 0.2s ease"
+              }}
+            >
+              ⚙️ Live OTA Config
+            </button>
+          </div>
+        </div>
+
+        {broadcastTab === "broadcasts" ? (
+          <div>
+            <form onSubmit={handleCreateBroadcast} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", background: "rgba(255,255,255,0.02)", padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)", marginBottom: "1.5rem" }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#e2e8f0" }}>Compose New Desktop Broadcast</h4>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                  Dispatched instantly to all desktop apps upon their next background sync, appearing in the notification feed and as a Windows notification toast.
+                </p>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Broadcast Title *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. New 4K Cyberpunk Batch Released!"
+                  value={bcTitle}
+                  onChange={(e) => setBcTitle(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Notification Category</label>
+                <select
+                  value={bcType}
+                  onChange={(e: any) => setBcType(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem" }}
+                >
+                  <option value="announcement">📢 Announcement</option>
+                  <option value="update">🚀 App Update / Release</option>
+                  <option value="alert">⚠️ Service Alert</option>
+                  <option value="tip">💡 Feature Tip</option>
+                </select>
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Message Body *</label>
+                <textarea
+                  placeholder="Over 40 new Ultra-HD Anime and Cyberpunk wallpapers are now available for automatic sync."
+                  value={bcMessage}
+                  onChange={(e) => setBcMessage(e.target.value)}
+                  rows={2}
+                  style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem", resize: "vertical" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Action Button Type</label>
+                <select
+                  value={bcActionType}
+                  onChange={(e: any) => setBcActionType(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem" }}
+                >
+                  <option value="sync">🔄 Trigger 4K Full Library Sync</option>
+                  <option value="link">🔗 Open External URL / Web Page</option>
+                  <option value="dismiss">ℹ️ Informational (Dismiss Only)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Action Button Label</label>
+                <input
+                  type="text"
+                  placeholder={bcActionType === "sync" ? "Sync Library Now" : "Open Link"}
+                  value={bcActionLabel}
+                  onChange={(e) => setBcActionLabel(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem" }}
+                />
+              </div>
+
+              {bcActionType === "link" && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>Target URL *</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/announcement"
+                    value={bcActionUrl}
+                    onChange={(e) => setBcActionUrl(e.target.value)}
+                    style={{ width: "100%", padding: "8px 12px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.9rem" }}
+                    required
+                  />
+                </div>
+              )}
+
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                <div>
+                  {bcStatusMsg && (
+                    <span style={{ fontSize: "0.85rem", color: bcStatusMsg.isError ? "#ef4444" : "#10b981", fontWeight: 500 }}>
+                      {bcStatusMsg.isError ? "❌ " : "✅ "}
+                      {bcStatusMsg.text}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={bcLoading}
+                  style={{
+                    padding: "9px 20px",
+                    background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                    border: "none",
+                    borderRadius: "6px",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: bcLoading ? "not-allowed" : "pointer",
+                    fontSize: "0.9rem",
+                    boxShadow: "0 2px 10px rgba(124, 58, 237, 0.3)"
+                  }}
+                >
+                  {bcLoading ? "Broadcasting..." : "🚀 Send Broadcast to Desktop Apps"}
+                </button>
+              </div>
+            </form>
+
+            <div>
+              <h4 style={{ margin: "0 0 0.75rem 0", fontSize: "0.9rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Active & Recent Broadcasts ({broadcastsList.length})
+              </h4>
+              {broadcastsList.length === 0 ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>No active broadcasts dispatched yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  {broadcastsList.map((bc) => (
+                    <div
+                      key={bc.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "10px 14px",
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "8px",
+                        gap: "1rem"
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "0.8rem", padding: "2px 8px", borderRadius: "12px", background: "rgba(124, 58, 237, 0.2)", color: "#c084fc", fontWeight: 600 }}>
+                            {bc.type || "announcement"}
+                          </span>
+                          <strong style={{ fontSize: "0.95rem", color: "#f8fafc" }}>{bc.title}</strong>
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                            {new Date(bc.createdAt).toLocaleDateString()} {new Date(bc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>{bc.message}</p>
+                        {bc.actionLabel && (
+                          <span style={{ display: "inline-block", marginTop: "4px", fontSize: "0.75rem", color: "#60a5fa" }}>
+                            Action: {bc.actionLabel} ({bc.actionType})
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBroadcast(bc.id)}
+                        style={{
+                          padding: "5px 10px",
+                          background: "rgba(239, 68, 68, 0.15)",
+                          border: "1px solid rgba(239, 68, 68, 0.3)",
+                          color: "#f87171",
+                          borderRadius: "6px",
+                          fontSize: "0.8rem",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Delete / Recall
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem", marginBottom: "1.5rem" }}>
+              {/* In-App Announcement Banner Settings */}
+              <div style={{ background: "rgba(255,255,255,0.02)", padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.95rem", color: "#e2e8f0" }}>📣 In-App Announcement Banner</h4>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem", color: bannerEnabled ? "#10b981" : "var(--text-muted)" }}>
+                    <input
+                      type="checkbox"
+                      checked={bannerEnabled}
+                      onChange={(e) => setBannerEnabled(e.target.checked)}
+                    />
+                    <span>{bannerEnabled ? "Active" : "Disabled"}</span>
+                  </label>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Banner Text</label>
+                    <input
+                      type="text"
+                      value={bannerText}
+                      onChange={(e) => setBannerText(e.target.value)}
+                      placeholder="e.g. Winter collection now live! Check it out."
+                      style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Type / Color</label>
+                      <select
+                        value={bannerType}
+                        onChange={(e: any) => setBannerType(e.target.value)}
+                        style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                      >
+                        <option value="info">Blue (Info)</option>
+                        <option value="purple">Purple (Special)</option>
+                        <option value="success">Green (Success)</option>
+                        <option value="warning">Orange (Alert)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Button Text</label>
+                      <input
+                        type="text"
+                        value={bannerActionLabel}
+                        onChange={(e) => setBannerActionLabel(e.target.value)}
+                        placeholder="View Details"
+                        style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Action URL (Optional)</label>
+                    <input
+                      type="text"
+                      value={bannerActionUrl}
+                      onChange={(e) => setBannerActionUrl(e.target.value)}
+                      placeholder="https://..."
+                      style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Seasonal Theme Tint & Spotlight */}
+              <div style={{ background: "rgba(255,255,255,0.02)", padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.95rem", color: "#e2e8f0" }}>🎨 Dynamic Seasonal Accent / Tint</h4>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem", color: seasonalEnabled ? "#10b981" : "var(--text-muted)" }}>
+                    <input
+                      type="checkbox"
+                      checked={seasonalEnabled}
+                      onChange={(e) => setSeasonalEnabled(e.target.checked)}
+                    />
+                    <span>{seasonalEnabled ? "Applied" : "Default"}</span>
+                  </label>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Theme Name</label>
+                    <input
+                      type="text"
+                      value={seasonalName}
+                      onChange={(e) => setSeasonalName(e.target.value)}
+                      placeholder="e.g. Cyberpunk Violet / Holiday Neon"
+                      style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Accent Hex</label>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <input
+                          type="color"
+                          value={seasonalPrimary}
+                          onChange={(e) => setSeasonalPrimary(e.target.value)}
+                          style={{ width: "36px", height: "34px", padding: 0, border: "none", borderRadius: "4px", cursor: "pointer", background: "none" }}
+                        />
+                        <input
+                          type="text"
+                          value={seasonalPrimary}
+                          onChange={(e) => setSeasonalPrimary(e.target.value)}
+                          style={{ flex: 1, padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Spotlight Collection</label>
+                      <select
+                        value={spotlightCol}
+                        onChange={(e) => setSpotlightCol(e.target.value)}
+                        style={{ width: "100%", padding: "7px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem" }}
+                      >
+                        <option value="">None</option>
+                        {collections.map((col) => (
+                          <option key={col.id} value={col.name}>
+                            {col.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                {cfgStatusMsg && (
+                  <span style={{ fontSize: "0.85rem", color: cfgStatusMsg.isError ? "#ef4444" : "#10b981", fontWeight: 500 }}>
+                    {cfgStatusMsg.isError ? "❌ " : "✅ "}
+                    {cfgStatusMsg.text}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveRemoteConfig}
+                disabled={cfgSaving}
+                style={{
+                  padding: "9px 22px",
+                  background: "linear-gradient(135deg, #10b981, #059669)",
+                  border: "none",
+                  borderRadius: "6px",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: cfgSaving ? "not-allowed" : "pointer",
+                  fontSize: "0.9rem"
+                }}
+              >
+                {cfgSaving ? "Saving Configuration..." : "💾 Save Live Remote Config"}
+              </button>
+            </div>
+
+            {/* Instant Remote Directives */}
+            <div style={{ background: "rgba(239, 68, 68, 0.04)", border: "1px dashed rgba(239, 68, 68, 0.3)", borderRadius: "8px", padding: "1.25rem" }}>
+              <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#f87171" }}>⚡ Instant Remote Directives (OTA Remote Commands)</h4>
+              <p style={{ margin: "0 0 1rem 0", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                Commands dispatched here are executed silently by connected desktop instances without prompting users.
+              </p>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => handleDispatchCommand("force_resync", "Force Full 4K Sync")}
+                  style={{
+                    padding: "8px 16px",
+                    background: "rgba(99, 102, 241, 0.15)",
+                    border: "1px solid rgba(99, 102, 241, 0.4)",
+                    color: "#a5b4fc",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                >
+                  🔄 Force Instant Full 4K Sync
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDispatchCommand("clear_thumbnail_cache", "Purge Thumbnail Cache")}
+                  style={{
+                    padding: "8px 16px",
+                    background: "rgba(245, 158, 11, 0.15)",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                    color: "#fcd34d",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                >
+                  🧹 Clear Desktop Thumbnail Cache
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Accessible Auto-Slider */}
       {sliderImages.length > 0 && (
