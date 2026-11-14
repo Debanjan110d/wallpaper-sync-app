@@ -209,7 +209,7 @@ body {
    ========================================================================== */
 .app-shell {
     display: grid;
-    grid-template-columns: 252px 1fr 310px;
+    grid-template-columns: 264px 1fr 310px;
     width: 100vw;
     height: 100vh;
     background: radial-gradient(circle at 60% 0%, var(--ambient-glow, rgba(133, 57, 83, 0.2)) 0%, transparent 65%), var(--bg-app);
@@ -223,7 +223,7 @@ body {
 }
 
 .app-shell.right-panel-collapsed {
-    grid-template-columns: 252px 1fr 0px;
+    grid-template-columns: 264px 1fr 0px;
 }
 
 .app-shell.sidebar-collapsed.right-panel-collapsed {
@@ -241,27 +241,28 @@ body {
 }
 
 .sidebar-collapse-btn {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     color: #ffffff;
     cursor: pointer;
-    width: 26px;
-    height: 26px;
-    min-width: 26px;
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 6px;
+    margin-left: auto;
     flex-shrink: 0;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-    z-index: 5;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    z-index: 10;
 }
 .sidebar-collapse-btn:hover {
     color: #ffffff;
     background: var(--primary);
-    border-color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.65);
+    box-shadow: 0 0 14px var(--primary-glow);
     transform: scale(1.08);
 }
 .sidebar-collapse-btn svg {
@@ -271,7 +272,7 @@ body {
 
 [data-theme="light"] .sidebar-collapse-btn {
     background: rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(0, 0, 0, 0.22);
     color: var(--text-main);
 }
 [data-theme="light"] .sidebar-collapse-btn:hover {
@@ -353,6 +354,7 @@ body {
 .sidebar-brand {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     padding: 0 2px 18px 2px;
     margin-bottom: 8px;
@@ -361,8 +363,8 @@ body {
 }
 
 .brand-logo-wrap {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 10px;
     background: transparent;
     display: flex;
@@ -394,15 +396,15 @@ body {
 }
 
 .brand-name {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-main);
-    letter-spacing: -0.3px;
+    letter-spacing: -0.2px;
     white-space: nowrap;
 }
 
 .version-badge {
-    font-size: 8.5px;
+    font-size: 8px;
     font-weight: 700;
     color: #ffffff;
     background: linear-gradient(135deg, var(--primary), var(--secondary));

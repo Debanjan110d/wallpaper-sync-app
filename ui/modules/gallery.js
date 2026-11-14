@@ -196,7 +196,7 @@ function getCollectionStatsMap() {
             if (colMap[colId]) {
                 colMap[colId].count++;
                 if (!colMap[colId].cover) {
-                    colMap[colId].cover = toFileUrl(img.path);
+                    colMap[colId].cover = toFileUrl(img.thumbPath || img.path);
                 }
             }
         });
@@ -483,7 +483,7 @@ export function renderRecentlyAdded() {
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
-            <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
+            <img src="${toFileUrl(img.thumbPath || img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
             <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
                 ${isFav ? '❤️' : '♡'}
             </button>
@@ -560,7 +560,7 @@ export function renderRandomDiscoveries() {
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
-            <img src="${toFileUrl(img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" />
+            <img src="${toFileUrl(img.thumbPath || img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
             <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
                 ${isFav ? '❤️' : '♡'}
             </button>
@@ -748,7 +748,7 @@ export function renderCatalog() {
 
             const img = document.createElement("img");
             img.className = "card-img";
-            img.src = toFileUrl(imgData.path);
+            img.src = toFileUrl(imgData.thumbPath || imgData.path);
             img.alt = imgData.filename;
             img.loading = "lazy";
             img.decoding = "async";

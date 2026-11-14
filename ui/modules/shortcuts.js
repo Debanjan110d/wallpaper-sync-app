@@ -4,6 +4,7 @@ import { showToast } from "./utils.js";
 import { setSlideshowPlaybackUI, updatePlayerStatusText } from "./player.js";
 import { updateQuickActionSlideshowUI } from "./quickActions.js";
 import { closeDetailDrawer } from "./drawer.js";
+import { openSettingsModal } from "./modal.js";
 
 export function initShortcuts() {
     const shortcutsModal = document.getElementById("shortcutsModal");
@@ -70,6 +71,13 @@ export function initShortcuts() {
             e.preventDefault();
             const collapseBtn = document.getElementById("collapseSidebarBtn");
             if (collapseBtn) collapseBtn.click();
+            return;
+        }
+
+        // Ctrl + ,: Open Settings Modal
+        if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+            e.preventDefault();
+            openSettingsModal();
             return;
         }
 

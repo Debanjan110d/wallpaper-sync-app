@@ -185,6 +185,21 @@ async function syncWallpapers(config, onProgress) {
 
           latestFile = destPath;
           downloadCount++;
+
+          // Generate lightweight thumbnail for high-efficiency grid rendering
+          try {
+            const thumbDir = config.THUMBNAIL_DIR || path.join(path.dirname(destPath), "..", "thumbnails");
+            if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+            const thumbPath = path.join(thumbDir, `thumb_${filename}`);
+            if (!fs.existsSync(thumbPath)) {
+              const { nativeImage } = require("electron");
+              const img = nativeImage.createFromPath(destPath);
+              if (!img.isEmpty()) {
+                const resized = img.resize({ width: 380, quality: "good" });
+                fs.writeFileSync(thumbPath, resized.toJPEG(75));
+              }
+            }
+          } catch { }
         } catch (err) {
           console.warn(`[Downloader] Skipped unavailable wallpaper "${filename}":`, err.message);
           failedIndices.add(index);

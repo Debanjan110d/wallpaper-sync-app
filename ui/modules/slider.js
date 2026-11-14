@@ -28,7 +28,7 @@ export function renderHeroSlider() {
         const catName = store.state.localMetadata.categories.find(c => c.id === catId)?.name || "Featured";
 
         slide.innerHTML = `
-            <img src="${toFileUrl(img.path)}" class="hero-slide-img" alt="${img.filename}" draggable="false" />
+            <img src="${toFileUrl(img.thumbPath || img.path)}" class="hero-slide-img" alt="${img.filename}" draggable="false" loading="eager" decoding="async" />
             <div class="hero-slide-overlay"></div>
             <div class="hero-slide-content">
                 <div class="hero-featured-tag">✨ Featured Collection</div>

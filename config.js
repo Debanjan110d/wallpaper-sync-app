@@ -9,6 +9,7 @@ module.exports = {
   },
   get SYNC_TOKEN() { return process.env.WALLPAPER_SYNC_TOKEN || "sync_secret_token_123"; },
   get WALLPAPER_DIR() { return path.join(app.getPath("userData"), "wallpapers"); },
+  get THUMBNAIL_DIR() { return path.join(app.getPath("userData"), "thumbnails"); },
   get SOURCE_DIR() { return app.isPackaged ? path.join(process.resourcesPath, "wall_img") : path.join(__dirname, "wall_img"); },
   NOTIFICATION_INTERVAL: 1000 * 60 * 60 * 24 * 30 // 30 days
 };

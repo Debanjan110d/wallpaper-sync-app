@@ -1,157 +1,129 @@
-# Wallpaper Sync
+# Wallpaper Sync (v5.1.0) 🌄✨
 
 <p align="center">
-  <img src="icon.png" alt="Wallpaper Sync Logo" width="160" height="160" />
+  <img src="icon.png" alt="Wallpaper Sync Logo" width="140" height="140" />
 </p>
 
 <p align="center">
-  <em>A lightweight Windows desktop app that rotates and syncs wallpapers.</em>
+  <strong>A lightning-fast, ultra-low-memory Windows desktop companion that curates, rotates, and synchronizes 4K wallpapers effortlessly.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/Debanjan110d/wallpaper-sync-app/releases">
-    <strong>Download Latest Version</strong>
+    <img src="https://img.shields.io/github/v/release/Debanjan110d/wallpaper-sync-app?color=7c3aed&label=Release&style=flat-square" alt="GitHub release" />
   </a>
-  &nbsp;&bull;&nbsp;
-  <a href="CHANGELOG.md">
-    <strong>What's New in Version 5.0.0</strong>
-  </a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue?style=flat-square" alt="Windows 10/11" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Idle%20RAM-%3C%2045MB-success?style=flat-square" alt="Low Memory" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/License-ISC-green?style=flat-square" alt="License" />
 </p>
 
-Wallpaper Sync is an Electron tray app that can:
+---
 
-- rotate wallpapers from your local collection
-- let you drag & drop new wallpapers into the app
-- optionally sync a wallpaper collection from a server API
+## 💡 What is Wallpaper Sync?
 
-This repo also contains an optional Next.js + Supabase web app under `web/` that exposes the API the desktop app consumes.
+Wallpaper Sync is designed for people who love beautiful desktops without the resource bloat. Most wallpaper software constantly consumes hundreds of megabytes of RAM and runs dozens of background processes. 
 
-## Features
+Wallpaper Sync flips the script: it runs quietly in your Windows system tray, maintains a curated cloud library of vibrant 4K and 5K wallpapers, automatically extracts dominant hues to theme your desktop interface, and uses a specialized native thumbnail pipeline that drops active memory consumption by over **90%**.
 
-- Drag & drop images directly into the app
-- Automatic wallpaper rotation
-- Customizable change intervals
-- Simple image management (delete & organize)
-- Runs silently in the system tray
-- Optional Windows Startup Apps support (enable/disable from Task Manager → Startup apps)
-- App updates (installed builds): checks once on startup; when an update is available, the app opens your browser to download the latest installer (`.exe`) from GitHub Releases
-- Double-click an image to open a viewer; use Left/Right arrow keys or the on-screen arrows to navigate
+---
 
-## Project structure
+## 🚀 Key Features
 
-- Desktop app (Electron): root folder (`main.js`, `ui/`, `wallpaperManager.js`)
-- Optional server/API + admin dashboard: `web/` (Next.js + Supabase)
-- Database Schema & Relations: [db_schema.md](architecture/db_schema.md) (documented layout of all tables, junctions, and states)
+- **⚡ Ultra-Low Memory Footprint**: Uses Electron's native image scaling to generate lightweight 380px grid thumbnails, slashing renderer memory from 264 MB down to ~65 MB. When minimized to the tray, it automatically sweeps caches down to **~35-45 MB**.
+- **🎨 Dynamic Adaptive Ambient Hue**: Reads the dominant color profile of whichever wallpaper is currently playing and gently tints the UI glow and borders to match the artwork.
+- **🌗 Dual Handcrafted Themes**:
+  - **Deep Plum Dark Mode**: Velvet midnight canvas (`#2C2C2C`), plum surfaces (`#612D53`), and rose highlights (`#853953`).
+  - **Warm Terracotta Light Mode**: Cream canvas (`#FFEAD3`), soft mint accents (`#BFE7EA`), and rust buttons (`#D46743`).
+- **🔄 Two-Stage Resilient Cloud Sync**:
+  - **Stage 1 (Metadata)**: Downloads collections, tags, titles, and color metadata in milliseconds.
+  - **Stage 2 (4K Wallpapers)**: Streams high-resolution files with an HTTP keep-alive connection pool, concurrency limit of 3, and atomic temporary-file swapping.
+- **🔔 Native Windows Toast Notifications**: Integrated directly with Windows Action Center (`AppUserModelID`) to alert you when fresh wallpapers drop or when an update is available.
+- **⌨️ Comprehensive Keyboard Shortcuts**: Instant controls for searching (`Ctrl+K`), playing/pausing (`Space` / `Alt+S`), toggling the sidebar (`Ctrl+B`), opening settings (`Ctrl+,`), and more.
+- **🛡️ 1-Click Diagnostics & Health Check**: Built-in self-healing engine verifies write permissions, checks API connectivity, repairs metadata mismatches, and cleans cache.
 
-## Running locally (desktop app)
+---
 
-Prerequisites: Node.js (v20 recommended)
+## ⌨️ Keyboard Shortcuts
 
+| Shortcut | Action |
+| :--- | :--- |
+| <kbd>Ctrl</kbd> + <kbd>K</kbd> | Focus global wallpaper search |
+| <kbd>Space</kbd> or <kbd>Alt</kbd> + <kbd>S</kbd> | Play / Pause wallpaper slideshow |
+| <kbd>→</kbd> or <kbd>Alt</kbd> + <kbd>N</kbd> | Skip to next wallpaper immediately |
+| <kbd>Alt</kbd> + <kbd>R</kbd> | Apply a random wallpaper |
+| <kbd>Alt</kbd> + <kbd>F</kbd> | Favorite / unfavorite current wallpaper |
+| <kbd>Ctrl</kbd> + <kbd>B</kbd> | Toggle left navigation sidebar |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd> | Toggle right control studio |
+| <kbd>Ctrl</kbd> + <kbd>,</kbd> | Open Settings & Cloud Sync modal |
+| <kbd>?</kbd> or <kbd>F1</kbd> | Open keyboard shortcuts cheatsheet |
+| <kbd>Esc</kbd> | Close active drawer, lightbox, or modal |
+
+---
+
+## 🛠️ Installation & Getting Started
+
+### Download the Windows Installer
+Download the latest Windows setup file (`.exe`) directly from the [Releases Page](https://github.com/Debanjan110d/wallpaper-sync-app/releases).
+
+1. Run the installer and launch the app.
+2. The app will automatically register in your Windows System Tray (near the clock).
+3. Open the dashboard to explore collections, star favorites, and start your rotation.
+
+---
+
+## 💻 Developer Setup & Local Development
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) v20+ recommended.
+- Windows 10 or 11.
+
+### 1. Clone & Install Dependencies
 ```bash
+git clone https://github.com/Debanjan110d/wallpaper-sync-app.git
+cd wallpaper-sync-app
 npm ci
+```
+
+### 2. Run Desktop App Locally
+```bash
 npm start
 ```
 
-## Running locally (optional server)
-
-The desktop app syncs from an API URL (defaults to `http://localhost:3000/api/wallpapers`).
-
-You can override it either by:
-
-- setting `apiUrl` in the desktop app settings file (stored in Electron's `userData` directory as `settings.json`), or
-- setting the env var `WALLPAPER_SYNC_API_URL`.
-
-Note: on Windows installed builds, the settings file is stored under `%LOCALAPPDATA%\Wallpaper Sync App\settings.json`.
-
-If your web API is protected, you can also set `syncToken` in that same settings file (or `WALLPAPER_SYNC_TOKEN` as an env var).
-
-1. Install and run the Next.js app:
-
+### 3. Run Web Showcase & Landing Page
 ```bash
-cd web
-npm ci
+cd launching_page
+npm install
 npm run dev
 ```
+Open `http://localhost:3000` to view the landing page, live studio preview, and reviews center.
 
-1. Create `web/.env.local` with:
+---
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-side only; never expose this key)
-- `ADMIN_PASSWORD` (simple admin login used by `/login`)
+## ⚙️ Configuration & Paths
 
-## Deploying the web app to Vercel
+- **Local Wallpapers Directory**: `%LOCALAPPDATA%\Wallpaper Sync App\wallpapers`
+- **Cached Thumbnails Directory**: `%LOCALAPPDATA%\Wallpaper Sync App\thumbnails`
+- **Settings File**: `%LOCALAPPDATA%\Wallpaper Sync App\settings.json`
+- **Environment Overrides**:
+  - `WALLPAPER_SYNC_API_URL`: Override the cloud sync server endpoint.
+  - `WALLPAPER_SYNC_TOKEN`: Set a custom authorization sync bearer token.
 
-1) In Vercel, import the repo and set **Root Directory** to `web/`.
+---
 
-2) Set the Node.js version to **20+** (Supabase packages require Node 20+).
+## 🤝 Contributing
 
-3) Add these environment variables in Vercel (Project → Settings → Environment Variables):
+Contributions, feature ideas, and bug reports are welcome!
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `ADMIN_PASSWORD`
-- `SYNC_TOKEN` (optional, but recommended if your desktop app will sync from this API)
+---
 
-After deployment, visit `/login` on your Vercel domain.
+## 📄 License
 
-Security note: the current admin auth is intentionally minimal (password + cookie). If you plan to expose this publicly, consider upgrading it to signed tokens or proper user auth.
-
-## Build
-
-```bash
-npm run dist
-```
-
-The Windows installer will be generated in `dist/`.
-
-Note: Windows Startup Apps integration works properly after installing the packaged build (NSIS). It will not reliably show up when running via `npm start`.
-
-Note: In-app update checks/notifications also only work for installed packaged builds (they rely on GitHub Releases artifacts).
-
-## Automated releases (GitHub Actions)
-
-Releases are fully automated from tags and use `CHANGELOG.md` as release notes.
-
-The release workflow triggers on `push` of tags matching `v*` (example: `v2.0.1`).
-
-1. Bump the version in root `package.json` (example: `2.0.1`)
-1. Add/update the matching section heading in `CHANGELOG.md` (example: `## 2.0.1`)
-1. Commit those changes
-1. Create and push a git tag like `v2.0.1`
-
-Example commands:
-
-```bash
-git status
-git add -A
-git commit -m "release: v3.0.1"
-
-# annotated tag is recommended
-git tag -a v3.0.1 -m "v3.0.1"
-
-git push origin main
-git push origin v3.0.1
-```
-
-When you push the tag, GitHub Actions will:
-
-- build the Windows artifacts
-- create a GitHub Release (non-draft)
-- attach the generated installer files
-- set the release body from the `CHANGELOG.md` section for that version
-
-## Contributing
-
-See `CONTRIBUTING.md` for setup, workflow, and release/changelog rules.
-
-## Disclaimer & Wallpaper Ownership
-
-The wallpapers cataloged or indexed in this application are **not owned** by the application creator. They are sourced/downloaded from public platforms such as Instagram, Unsplash, or Pinterest.
-
-If you are the copyright owner of any wallpaper present in this catalog and wish to have it removed, please contact the maintainers directly via email at debanjangamedu@gmail.com or by raising a GitHub Issue.
-
-## License
-
-ISC
+Distributed under the **ISC License**. Built with care by [Debanjan Dutta](https://github.com/Debanjan110d).

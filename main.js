@@ -1,4 +1,4 @@
-const { app, Tray, Menu, Notification, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, Tray, Menu, Notification, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require("electron");
 
 // Ensure a single running instance at startup
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -19,9 +19,10 @@ if (process.platform === "win32") {
 }
 
 // High-efficiency memory optimizations: limit heap growth & trim background renderer bloat
-app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
+app.commandLine.appendSwitch("js-flags", "--expose-gc --max-old-space-size=96");
 app.commandLine.appendSwitch("disable-site-isolation-trials");
-app.commandLine.appendSwitch("disable-features", "TranslateUI");
+app.commandLine.appendSwitch("disable-dev-shm-usage");
+app.commandLine.appendSwitch("disable-features", "TranslateUI,CalculateNativeWinOcclusion,AudioServiceOutOfProcess");
 
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
@@ -448,7 +449,33 @@ function createMainWindow() {
     }
     mainWindow = null;
   });
+
+  mainWindow.on("minimize", () => {
+    trimProcessWorkingSet();
+  });
+
+  mainWindow.on("hide", () => {
+    trimProcessWorkingSet();
+  });
 }
+
+function trimProcessWorkingSet() {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.session.clearCache().catch(() => {});
+    }
+    if (global.gc) {
+      global.gc();
+    }
+  } catch {}
+}
+
+// Background idle working set memory trim
+setInterval(() => {
+  if (mainWindow && mainWindow.isMinimized()) {
+    trimProcessWorkingSet();
+  }
+}, 10 * 60 * 1000);
 
 function promptInstallUpdateIfPossible() {
   if (!app.isPackaged || process.platform !== "win32") return;
@@ -494,6 +521,67 @@ function promptInstallUpdateIfPossible() {
   }
 }
 
+function getThumbnailPath(fullPath) {
+  try {
+    if (!fullPath) return fullPath;
+    const thumbDir = config.THUMBNAIL_DIR;
+    if (!fs.existsSync(thumbDir)) {
+      fs.mkdirSync(thumbDir, { recursive: true });
+    }
+    const filename = path.basename(fullPath);
+    const thumbPath = path.join(thumbDir, `thumb_${filename}`);
+    if (fs.existsSync(thumbPath)) {
+      return thumbPath;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+let isGeneratingThumbnails = false;
+function scheduleThumbnailGeneration(filesList) {
+  if (isGeneratingThumbnails || !Array.isArray(filesList) || filesList.length === 0) return;
+  isGeneratingThumbnails = true;
+
+  const pending = filesList.filter(f => f.path && (!f.thumbPath || f.thumbPath === f.path));
+  if (pending.length === 0) {
+    isGeneratingThumbnails = false;
+    return;
+  }
+
+  let index = 0;
+  function processNext() {
+    if (index >= pending.length) {
+      isGeneratingThumbnails = false;
+      return;
+    }
+    const item = pending[index++];
+    try {
+      const thumbDir = config.THUMBNAIL_DIR;
+      if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+      const thumbPath = path.join(thumbDir, `thumb_${item.filename}`);
+      if (!fs.existsSync(thumbPath)) {
+        const img = nativeImage.createFromPath(item.path);
+        if (!img.isEmpty()) {
+          const sz = img.getSize();
+          if (sz.width > 420) {
+            const resized = img.resize({ width: 380, quality: "good" });
+            fs.writeFileSync(thumbPath, resized.toJPEG(75));
+            item.thumbPath = thumbPath;
+          }
+        }
+      } else {
+        item.thumbPath = thumbPath;
+      }
+    } catch { }
+
+    setTimeout(processNext, 20);
+  }
+
+  setTimeout(processNext, 1200);
+}
+
 function getImages() {
   const sourceDir = config.SOURCE_DIR;
   const userDir = config.WALLPAPER_DIR;
@@ -504,7 +592,8 @@ function getImages() {
       const full = path.join(sourceDir, f);
       let sizeBytes = 0;
       try { sizeBytes = fs.statSync(full).size || 0; } catch {}
-      files.push({ filename: f, path: full, sizeBytes });
+      const existingThumb = getThumbnailPath(full);
+      files.push({ filename: f, path: full, thumbPath: existingThumb || full, sizeBytes });
     });
   }
   if (fs.existsSync(userDir)) {
@@ -523,16 +612,21 @@ function getImages() {
           mtimeMs = 0;
           sizeBytes = 0;
         }
-        return { filename: f, path: full, mtimeMs, sizeBytes };
+        const existingThumb = getThumbnailPath(full);
+        return { filename: f, path: full, thumbPath: existingThumb || full, mtimeMs, sizeBytes };
       })
       .sort((a, b) => a.mtimeMs - b.mtimeMs);
 
     for (const f of userFiles) {
       if (!files.find((existing) => existing.filename === f.filename)) {
-        files.push({ filename: f.filename, path: f.path, sizeBytes: f.sizeBytes });
+        files.push({ filename: f.filename, path: f.path, thumbPath: f.thumbPath, sizeBytes: f.sizeBytes });
       }
     }
   }
+
+  // Queue non-blocking thumbnail generation for pending wallpapers
+  scheduleThumbnailGeneration(files);
+
   return files;
 }
 
@@ -1307,6 +1401,15 @@ ipcMain.handle("clear-local-wallpapers", async () => {
         } catch (err) {
           console.error("Failed to delete local wallpaper:", f, err && err.message ? err.message : err);
         }
+      }
+    }
+
+    // Also clean up cached thumbnails
+    const thumbDir = config.THUMBNAIL_DIR;
+    if (fs.existsSync(thumbDir)) {
+      const thumbs = fs.readdirSync(thumbDir);
+      for (const t of thumbs) {
+        try { fs.unlinkSync(path.join(thumbDir, t)); } catch { }
       }
     }
 
