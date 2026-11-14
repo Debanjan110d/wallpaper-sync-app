@@ -374,6 +374,54 @@ export default function DocsPage() {
               We follow a strict <em>&quot;Generate Once, Search Locally&quot;</em> philosophy. When wallpapers are uploaded to our CDN, Gemini 2.5 Flash inspects each image once to extract subject matter, aesthetic mood, and dominant RGB color swatches. This metadata is saved directly to your local cache, so all your searches and filters run offline at blazing speed with 0ms network latency.
             </p>
           </section>
+
+          {/* Section 6: Privacy, Bandwidth & Anonymous Diagnostics */}
+          <section
+            style={{
+              background: "rgba(15, 23, 42, 0.55)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "20px",
+              padding: "2.2rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "1rem" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(59, 130, 246, 0.2)",
+                  color: "#60a5fa",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 800,
+                }}
+              >
+                6
+              </div>
+              <h2 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff", margin: 0 }}>
+                Privacy, Bandwidth Control &amp; Anonymous Diagnostics
+              </h2>
+            </div>
+            <p style={{ lineHeight: 1.7, color: "rgba(233, 238, 252, 0.8)", marginBottom: "1rem" }}>
+              Wallpaper Sync is designed with deep respect for your machine&apos;s resources, network bandwidth, and privacy.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.2rem", marginTop: "1.2rem" }}>
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "1.2rem", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <h3 style={{ fontSize: "1.05rem", color: "#f8fafc", margin: "0 0 0.5rem 0" }}>⚡ Bandwidth Control (Auto vs Manual)</h3>
+                <p style={{ fontSize: "0.85rem", color: "rgba(233, 238, 252, 0.7)", lineHeight: 1.6, margin: 0 }}>
+                  Downloading 4K wallpapers can consume metered bandwidth. In <strong>Settings &amp; Cloud Sync</strong>, you can toggle <em>Auto-Sync</em> off anytime. The app will only check lightweight metadata and let you click <strong>Sync Now</strong> whenever you want full control.
+                </p>
+              </div>
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "1.2rem", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <h3 style={{ fontSize: "1.05rem", color: "#f8fafc", margin: "0 0 0.5rem 0" }}>🛡️ Weekly Error Logs (Strictly Opt-In)</h3>
+                <p style={{ fontSize: "0.85rem", color: "rgba(233, 238, 252, 0.7)", lineHeight: 1.6, margin: 0 }}>
+                  Diagnostic crash reporting is <strong>disabled by default</strong>. When explicitly enabled by you, the app sends anonymous software error logs once a week. It never logs usernames, file contents, IP addresses, or personal info, and you can view or clear local logs anytime.
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </main>
 

@@ -67,5 +67,12 @@ contextBridge.exposeInMainWorld("api", {
   getRemoteConfig: () => ipcRenderer.invoke("remote-config:get"),
   checkRemoteConfig: () => ipcRenderer.invoke("remote-config:check"),
   onRemoteConfigUpdated: (callback) => ipcRenderer.on("remote-config:updated", (event, config) => callback(config)),
-  openExternalUrl: (url) => ipcRenderer.invoke("open-external-url", url)
+  openExternalUrl: (url) => ipcRenderer.invoke("open-external-url", url),
+
+  // Anonymous Diagnostics & Problem Logging APIs (Strictly Opt-In Privacy)
+  getDiagnosticsSummary: () => ipcRenderer.invoke("diagnostics:get-summary"),
+  clearDiagnostics: () => ipcRenderer.invoke("diagnostics:clear"),
+  toggleTelemetry: (enabled) => ipcRenderer.invoke("diagnostics:toggle-telemetry", enabled),
+  setTelemetryPrompted: () => ipcRenderer.invoke("diagnostics:set-prompted"),
+  sendDiagnosticsNow: () => ipcRenderer.invoke("diagnostics:send-now"),
 });

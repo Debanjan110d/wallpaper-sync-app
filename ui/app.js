@@ -58,8 +58,43 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Sync slides button state based on loaded settings
         setSlideshowPlaybackUI(!!store.state.settings.slideshow);
 
-        // Trigger background sync on initial startup
-        store.triggerBackgroundSync();
+        // Only trigger background sync on initial startup if user explicitly enabled autoSync and syncOnStartup
+        if (store.state.settings?.autoSync && store.state.settings?.syncOnStartup) {
+            store.triggerBackgroundSync(false);
+        }
+
+        // Polite Opt-In Privacy Prompt: Ask user if they wish to share anonymous error logs
+        if (store.state.settings && !store.state.settings.telemetryPrompted) {
+            const telemetryModal = document.getElementById("telemetryConsentModal");
+            const btnAccept = document.getElementById("btnAcceptTelemetry");
+            const btnDecline = document.getElementById("btnDeclineTelemetry");
+
+            if (telemetryModal) {
+                setTimeout(() => {
+                    telemetryModal.classList.remove("hidden");
+                }, 2500);
+
+                if (btnAccept) {
+                    btnAccept.addEventListener("click", async () => {
+                        await window.api.toggleTelemetry(true);
+                        store.state.settings.telemetryEnabled = true;
+                        store.state.settings.telemetryPrompted = true;
+                        telemetryModal.classList.add("hidden");
+                        showToast("Anonymous diagnostics enabled. Thank you!", "info");
+                    });
+                }
+
+                if (btnDecline) {
+                    btnDecline.addEventListener("click", async () => {
+                        await window.api.toggleTelemetry(false);
+                        store.state.settings.telemetryEnabled = false;
+                        store.state.settings.telemetryPrompted = true;
+                        telemetryModal.classList.add("hidden");
+                        showToast("Diagnostics kept offline.", "info");
+                    });
+                }
+            }
+        }
 
         // Check rating prompt eligibility on startup
         checkReviewEligibility();

@@ -83,6 +83,21 @@ export async function updateWallpaperInfo() {
 }
 
 export async function triggerBackgroundSync(isManual = false) {
+    // If auto-sync is disabled and this was an automatic background trigger, only sync metadata (saving bandwidth & CPU)
+    if (!isManual && store.state.settings && store.state.settings.autoSync === false) {
+        updateConnectionDot("offline", "Checking...");
+        try {
+            await window.api.syncMetadataNow();
+            updateConnectionDot("online", "Connected (Manual Sync Mode)");
+            await refreshMetadata();
+            await updateWallpaperInfo();
+            await loadWallpapers();
+        } catch {
+            updateConnectionDot("online", "Connected (Manual Sync Mode)");
+        }
+        return;
+    }
+
     updateConnectionDot("offline", "Syncing...");
     if (isManual) showToast("Synchronizing cloud library & wallpapers...", "info");
     try {

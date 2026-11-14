@@ -218,6 +218,15 @@ export async function syncSettingsModalValues() {
         if (notifyWallpapersToggle) notifyWallpapersToggle.checked = settings.notifyNewWallpapers !== false;
         if (notifyUpdatesToggle) notifyUpdatesToggle.checked = settings.notifyAppUpdates !== false;
 
+        const telemetryToggle = document.getElementById("settingTelemetryToggle");
+        if (telemetryToggle) telemetryToggle.checked = !!settings.telemetryEnabled;
+
+        const diagStatus = document.getElementById("diagnosticsLogStatusLabel");
+        if (diagStatus && window.api.getDiagnosticsSummary) {
+            const summary = await window.api.getDiagnosticsSummary();
+            diagStatus.textContent = `Local error log: ${summary.totalLines || 0} entries (${Math.round((summary.sizeBytes || 0) / 1024)} KB)`;
+        }
+
         if (dirPathEl && window.api.getWallpaperDir) {
             const dir = await window.api.getWallpaperDir();
             dirPathEl.textContent = dir || "Local Wallpapers Folder";
@@ -326,6 +335,48 @@ export function initSettingsModal() {
             } finally {
                 forceResyncBtn.textContent = "⚡ Force Cloud Re-Sync";
                 forceResyncBtn.disabled = false;
+            }
+        });
+    }
+
+    const telemetryToggle = document.getElementById("settingTelemetryToggle");
+    const viewDiagBtn = document.getElementById("viewDiagnosticsLogsBtn");
+    const clearDiagBtn = document.getElementById("clearDiagnosticsLogsBtn");
+    const diagViewerModal = document.getElementById("diagnosticsViewerModal");
+    const closeDiagViewerBtn = document.getElementById("closeDiagnosticsViewerBtn");
+    const diagViewerBackdrop = document.getElementById("diagnosticsViewerBackdrop");
+    const diagLogPre = document.getElementById("diagnosticsLogPre");
+
+    if (telemetryToggle) {
+        telemetryToggle.addEventListener("change", async (e) => {
+            await window.api.toggleTelemetry(e.target.checked);
+            showToast(e.target.checked ? "Anonymous diagnostics enabled. Thank you!" : "Anonymous diagnostics disabled.", "info");
+        });
+    }
+
+    if (viewDiagBtn) {
+        viewDiagBtn.addEventListener("click", async () => {
+            if (window.api.getDiagnosticsSummary) {
+                const summary = await window.api.getDiagnosticsSummary();
+                if (diagLogPre) {
+                    diagLogPre.textContent = summary.recentLogs && summary.recentLogs.length > 0
+                        ? summary.recentLogs.join("\n")
+                        : "No problems or errors logged. System is operating cleanly.";
+                }
+                diagViewerModal?.classList.remove("hidden");
+            }
+        });
+    }
+
+    if (closeDiagViewerBtn) closeDiagViewerBtn.addEventListener("click", () => diagViewerModal?.classList.add("hidden"));
+    if (diagViewerBackdrop) diagViewerBackdrop.addEventListener("click", () => diagViewerModal?.classList.add("hidden"));
+
+    if (clearDiagBtn) {
+        clearDiagBtn.addEventListener("click", async () => {
+            if (confirm("Clear local diagnostics log?")) {
+                await window.api.clearDiagnostics();
+                showToast("Local diagnostics log cleared", "info");
+                await syncSettingsModalValues();
             }
         });
     }

@@ -148,14 +148,10 @@ async function syncWallpapers(config, onProgress) {
       // Only download if we don't already have it
       if (!fs.existsSync(destPath)) {
         console.log(`[Downloader] Fetching 4K wallpaper [${index + 1}/${total}]:`, filename);
-        const tempPath = destPath + ".tmp";
-
-        // Clean stale temp file
-        try {
-          if (fs.existsSync(tempPath)) {
-            fs.unlinkSync(tempPath);
-          }
-        } catch { }
+        const tempPath = path.join(
+          config.WALLPAPER_DIR,
+          `.${filename}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`
+        );
 
         let writer = null;
         try {
@@ -172,8 +168,12 @@ async function syncWallpapers(config, onProgress) {
           // Wait until fully flushed and written to disk
           await finishedStream(writer);
 
-          // Atomic rename from temp to destination
-          fs.renameSync(tempPath, destPath);
+          // Atomic rename from temp to destination (safely check if already exists)
+          if (!fs.existsSync(destPath)) {
+            fs.renameSync(tempPath, destPath);
+          } else {
+            try { fs.unlinkSync(tempPath); } catch {}
+          }
 
           // Apply server created_at as local modified time
           try {
@@ -204,6 +204,10 @@ async function syncWallpapers(config, onProgress) {
           console.warn(`[Downloader] Skipped unavailable wallpaper "${filename}":`, err.message);
           failedIndices.add(index);
           downloadErrors.push(`${filename}: ${err.message}`);
+          try {
+            const { logProblem } = require("./diagnostics");
+            logProblem("downloader", `Download failed for ${filename}`, err.message);
+          } catch {}
 
           if (writer && !writer.destroyed) {
             writer.destroy();

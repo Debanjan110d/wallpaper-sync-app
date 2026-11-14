@@ -51,6 +51,10 @@ function loadSettings() {
     receivedBroadcasts: [],
     executedRemoteCommands: [],
     remoteConfig: null,
+    // Anonymous weekly error logging (Strictly Opt-in; false by default)
+    telemetryEnabled: false,
+    telemetryPrompted: false,
+    lastTelemetrySent: 0,
     ...savedSettings,
     firstUsedAt
   };
