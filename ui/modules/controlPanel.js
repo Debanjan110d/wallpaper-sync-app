@@ -212,6 +212,11 @@ export function initCloudSyncCard() {
 // Dynamic Adaptive Ambient Hue following the currently playing wallpaper (Hibernation-Aware)
 let isAppWindowVisible = true;
 let pendingAmbientWallpaper = null;
+export let activeThemePalette = null;
+
+export function getActiveThemePalette() {
+    return activeThemePalette;
+}
 
 export function handleAppVisibilityChange(visible) {
     isAppWindowVisible = !!visible;
@@ -236,6 +241,52 @@ function hexToRgb(hex) {
     };
 }
 
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    h /= 360; s /= 100; l /= 100;
+    let r, g, b;
+    if (s === 0) {
+        r = g = b = l;
+    } else {
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+    const R = Math.round(r * 255);
+    const G = Math.round(g * 255);
+    const B = Math.round(b * 255);
+    const hex = `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
+    return { r: R, g: G, b: B, hex };
+}
+
 export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
     if (!activePath) return;
 
@@ -257,7 +308,7 @@ export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
         rgb = hexToRgb(meta.primary_color);
     }
 
-    // 2. High-Performance Fallback: Extract dominant hue via native Electron C++ runtime
+    // 2. High-Performance Fallback: Extract dominant chromatic hue via native Electron runtime
     if (!rgb && window.api && window.api.getDominantColor) {
         try {
             const res = await window.api.getDominantColor(activePath);
@@ -269,13 +320,67 @@ export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
         }
     }
 
-    // 3. Smoothly apply CSS variables across the app shell with 1.2s ambient transition
-    if (rgb) {
-        const root = document.documentElement;
-        root.style.setProperty("--ambient-glow", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28)`);
-        root.style.setProperty("--ambient-tint", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
-        root.style.setProperty("--ambient-border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45)`);
-        root.style.setProperty("--ambient-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    if (!rgb) return;
+
+    // 3. Derive harmonious dynamic theme palette matching wallpaper hue
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const isDark = (document.documentElement.getAttribute("data-theme") || "dark") !== "light";
+
+    // Primary vibrant accent for interactive controls, badges, glows, active borders
+    const accentSat = Math.max(hsl.s, 64);
+    const accentLight = isDark ? 54 : 44;
+    const primary = hslToRgb(hsl.h, accentSat, accentLight);
+    const primaryHover = hslToRgb(hsl.h, accentSat, isDark ? accentLight + 8 : accentLight - 8);
+    const secondary = hslToRgb((hsl.h + 24) % 360, Math.max(hsl.s - 12, 42), isDark ? 46 : 48);
+
+    // Dark Mode surfaces subtly tinted with wallpaper hue
+    const surfaceSat = Math.min(hsl.s, 22);
+    const bgSurface = hslToRgb(hsl.h, surfaceSat, 14);
+    const bgSurfaceElevated = hslToRgb(hsl.h, surfaceSat, 18);
+    const bgSurfaceCard = hslToRgb(hsl.h, surfaceSat, 12);
+    const bgApp = hslToRgb(hsl.h, Math.min(hsl.s, 16), 9);
+
+    // Light Mode surfaces subtly tinted with wallpaper hue
+    const lightBgApp = hslToRgb(hsl.h, Math.min(hsl.s, 20), 95);
+    const lightSurfaceElevated = hslToRgb(hsl.h, Math.min(hsl.s, 20), 98);
+
+    activeThemePalette = {
+        primary,
+        primaryHover,
+        secondary,
+        bgSurface,
+        bgSurfaceElevated,
+        bgSurfaceCard,
+        bgApp,
+        lightBgApp,
+        lightSurfaceElevated,
+        rgb,
+        hsl
+    };
+
+    const root = document.documentElement;
+    root.style.setProperty("--primary", primary.hex);
+    root.style.setProperty("--primary-hover", primaryHover.hex);
+    root.style.setProperty("--primary-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.45)`);
+    root.style.setProperty("--secondary", secondary.hex);
+    root.style.setProperty("--border-active", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.6)`);
+    root.style.setProperty("--border-glow", `0 0 24px rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.35)`);
+    root.style.setProperty("--ambient-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.32)`);
+    root.style.setProperty("--ambient-tint", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.14)`);
+    root.style.setProperty("--ambient-border", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.45)`);
+    root.style.setProperty("--ambient-rgb", `${primary.r}, ${primary.g}, ${primary.b}`);
+
+    if (isDark) {
+        root.style.setProperty("--bg-app", bgApp.hex);
+        root.style.setProperty("--bg-surface", bgSurface.hex);
+        root.style.setProperty("--bg-surface-elevated", bgSurfaceElevated.hex);
+        root.style.setProperty("--bg-surface-card", bgSurfaceCard.hex);
+        root.style.setProperty("--bg-glass", `rgba(${bgSurface.r}, ${bgSurface.g}, ${bgSurface.b}, 0.92)`);
+        root.style.setProperty("--border-subtle", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.16)`);
+    } else {
+        root.style.setProperty("--bg-app", lightBgApp.hex);
+        root.style.setProperty("--bg-surface-elevated", lightSurfaceElevated.hex);
+        root.style.setProperty("--border-subtle", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.18)`);
     }
 }
 

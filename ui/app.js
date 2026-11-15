@@ -21,7 +21,7 @@ import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
 import { initReviewModal, checkReviewEligibility, updateMetadataSyncUI, openReviewModal, initSettingsModal, openSettingsModal } from "./modules/modal.js";
 import { initQuickActions } from "./modules/quickActions.js";
-import { initControlPanel, syncRightControlPanelState, handleAppVisibilityChange } from "./modules/controlPanel.js";
+import { initControlPanel, syncRightControlPanelState, handleAppVisibilityChange, updateNowPlayingCard } from "./modules/controlPanel.js";
 import { initShortcuts } from "./modules/shortcuts.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -54,6 +54,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         await store.refreshMetadata();
         await store.loadWallpapers();
         await store.updateWallpaperInfo();
+
+        // Apply Now Playing card and dynamic adaptive ambient hue on startup
+        updateNowPlayingCard();
 
         // Sync slides button state based on loaded settings
         setSlideshowPlaybackUI(!!store.state.settings.slideshow);
@@ -269,6 +272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.documentElement.setAttribute("data-theme", next);
             localStorage.setItem("ws_theme", next);
             updateThemeIcon(next);
+            updateNowPlayingCard();
             showToast(`Theme: ${next === "light" ? "Light Mode" : "Dark Mode"}`, "info");
         });
     }

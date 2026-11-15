@@ -2,6 +2,7 @@
 import { store } from "../store.js";
 import { toFileUrl, fuzzyMatch, showToast, updateNavButtonsVisibility } from "./utils.js";
 import { openDetailDrawer } from "./drawer.js";
+import { getActiveThemePalette } from "./controlPanel.js";
 
 // Standard dominant color neon matching map
 const COLOR_NEON_MAP = {
@@ -35,13 +36,20 @@ export function applyDynamicAccentColor(colorName) {
 }
 
 export function resetDynamicAccentColor() {
-    // Restore default indigo glows
-    document.documentElement.style.setProperty("--primary", "#7209b7");
-    document.documentElement.style.setProperty("--primary-glow", "rgba(114, 9, 183, 0.4)");
+    const palette = getActiveThemePalette();
+    const isDark = (document.documentElement.getAttribute("data-theme") || "dark") !== "light";
+    const defaultColor = isDark ? "#853953" : "#D46743";
+    const defaultGlow = isDark ? "rgba(133, 57, 83, 0.45)" : "rgba(212, 103, 67, 0.35)";
+
+    const primaryColor = (palette && palette.primary) ? palette.primary.hex : defaultColor;
+    const glowColor = (palette && palette.primary) ? `rgba(${palette.primary.r}, ${palette.primary.g}, ${palette.primary.b}, 0.45)` : defaultGlow;
+
+    document.documentElement.style.setProperty("--primary", primaryColor);
+    document.documentElement.style.setProperty("--primary-glow", glowColor);
     
     const startBtn = document.querySelector(".mockup-taskbar-start");
     if (startBtn) {
-        startBtn.style.backgroundColor = "#7209b7";
+        startBtn.style.backgroundColor = primaryColor;
     }
 }
 

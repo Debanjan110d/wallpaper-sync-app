@@ -218,6 +218,7 @@ export function initDrawer() {
                 await window.api.setWallpaper(store.state.currentSelectedImage.path);
                 showToast("Desktop wallpaper applied!", "success");
                 store.state.settings = await window.api.getSettings();
+                import("./controlPanel.js").then(m => m.updateNowPlayingCard(store.state.currentSelectedImage));
                 checkReviewEligibility();
             } catch {
                 showToast("Failed to apply wallpaper", "error");

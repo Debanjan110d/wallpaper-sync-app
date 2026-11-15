@@ -6,11 +6,11 @@
 
 :root,
 [data-theme="dark"] {
-    --bg-app: #2C2C2C;
-    --bg-surface: #612D53;
-    --bg-surface-elevated: #4A2340;
-    --bg-surface-card: #3A1B32;
-    --bg-glass: rgba(97, 45, 83, 0.9);
+    --bg-app: #121316;
+    --bg-surface: #1e1e24;
+    --bg-surface-elevated: #282830;
+    --bg-surface-card: #202026;
+    --bg-glass: rgba(30, 30, 36, 0.92);
 
     --primary: #853953;
     --primary-hover: #9E4564;
@@ -336,6 +336,7 @@ body {
 .sidebar-v5 {
     background: var(--bg-surface);
     border-right: 1px solid var(--border-subtle);
+    transition: background 0.8s ease, border-color 0.8s ease;
     display: flex;
     flex-direction: column;
     padding: 20px 14px 16px 14px;
@@ -1846,6 +1847,7 @@ body {
 .control-panel-v5 {
     background: var(--bg-surface);
     border-left: 1px solid var(--border-subtle);
+    transition: background 0.8s ease, border-color 0.8s ease;
     display: flex;
     flex-direction: column;
     gap: 14px;

@@ -619,34 +619,45 @@ function extractDominantColor(filePath) {
     // Fast downsample to 16x16: 256 pixels in native C++ (no canvas/CORS taint)
     const thumb = img.resize({ width: 16, height: 16, quality: "good" });
     const raw = thumb.toBitmap(); // 1024 bytes: [B, G, R, A]
-    let totalR = 0, totalG = 0, totalB = 0, count = 0;
+    let vR = 0, vG = 0, vB = 0, vTotalWeight = 0;
+    let sR = 0, sG = 0, sB = 0, sCount = 0;
 
     for (let i = 0; i < raw.length; i += 4) {
       const b = raw[i];
       const g = raw[i + 1];
       const r = raw[i + 2];
       const br = (r * 299 + g * 587 + b * 114) / 1000;
-      // Filter out pure black / extreme dark or blown-out white to get the vibrant dominant hue
-      if (br > 25 && br < 235) {
-        totalR += r;
-        totalG += g;
-        totalB += b;
-        count++;
+
+      // Filter out pure black / extreme dark or blown-out white to extract true chromatic hue
+      if (br > 18 && br < 242) {
+        sR += r; sG += g; sB += b; sCount++;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+        const sat = max === 0 ? 0 : delta / max;
+
+        // Weight by saturation^1.5 to emphasize vibrant chromatic accent colors over dull grays
+        const weight = Math.pow(sat, 1.5) + 0.05;
+        vR += r * weight;
+        vG += g * weight;
+        vB += b * weight;
+        vTotalWeight += weight;
       }
     }
 
-    if (count === 0) {
+    if (vTotalWeight === 0 && sCount === 0) {
       for (let i = 0; i < raw.length; i += 4) {
-        totalB += raw[i];
-        totalG += raw[i + 1];
-        totalR += raw[i + 2];
-        count++;
+        vB += raw[i];
+        vG += raw[i + 1];
+        vR += raw[i + 2];
+        vTotalWeight++;
       }
     }
 
-    const avgR = Math.round(totalR / count);
-    const avgG = Math.round(totalG / count);
-    const avgB = Math.round(totalB / count);
+    const avgR = Math.round(vTotalWeight > 0 ? (vR / vTotalWeight) : (sR / Math.max(1, sCount)));
+    const avgG = Math.round(vTotalWeight > 0 ? (vG / vTotalWeight) : (sG / Math.max(1, sCount)));
+    const avgB = Math.round(vTotalWeight > 0 ? (vB / vTotalWeight) : (sB / Math.max(1, sCount)));
     const hex = `#${((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1)}`;
     const result = { r: avgR, g: avgG, b: avgB, hex };
     dominantColorCache.set(filePath, result);
@@ -766,6 +777,12 @@ async function rotateWallpaperFile(filePath, degrees = 90) {
     if (settings && settings.activeWallpaper === filePath) {
       try {
         await setWallpaper(filePath);
+        if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.send("wallpaper:changed", {
+            path: filePath,
+            filename: base
+          });
+        }
       } catch (e) {
         console.warn("Failed to re-apply active rotated wallpaper:", e);
       }
@@ -1924,7 +1941,13 @@ ipcMain.handle("set-wallpaper", async (event, absolutePath) => {
     settings.activeWallpaper = absolutePath;
     settings.wallpaperChangesCount = (settings.wallpaperChangesCount || 0) + 1;
     saveSettings(settings);
-    if (mainWindow) mainWindow.webContents.send("sync-complete");
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("sync-complete");
+      mainWindow.webContents.send("wallpaper:changed", {
+        path: absolutePath,
+        filename: path.basename(absolutePath)
+      });
+    }
     return { success: true };
   } catch (err) {
     console.error("set-wallpaper error:", err);
