@@ -15,7 +15,8 @@ import {
     showLightboxAt,
     closeLightbox,
     resetFiltersUI,
-    openAllCollectionsModal
+    openAllCollectionsModal,
+    initBatchFixBanner
 } from "./modules/gallery.js";
 import { initDrawer, closeDetailDrawer } from "./modules/drawer.js";
 import { initPlayer, setSlideshowPlaybackUI, updatePlayerStatusText } from "./modules/player.js";
@@ -57,6 +58,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Apply Now Playing card and dynamic adaptive ambient hue on startup
         updateNowPlayingCard();
+
+        // Check for sideways wallpapers and display 1-click batch fix banner if detected
+        initBatchFixBanner();
 
         // Sync slides button state based on loaded settings
         setSlideshowPlaybackUI(!!store.state.settings.slideshow);

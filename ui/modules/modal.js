@@ -339,6 +339,43 @@ export function initSettingsModal() {
         });
     }
 
+    const batchFixSettingsBtn = document.getElementById("settingBatchFixRotationsBtn");
+    if (batchFixSettingsBtn) {
+        batchFixSettingsBtn.addEventListener("click", async () => {
+            batchFixSettingsBtn.disabled = true;
+            batchFixSettingsBtn.innerHTML = `<span>⏳ Checking orientations...</span>`;
+            try {
+                const info = await window.api.getSidewaysWallpapers();
+                if (!info || info.count === 0) {
+                    showToast("All wallpapers are already upright portrait!", "success");
+                    return;
+                }
+                batchFixSettingsBtn.innerHTML = `<span>⏳ Rotating ${info.count} wallpapers...</span>`;
+                window.api.onBatchFixProgress(({ current, total, percent }) => {
+                    batchFixSettingsBtn.innerHTML = `<span>⏳ Rotating ${current}/${total} (${percent}%)...</span>`;
+                });
+                const res = await window.api.batchFixWallpapers();
+                if (res && res.success) {
+                    showToast(`Successfully rotated ${res.count} wallpapers upright!`, "success");
+                    await store.loadWallpapers();
+                    const gallery = await import("./gallery.js");
+                    gallery.renderCatalog();
+                    gallery.renderRecentlyAdded();
+                    gallery.renderRandomDiscoveries();
+                    const banner = document.getElementById("batchFixBanner");
+                    if (banner) banner.classList.add("hidden");
+                } else {
+                    showToast("Failed to rotate wallpapers", "error");
+                }
+            } catch (err) {
+                showToast("Error rotating wallpapers: " + err.message, "error");
+            } finally {
+                batchFixSettingsBtn.innerHTML = `<span>🔄 Fix Sideways Wallpapers (Batch Rotate 90°)</span>`;
+                batchFixSettingsBtn.disabled = false;
+            }
+        });
+    }
+
     const telemetryToggle = document.getElementById("settingTelemetryToggle");
     const viewDiagBtn = document.getElementById("viewDiagnosticsLogsBtn");
     const clearDiagBtn = document.getElementById("clearDiagnosticsLogsBtn");

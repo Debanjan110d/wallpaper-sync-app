@@ -1207,3 +1207,83 @@ export function initSearchAutoSuggest() {
         }
     });
 }
+
+// 1-Click Batch Sideways Wallpaper Auto-Fix Banner
+export async function initBatchFixBanner() {
+    const banner = document.getElementById("batchFixBanner");
+    const fixBtn = document.getElementById("batchFixActionBtn");
+    const btnLabel = document.getElementById("batchFixBtnLabel");
+    const dismissBtn = document.getElementById("batchFixDismissBtn");
+    const titleEl = document.getElementById("batchFixTitle");
+    const descEl = document.getElementById("batchFixDesc");
+
+    if (!banner || !fixBtn) return;
+
+    if (sessionStorage.getItem("ws_batch_fix_dismissed") === "1") {
+        banner.classList.add("hidden");
+        return;
+    }
+
+    try {
+        if (window.api && window.api.getSidewaysWallpapers) {
+            const info = await window.api.getSidewaysWallpapers();
+            if (info && info.count > 0) {
+                if (titleEl) titleEl.textContent = `${info.count} Sideways Wallpapers Detected`;
+                if (descEl) descEl.textContent = `Found ${info.count} mobile 9:16 portrait wallpapers saved sideways. Auto-rotate all 90° upright in one click.`;
+                banner.classList.remove("hidden");
+            } else {
+                banner.classList.add("hidden");
+            }
+        }
+    } catch (err) {
+        console.warn("Failed to check sideways wallpapers:", err);
+    }
+
+    if (dismissBtn && !dismissBtn.dataset.wired) {
+        dismissBtn.dataset.wired = "true";
+        dismissBtn.addEventListener("click", () => {
+            banner.classList.add("hidden");
+            sessionStorage.setItem("ws_batch_fix_dismissed", "1");
+        });
+    }
+
+    if (fixBtn && !fixBtn.dataset.wired) {
+        fixBtn.dataset.wired = "true";
+        fixBtn.addEventListener("click", async () => {
+            fixBtn.disabled = true;
+            if (btnLabel) btnLabel.textContent = "⏳ Preparing...";
+
+            let unsubProgress = null;
+            if (window.api.onBatchFixProgress) {
+                unsubProgress = window.api.onBatchFixProgress(({ current, total, percent }) => {
+                    if (btnLabel) btnLabel.textContent = `⏳ Rotating ${current}/${total} (${percent}%)...`;
+                });
+            }
+
+            try {
+                const res = await window.api.batchFixWallpapers();
+                if (res && res.success) {
+                    showToast(`Successfully rotated ${res.count} wallpapers upright!`, "success");
+                    banner.classList.add("hidden");
+                    sessionStorage.setItem("ws_batch_fix_dismissed", "1");
+
+                    // Reload wallpapers & re-render gallery
+                    await store.loadWallpapers();
+                    renderCatalog();
+                    renderRecentlyAdded();
+                    renderRandomDiscoveries();
+
+                    // Refresh Now Playing card if needed
+                    import("./controlPanel.js").then(m => m.updateNowPlayingCard());
+                } else {
+                    showToast("Failed to rotate wallpapers: " + (res?.message || "Unknown error"), "error");
+                }
+            } catch (err) {
+                showToast("Error during batch rotation: " + err.message, "error");
+            } finally {
+                fixBtn.disabled = false;
+                if (btnLabel) btnLabel.textContent = "⚡ Auto-Fix All 90° Upright";
+            }
+        });
+    }
+}

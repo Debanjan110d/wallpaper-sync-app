@@ -801,6 +801,153 @@ async function rotateWallpaperFile(filePath, degrees = 90) {
   }
 }
 
+// Fast binary header reader for instant orientation checks without full image decoding
+function getJpegDimensionsFast(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const fd = fs.openSync(filePath, "r");
+    const buf = Buffer.alloc(8192);
+    const bytesRead = fs.readSync(fd, buf, 0, 8192, 0);
+    fs.closeSync(fd);
+    if (bytesRead < 4) return null;
+
+    // JPEG SOF0/SOF2 marker
+    if (buf[0] === 0xFF && buf[1] === 0xD8) {
+      let i = 2;
+      while (i < bytesRead - 8) {
+        if (buf[i] !== 0xFF) break;
+        const marker = buf[i + 1];
+        if (marker === 0xC0 || marker === 0xC2) {
+          const height = buf.readUInt16BE(i + 5);
+          const width = buf.readUInt16BE(i + 7);
+          return { width, height };
+        }
+        const len = buf.readUInt16BE(i + 2);
+        i += 2 + len;
+      }
+    }
+    // PNG IHDR marker
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+      const width = buf.readUInt32BE(16);
+      const height = buf.readUInt32BE(20);
+      return { width, height };
+    }
+  } catch {}
+  return null;
+}
+
+function getSidewaysWallpapersInfo() {
+  try {
+    const metaPath = config.METADATA_FILE;
+    if (!fs.existsSync(metaPath)) return { count: 0, items: [] };
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    const wm = meta.wallpaper_metadata || {};
+    const wpDir = config.WALLPAPER_DIR;
+    if (!fs.existsSync(wpDir)) return { count: 0, items: [] };
+
+    const sideways = [];
+    for (const [hash, entry] of Object.entries(wm)) {
+      const fileName = entry.file_name || "";
+      if (fileName.startsWith("SnapInsta")) {
+        let fullPath = path.join(wpDir, `${hash}.jpg`);
+        let ext = ".jpg";
+        if (!fs.existsSync(fullPath)) {
+          if (fs.existsSync(path.join(wpDir, `${hash}.jpeg`))) {
+            fullPath = path.join(wpDir, `${hash}.jpeg`);
+            ext = ".jpeg";
+          } else if (fs.existsSync(path.join(wpDir, `${hash}.png`))) {
+            fullPath = path.join(wpDir, `${hash}.png`);
+            ext = ".png";
+          }
+        }
+        if (fs.existsSync(fullPath)) {
+          const dims = getJpegDimensionsFast(fullPath);
+          if (dims && dims.width > dims.height) {
+            sideways.push({
+              hash,
+              filePath: fullPath,
+              filename: `${hash}${ext}`,
+              originalName: fileName,
+              width: dims.width,
+              height: dims.height,
+            });
+          }
+        }
+      }
+    }
+    return { count: sideways.length, items: sideways };
+  } catch (err) {
+    console.error("getSidewaysWallpapersInfo error:", err);
+    return { count: 0, items: [] };
+  }
+}
+
+async function batchFixSidewaysWallpapers(hashesToFix = null) {
+  const info = getSidewaysWallpapersInfo();
+  let targetItems = info.items;
+  if (Array.isArray(hashesToFix) && hashesToFix.length > 0) {
+    const set = new Set(hashesToFix);
+    targetItems = targetItems.filter(item => set.has(item.hash));
+  }
+
+  const total = targetItems.length;
+  if (total === 0) {
+    return { success: true, count: 0, message: "No sideways wallpapers to rotate" };
+  }
+
+  console.log(`[BatchFix] Starting batch auto-rotation of ${total} wallpapers...`);
+  let fixedCount = 0;
+  let errors = [];
+
+  for (let i = 0; i < total; i++) {
+    const item = targetItems[i];
+    try {
+      await rotateWallpaperFile(item.filePath, 90);
+      fixedCount++;
+    } catch (err) {
+      console.warn(`[BatchFix] Failed to rotate ${item.filename}:`, err);
+      errors.push({ filename: item.filename, error: err.message });
+    }
+
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send("batch-fix:progress", {
+        current: i + 1,
+        total,
+        filename: item.originalName || item.filename,
+        percent: Math.round(((i + 1) / total) * 100),
+      });
+    }
+  }
+
+  // Update orientation in local_metadata.json
+  try {
+    const metaPath = config.METADATA_FILE;
+    if (fs.existsSync(metaPath)) {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+      if (meta.wallpaper_metadata) {
+        for (const item of targetItems) {
+          if (meta.wallpaper_metadata[item.hash]) {
+            meta.wallpaper_metadata[item.hash].orientation = "portrait";
+          }
+        }
+        fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+      }
+    }
+  } catch (metaErr) {
+    console.warn("[BatchFix] Failed to update metadata orientation:", metaErr);
+  }
+
+  if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send("wallpaper:batch-rotated", {
+      count: fixedCount,
+      total,
+    });
+  }
+
+  console.log(`[BatchFix] Finished rotating ${fixedCount}/${total} wallpapers.`);
+  return { success: true, count: fixedCount, total, errors };
+}
+
 function getImages() {
   const sourceDir = config.SOURCE_DIR;
   const userDir = config.WALLPAPER_DIR;
@@ -1963,6 +2110,14 @@ ipcMain.handle("image:get-dominant-color", async (event, filePath) => {
 
 ipcMain.handle("image:rotate", async (event, filePath, degrees = 90) => {
   return rotateWallpaperFile(filePath, degrees);
+});
+
+ipcMain.handle("image:get-sideways-info", async () => {
+  return getSidewaysWallpapersInfo();
+});
+
+ipcMain.handle("image:batch-fix-orientations", async (event, hashes) => {
+  return batchFixSidewaysWallpapers(hashes);
 });
 
 // Offline-First Metadata Cache Handlers

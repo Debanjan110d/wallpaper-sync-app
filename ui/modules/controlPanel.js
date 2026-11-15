@@ -341,8 +341,8 @@ export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
     const bgApp = hslToRgb(hsl.h, Math.min(hsl.s, 16), 9);
 
     // Light Mode surfaces subtly tinted with wallpaper hue
-    const lightBgApp = hslToRgb(hsl.h, Math.min(hsl.s, 20), 95);
-    const lightSurfaceElevated = hslToRgb(hsl.h, Math.min(hsl.s, 20), 98);
+    const lightBgApp = hslToRgb(hsl.h, Math.min(hsl.s, 16), 96);
+    const lightSurfaceElevated = hslToRgb(hsl.h, Math.min(hsl.s, 18), 98);
 
     activeThemePalette = {
         primary,
@@ -361,13 +361,13 @@ export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
     const root = document.documentElement;
     root.style.setProperty("--primary", primary.hex);
     root.style.setProperty("--primary-hover", primaryHover.hex);
-    root.style.setProperty("--primary-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.45)`);
+    root.style.setProperty("--primary-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.45" : "0.22"})`);
     root.style.setProperty("--secondary", secondary.hex);
-    root.style.setProperty("--border-active", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.6)`);
-    root.style.setProperty("--border-glow", `0 0 24px rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.35)`);
-    root.style.setProperty("--ambient-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.32)`);
-    root.style.setProperty("--ambient-tint", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.14)`);
-    root.style.setProperty("--ambient-border", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.45)`);
+    root.style.setProperty("--border-active", `rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.6" : "0.5"})`);
+    root.style.setProperty("--border-glow", `0 0 24px rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.35" : "0.2"})`);
+    root.style.setProperty("--ambient-glow", `rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.32" : "0.18"})`);
+    root.style.setProperty("--ambient-tint", `rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.14" : "0.08"})`);
+    root.style.setProperty("--ambient-border", `rgba(${primary.r}, ${primary.g}, ${primary.b}, ${isDark ? "0.45" : "0.35"})`);
     root.style.setProperty("--ambient-rgb", `${primary.r}, ${primary.g}, ${primary.b}`);
 
     if (isDark) {
@@ -377,10 +377,17 @@ export async function applyAdaptiveAmbientHue(activePath, currentImg = null) {
         root.style.setProperty("--bg-surface-card", bgSurfaceCard.hex);
         root.style.setProperty("--bg-glass", `rgba(${bgSurface.r}, ${bgSurface.g}, ${bgSurface.b}, 0.92)`);
         root.style.setProperty("--border-subtle", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.16)`);
+        root.style.setProperty("--text-main", "#E4E4E7");
+        root.style.setProperty("--text-muted", "#9FA3AF");
     } else {
         root.style.setProperty("--bg-app", lightBgApp.hex);
+        root.style.setProperty("--bg-surface", "#FFFFFF");
         root.style.setProperty("--bg-surface-elevated", lightSurfaceElevated.hex);
+        root.style.setProperty("--bg-surface-card", "#FFFFFF");
+        root.style.setProperty("--bg-glass", `rgba(255, 255, 255, 0.94)`);
         root.style.setProperty("--border-subtle", `rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.18)`);
+        root.style.setProperty("--text-main", "#1A1D23");
+        root.style.setProperty("--text-muted", "#525866");
     }
 }
 

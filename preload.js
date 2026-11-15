@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld("api", {
   // Dynamic Ambient Hue & Lossless Image Rotation APIs
   getDominantColor: (filePath) => ipcRenderer.invoke("image:get-dominant-color", filePath),
   rotateWallpaper: (filePath, degrees = 90) => ipcRenderer.invoke("image:rotate", filePath, degrees),
+  getSidewaysWallpapers: () => ipcRenderer.invoke("image:get-sideways-info"),
+  batchFixWallpapers: (hashes) => ipcRenderer.invoke("image:batch-fix-orientations", hashes),
+  onBatchFixProgress: (callback) => ipcRenderer.on("batch-fix:progress", (event, data) => callback(data)),
+  onWallpapersBatchRotated: (callback) => ipcRenderer.on("wallpaper:batch-rotated", (event, data) => callback(data)),
 
   // Recovery Watchdog & System Health APIs
   getWatchdogStatus: () => ipcRenderer.invoke("watchdog:get-status"),

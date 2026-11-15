@@ -331,6 +331,26 @@
                     <button id="closeRemoteBannerBtn" class="remote-banner-close-btn" type="button" aria-label="Dismiss banner">✕</button>
                 </div>
 
+                <!-- Batch Sideways Wallpaper Auto-Fix Banner -->
+                <div id="batchFixBanner" class="batch-fix-banner hidden" role="region" aria-label="Sideways wallpapers detector">
+                    <div class="batch-fix-content">
+                        <div class="batch-fix-icon-badge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </div>
+                        <div class="batch-fix-text-wrap">
+                            <span class="batch-fix-title" id="batchFixTitle">Sideways Wallpapers Detected</span>
+                            <span class="batch-fix-desc" id="batchFixDesc">Found mobile 9:16 portrait wallpapers saved sideways. Auto-rotate all 90° upright in one click.</span>
+                        </div>
+                        <button id="batchFixActionBtn" class="batch-fix-btn" type="button">
+                            <span id="batchFixBtnLabel">⚡ Auto-Fix All 90° Upright</span>
+                        </button>
+                        <button id="batchFixDismissBtn" class="batch-fix-close" type="button" title="Dismiss banner">✕</button>
+                    </div>
+                </div>
+
                 <!-- 1. Featured Hero Carousel Banner -->
                 <section class="hero-carousel-v5" id="heroSliderSection">
                     <!-- Carousel slides injected dynamically -->
@@ -1068,6 +1088,9 @@
                                 <span>⚡ Force Cloud Re-Sync</span>
                             </button>
                         </div>
+                        <button id="settingBatchFixRotationsBtn" class="primary-btn btn-secondary" type="button" style="width: 100%; margin-top: 6px; padding: 8px 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                            <span>🔄 Fix Sideways Wallpapers (Batch Rotate 90°)</span>
+                        </button>
                     </div>
                 </div>
 
