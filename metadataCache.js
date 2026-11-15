@@ -167,6 +167,7 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
           data.wallpaper_metadata[sw.hash] = {
             ...existing,
             file_name: sw.file_name || existing.file_name || null,
+            created_at: sw.created_at || existing.created_at || null,
             collection_id: sw.collection_id ? Number(sw.collection_id) : existing.collection_id,
             collection_ids: Array.isArray(sw.collections)
               ? sw.collections.map((c) => Number(c.id))

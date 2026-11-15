@@ -43,7 +43,7 @@ function loadSettings() {
     selectedImages: [],
     apiUrl: "",
     syncToken: "",
-    appVersion: "5.2.0",
+    appVersion: "5.2.1",
     alreadyReviewed: false,
     firstUsedAt,
     reviewRemindAfter: 0,

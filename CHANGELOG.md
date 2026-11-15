@@ -1,8 +1,17 @@
 # Changelog
 
-## 5.2.0 (v5.2.0) — 2026-11-15
+## 5.2.1 (v5.2.1) — 2026-11-15
 
-### Orientation Safe Switch, Dynamic Ambient Hue Hibernation & Offline-First Metadata
+### Resilient Sync & 404 Elimination, Gallery Ordering Restoration, and Diagnostics Health Fix
+- **Resilient Sync Engine & 404 Auto-Ignored:**
+  - Resolved `Sync encountered issues: Failed to download 1 file(s): 4ec848fa5365e1060434b5e8693a820df9a2b221edb0d81324aa2e9ac36f9659.jpg: Request failed with status code 404`.
+  - Added intelligent 404/410 handling in `downloader.js`: permanently missing CDN assets are automatically marked as ignored in `settings.ignoredServerFiles`, advancing sync cursors safely without throwing error toasts.
+- **Diagnostics Health Fix ReferenceError Resolved:**
+  - Fixed `ReferenceError: setDesktopWallpaper is not defined` at `main.js:2422` by routing to `setWallpaper(target.path)` from `wallpaperManager.js`.
+- **Accurate Wallpaper Timestamp & Gallery Ordering Restoration:**
+  - Restored true server `created_at` timestamps across all 732 wallpapers on disk and in `local_metadata.json`, resolving flipped ordering and scrambled "Recently Added" feeds.
+  - Updated `rotateWallpaperFile()` to preserve the original file's `mtime` atomically via `fs.utimesSync`, guaranteeing that rotating wallpapers never alters their chronological order.
+  - Updated `getImages()` in `main.js` to prioritize `meta.created_at` and pass `mtimeMs` consistently to the UI gallery.
 - **Orientation Safe Switch & 16:9 Widescreen Normalization:**
   - Added dedicated **Orientation Safe Switch** button (`#btnSafeOrientationSwitch`) in the top navigation bar with a visible `16:9` indicator.
   - Added corresponding **Orientation Safe Switch** in the Settings modal (`#settingBatchFixRotationsBtn`).

@@ -1,4 +1,4 @@
-# Wallpaper Sync (v5.2.0) 🌄✨
+# Wallpaper Sync (v5.2.1) 🌄✨
 
 <p align="center">
   <img src="icon.png" alt="Wallpaper Sync Logo" width="140" height="140" />

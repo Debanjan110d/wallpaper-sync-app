@@ -113,6 +113,7 @@ async function syncWallpapers(config, onProgress) {
     const serverFiles = wallpapers.map(wp => String(wp?.storage_path || wp?.name || "")).filter(Boolean);
     const failedIndices = new Set();
     const downloadErrors = [];
+    const missingServerFiles = [];
     let completedCount = 0;
 
     // Concurrency limit: 3 parallel downloads optimal for 4K images on standard home broadband
@@ -201,13 +202,23 @@ async function syncWallpapers(config, onProgress) {
             }
           } catch { }
         } catch (err) {
-          console.warn(`[Downloader] Skipped unavailable wallpaper "${filename}":`, err.message);
-          failedIndices.add(index);
-          downloadErrors.push(`${filename}: ${err.message}`);
-          try {
-            const { logProblem } = require("./diagnostics");
-            logProblem("downloader", `Download failed for ${filename}`, err.message);
-          } catch {}
+          const status = err?.response?.status;
+          const isNotFound = status === 404 || status === 410;
+          if (isNotFound) {
+            console.warn(`[Downloader] Wallpaper permanently missing on CDN (${status}): "${filename}". Ignoring from future syncs.`);
+            ignored.add(fileKey);
+            ignored.add(filename);
+            missingServerFiles.push(fileKey);
+            missingServerFiles.push(filename);
+          } else {
+            console.warn(`[Downloader] Skipped unavailable wallpaper "${filename}":`, err.message);
+            failedIndices.add(index);
+            downloadErrors.push(`${filename}: ${err.message}`);
+            try {
+              const { logProblem } = require("./diagnostics");
+              logProblem("downloader", `Download failed for ${filename}`, err.message);
+            } catch {}
+          }
 
           if (writer && !writer.destroyed) {
             writer.destroy();
@@ -251,7 +262,7 @@ async function syncWallpapers(config, onProgress) {
       finalError = `Failed to download ${downloadErrors.length} file(s): ${downloadErrors.join("; ")}`;
     }
 
-    return { latestFile, downloadCount, serverFiles, maxCreatedAt: safeMaxCreatedAt, error: finalError };
+    return { latestFile, downloadCount, serverFiles, maxCreatedAt: safeMaxCreatedAt, missingServerFiles, error: finalError };
   } catch (error) {
     const status = error?.response?.status;
     const statusText = error?.response?.statusText;

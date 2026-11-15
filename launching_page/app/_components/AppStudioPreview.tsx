@@ -119,7 +119,7 @@ export default function AppStudioPreview() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Image src="/logo.png" alt="App Icon" width={16} height={16} />
           <span style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "-0.2px" }}>
-            Wallpaper Sync v5.2.0 — Desktop Wallpaper Manager
+            Wallpaper Sync v5.2.1 — Desktop Wallpaper Manager
           </span>
         </div>
 

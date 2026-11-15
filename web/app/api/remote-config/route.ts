@@ -58,7 +58,7 @@ const DEFAULT_CONFIG: RemoteConfig = {
   banner: {
     enabled: true,
     id: "banner-v510",
-    text: "✨ Wallpaper Sync v5.2.0: 730+ 4K wallpapers streaming with ultra-low RAM footprint & Orientation Safe Switch!",
+    text: "✨ Wallpaper Sync v5.2.1: 730+ 4K wallpapers streaming with ultra-low RAM footprint & Orientation Safe Switch!",
     type: "info",
     actionLabel: "View Docs",
     actionUrl: "https://wallpaper-sync-app.vercel.app/docs",

@@ -1,4 +1,4 @@
-# Wallpaper Sync v5.2.0 Release Notes & Patch Documentation 🌄🚀
+# Wallpaper Sync v5.2.1 Release Notes & Patch Documentation 🌄🚀
 
 **Release Date:** November 15, 2026  
 **Target Platform:** Windows 10 & 11 (x64)  
@@ -8,12 +8,13 @@
 
 ## 🌟 Executive Summary
 
-Wallpaper Sync **v5.2.0** brings significant visual enhancements, background process optimizations, and resilient offline capabilities:
+Wallpaper Sync **v5.2.1** is a stability and refinement release resolving sync anomalies, gallery chronological ordering, and system diagnostics:
 
-1. **Orientation Safe Switch (16:9 Widescreen Normalization):** A one-click automated normalization engine that identifies mobile/vertical scrapes, rotated EXIF tags, or sideways orientation glitches, losslessly normalizing wallpapers to 16:9 widescreen landscape with synchronized thumbnail regeneration.
-2. **Hibernation-Aware Dynamic Ambient Hue System:** An ambient lighting engine that dynamically extracts the dominant color from your active desktop wallpaper and softly tints application cards, borders, and glows in both Dark and Light modes. When the application is minimized or hidden in the background, it safely enters hibernation, pausing CPU-intensive timers and color extractions to maintain **0% idle background CPU**.
-3. **Resilient Offline-First Metadata Engine:** Robust local caching with 3.5s connection timeouts and graceful offline fallback, completely eliminating `ECONNRESET` crash logs and fixing collection count glitches on initial boot.
-4. **Gallery Aspect Ratio Lock:** Strict 16:9 card geometry enforcement with `object-fit: cover` and individual on-card 90° clockwise lossless rotation controls.
+1. **Resilient Sync Engine & 404 Auto-Ignored:** Added automatic handling for missing CDN assets (e.g. `4ec848fa5365e106...jpg`), completely preventing 404 download errors from surfacing as application error toasts and ensuring sync cursor progress.
+2. **Accurate Chronological Ordering & Gallery Sync:** Restored true server upload timestamps across all wallpapers on disk and in `local_metadata.json`, resolving flipped ordering and ensuring "Recently Added" displays the actual newest wallpapers.
+3. **Diagnostics Self-Repair Fix:** Fixed `ReferenceError: setDesktopWallpaper is not defined` during 1-click health repairs.
+4. **Orientation Safe Switch (16:9 Widescreen Normalization):** One-click automated normalization engine that identifies mobile/vertical scrapes, rotated EXIF tags, or sideways orientation glitches, losslessly normalizing wallpapers to 16:9 widescreen landscape while atomically preserving file timestamps.
+5. **Hibernation-Aware Dynamic Ambient Hue System:** Ambient lighting that extracts dominant colors in Dark and Light themes with 0% idle CPU when minimized.
 
 ---
 

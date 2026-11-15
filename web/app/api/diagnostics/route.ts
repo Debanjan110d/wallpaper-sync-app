@@ -120,7 +120,7 @@ export async function POST(request: Request) {
 
     const report: DiagnosticReport = {
       id: `diag-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      appVersion: String(appVersion || "5.2.0"),
+      appVersion: String(appVersion || "5.2.1"),
       osPlatform: String(osPlatform || "win32"),
       osRelease: String(osRelease || "unknown"),
       arch: String(arch || "x64"),

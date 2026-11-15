@@ -213,7 +213,7 @@ export default function ReviewsPage() {
                 border: "1px solid rgba(168, 85, 247, 0.3)",
               }}
             >
-              v5.2.0 Reviews
+              v5.2.1 Reviews
             </span>
           </Link>
           <nav style={{ display: "flex", alignItems: "center", gap: "1.5rem", fontSize: "0.9rem" }}>

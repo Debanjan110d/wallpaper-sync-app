@@ -754,10 +754,15 @@ async function rotateWallpaperFile(filePath, degrees = 90) {
     const dir = path.dirname(filePath);
     const base = path.basename(filePath);
     const tmpPath = path.join(dir, `.${base}.${process.pid}.${Date.now()}.rot.tmp`);
+    let origMtime = null;
+    try { origMtime = fs.statSync(filePath).mtime; } catch {}
 
     try {
       fs.writeFileSync(tmpPath, outBuf);
       fs.renameSync(tmpPath, filePath);
+      if (origMtime) {
+        try { fs.utimesSync(filePath, new Date(), origMtime); } catch {}
+      }
     } catch (writeErr) {
       try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch {}
       throw writeErr;
@@ -770,6 +775,9 @@ async function rotateWallpaperFile(filePath, degrees = 90) {
       const thumbPath = path.join(thumbDir, `thumb_${base}`);
       const thumb = rotatedImg.resize({ width: 380, quality: "good" });
       fs.writeFileSync(thumbPath, thumb.toJPEG(75));
+      if (origMtime) {
+        try { fs.utimesSync(thumbPath, new Date(), origMtime); } catch {}
+      }
     } catch (thumbErr) {
       console.warn("Failed to update rotated thumbnail:", thumbErr);
     }
@@ -1001,6 +1009,15 @@ function getImages() {
     });
   }
   if (fs.existsSync(userDir)) {
+    const metaPath = config.METADATA_FILE;
+    let wm = {};
+    if (safeExists(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+        wm = meta.wallpaper_metadata || {};
+      } catch {}
+    }
+
     const userFiles = fs
       .readdirSync(userDir)
       .filter((f) => f.match(/\.(jpg|jpeg|png|webp)$/i))
@@ -1016,14 +1033,24 @@ function getImages() {
           mtimeMs = 0;
           sizeBytes = 0;
         }
+
+        const hash = f.replace(/\.[^/.]+$/, "");
+        const meta = wm[hash] || {};
+        let timestamp = 0;
+        if (meta.created_at) {
+          const t = new Date(meta.created_at).getTime();
+          if (!Number.isNaN(t)) timestamp = t;
+        }
+        if (!timestamp) timestamp = mtimeMs;
+
         const existingThumb = getThumbnailPath(full);
-        return { filename: f, path: full, thumbPath: existingThumb || full, mtimeMs, sizeBytes };
+        return { filename: f, path: full, thumbPath: existingThumb || full, mtimeMs: timestamp, sizeBytes };
       })
       .sort((a, b) => a.mtimeMs - b.mtimeMs);
 
     for (const f of userFiles) {
       if (!files.find((existing) => existing.filename === f.filename)) {
-        files.push({ filename: f.filename, path: f.path, thumbPath: f.thumbPath, sizeBytes: f.sizeBytes });
+        files.push({ filename: f.filename, path: f.path, thumbPath: f.thumbPath, mtimeMs: f.mtimeMs, sizeBytes: f.sizeBytes });
       }
     }
   }
@@ -1476,6 +1503,7 @@ async function runFullLibrarySync(promptUser = false, notifyOnError = false) {
       downloadCount,
       serverFiles,
       maxCreatedAt,
+      missingServerFiles,
       error
     } = await syncWallpapers(
       { ...syncConfig, FULL_SYNC: fullSync },
@@ -1485,6 +1513,18 @@ async function runFullLibrarySync(promptUser = false, notifyOnError = false) {
         }
       }
     );
+
+    if (Array.isArray(missingServerFiles) && missingServerFiles.length > 0) {
+      if (!settings.ignoredServerFiles) settings.ignoredServerFiles = [];
+      let updatedIgnored = false;
+      for (const mf of missingServerFiles) {
+        if (!settings.ignoredServerFiles.includes(mf)) {
+          settings.ignoredServerFiles.push(mf);
+          updatedIgnored = true;
+        }
+      }
+      if (updatedIgnored) saveSettings(settings);
+    }
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("download-progress", 100);
@@ -2419,7 +2459,7 @@ ipcMain.handle("app:health-fix", async (event, action) => {
       const all = getImages();
       if (all.length > 0) {
         const target = all[0];
-        await setDesktopWallpaper(target.path);
+        await setWallpaper(target.path);
         settings.activeWallpaper = target.path;
         saveSettings(settings);
         results.newActive = target.path;
