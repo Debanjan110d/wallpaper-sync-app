@@ -340,40 +340,51 @@ export function initSettingsModal() {
     }
 
     const batchFixSettingsBtn = document.getElementById("settingBatchFixRotationsBtn");
-    if (batchFixSettingsBtn) {
-        batchFixSettingsBtn.addEventListener("click", async () => {
-            batchFixSettingsBtn.disabled = true;
-            batchFixSettingsBtn.innerHTML = `<span>⏳ Checking orientations...</span>`;
-            try {
-                const info = await window.api.getSidewaysWallpapers();
-                if (!info || info.count === 0) {
-                    showToast("All wallpapers are already upright portrait!", "success");
-                    return;
-                }
-                batchFixSettingsBtn.innerHTML = `<span>⏳ Rotating ${info.count} wallpapers...</span>`;
-                window.api.onBatchFixProgress(({ current, total, percent }) => {
-                    batchFixSettingsBtn.innerHTML = `<span>⏳ Rotating ${current}/${total} (${percent}%)...</span>`;
-                });
-                const res = await window.api.batchFixWallpapers();
-                if (res && res.success) {
-                    showToast(`Successfully rotated ${res.count} wallpapers upright!`, "success");
-                    await store.loadWallpapers();
-                    const gallery = await import("./gallery.js");
-                    gallery.renderCatalog();
-                    gallery.renderRecentlyAdded();
-                    gallery.renderRandomDiscoveries();
-                    const banner = document.getElementById("batchFixBanner");
-                    if (banner) banner.classList.add("hidden");
-                } else {
-                    showToast("Failed to rotate wallpapers", "error");
-                }
-            } catch (err) {
-                showToast("Error rotating wallpapers: " + err.message, "error");
-            } finally {
-                batchFixSettingsBtn.innerHTML = `<span>🔄 Fix Sideways Wallpapers (Batch Rotate 90°)</span>`;
-                batchFixSettingsBtn.disabled = false;
+    const topSafeSwitchBtn = document.getElementById("btnSafeOrientationSwitch");
+
+    async function handleSafeSwitch(btn) {
+        if (!btn) return;
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<span>⏳ Checking orientations...</span>`;
+        try {
+            const info = await window.api.getSidewaysWallpapers();
+            if (!info || info.count === 0) {
+                showToast("All wallpapers are already 16:9 widescreen!", "success");
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                return;
             }
-        });
+            btn.innerHTML = `<span>⏳ Normalizing ${info.count} wallpapers...</span>`;
+            window.api.onBatchFixProgress(({ current, total, percent }) => {
+                btn.innerHTML = `<span>⏳ Normalizing ${current}/${total} (${percent}%)...</span>`;
+            });
+            const res = await window.api.batchFixWallpapers();
+            if (res && res.success) {
+                showToast(`Safe Switch: Successfully normalized ${res.count} wallpapers to 16:9 widescreen!`, "success");
+                await store.loadWallpapers();
+                const gallery = await import("./gallery.js");
+                gallery.renderCatalog();
+                gallery.renderRecentlyAdded();
+                gallery.renderRandomDiscoveries();
+                const banner = document.getElementById("batchFixBanner");
+                if (banner) banner.classList.add("hidden");
+            } else {
+                showToast("Failed to normalize wallpapers", "error");
+            }
+        } catch (err) {
+            showToast("Error during Safe Switch: " + err.message, "error");
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+
+    if (batchFixSettingsBtn) {
+        batchFixSettingsBtn.addEventListener("click", () => handleSafeSwitch(batchFixSettingsBtn));
+    }
+    if (topSafeSwitchBtn) {
+        topSafeSwitchBtn.addEventListener("click", () => handleSafeSwitch(topSafeSwitchBtn));
     }
 
     const telemetryToggle = document.getElementById("settingTelemetryToggle");

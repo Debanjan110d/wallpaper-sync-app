@@ -849,6 +849,22 @@ body {
     box-shadow: 0 0 12px rgba(120, 56, 245, 0.35);
 }
 
+.safe-switch-badge {
+    position: absolute;
+    bottom: -3px;
+    right: -5px;
+    font-size: 7.5px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 2px 3.5px;
+    background: var(--primary);
+    color: #ffffff;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
 .notif-dot {
     position: absolute;
     top: 6px;

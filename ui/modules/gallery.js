@@ -1300,7 +1300,7 @@ export async function initBatchFixBanner() {
             const info = await window.api.getSidewaysWallpapers();
             if (info && info.count > 0) {
                 if (titleEl) titleEl.textContent = `${info.count} Sideways Wallpapers Detected`;
-                if (descEl) descEl.textContent = `Found ${info.count} mobile 9:16 portrait wallpapers saved sideways. Auto-rotate all 90° upright in one click.`;
+                if (descEl) descEl.textContent = `Found ${info.count} wallpapers requiring normalization. Orientation Safe Switch auto-normalizes all to 16:9 widescreen in one click.`;
                 banner.classList.remove("hidden");
             } else {
                 banner.classList.add("hidden");
@@ -1334,7 +1334,7 @@ export async function initBatchFixBanner() {
             try {
                 const res = await window.api.batchFixWallpapers();
                 if (res && res.success) {
-                    showToast(`Successfully rotated ${res.count} wallpapers upright!`, "success");
+                    showToast(`Safe Switch: Successfully normalized ${res.count} wallpapers to 16:9 widescreen!`, "success");
                     banner.classList.add("hidden");
                     sessionStorage.setItem("ws_batch_fix_dismissed", "1");
 
@@ -1347,13 +1347,13 @@ export async function initBatchFixBanner() {
                     // Refresh Now Playing card if needed
                     import("./controlPanel.js").then(m => m.updateNowPlayingCard());
                 } else {
-                    showToast("Failed to rotate wallpapers: " + (res?.message || "Unknown error"), "error");
+                    showToast("Failed to normalize wallpapers: " + (res?.message || "Unknown error"), "error");
                 }
             } catch (err) {
-                showToast("Error during batch rotation: " + err.message, "error");
+                showToast("Error during Safe Switch normalization: " + err.message, "error");
             } finally {
                 fixBtn.disabled = false;
-                if (btnLabel) btnLabel.textContent = "⚡ Auto-Fix All 90° Upright";
+                if (btnLabel) btnLabel.textContent = "⚡ Auto-Normalize All to 16:9 Widescreen";
             }
         });
     }

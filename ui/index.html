@@ -209,6 +209,15 @@
 
                 <!-- Top Right Quick Controls -->
                 <div class="top-actions-group">
+                    <button class="top-action-btn" id="btnSafeOrientationSwitch" title="Orientation Safe Switch: Normalize all wallpapers to upright 16:9 widescreen" type="button" aria-label="Orientation Safe Switch">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                        <span class="safe-switch-badge" id="safeSwitchBadge">16:9</span>
+                    </button>
+
                     <button class="top-action-btn" id="btnThemeToggle" title="Toggle Light / Dark Theme" type="button" aria-label="Toggle Theme">
                         <svg class="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
@@ -1089,7 +1098,7 @@
                             </button>
                         </div>
                         <button id="settingBatchFixRotationsBtn" class="primary-btn btn-secondary" type="button" style="width: 100%; margin-top: 6px; padding: 8px 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
-                            <span>🔄 Fix Sideways Wallpapers (Batch Rotate 90°)</span>
+                            <span>🛡️ Orientation Safe Switch (Auto-Normalize 16:9 Widescreen)</span>
                         </button>
                     </div>
                 </div>
