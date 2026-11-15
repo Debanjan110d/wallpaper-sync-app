@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.2.0 (v5.2.0) — 2026-11-15
+
+### Orientation Safe Switch, Dynamic Ambient Hue Hibernation & Offline-First Metadata
+- **Orientation Safe Switch & 16:9 Widescreen Normalization:**
+  - Added dedicated **Orientation Safe Switch** button (`#btnSafeOrientationSwitch`) in the top navigation bar with a visible `16:9` indicator.
+  - Added corresponding **Orientation Safe Switch** in the Settings modal (`#settingBatchFixRotationsBtn`).
+  - Automatically scans all wallpapers on disk and flags any vertical or tilted images (`height > width`), EXIF orientation tags, or mismatched portrait thumbnails.
+  - One-click batch normalization losslessly rotates files 270° (or 90°) to 16:9 widescreen landscape and regenerates $380 \times 214$ thumbnails with instant cache-busting.
+- **Strict 16:9 Gallery Aspect Ratio Enforcement:**
+  - Standardized `.card`, `.wallpaper-card`, and `.card-img` with `aspect-ratio: 16 / 9; object-fit: cover; object-position: center;`.
+  - Added cache-busting query strings (`?v=${mtime}`) to all gallery image sources, preventing stale thumbnail rendering.
+  - Added on-card 90° clockwise rotation button (`.card-rotate-btn`) visible on hover for immediate manual fine-tuning.
+- **Hibernation-Aware Dynamic Ambient Hue System:**
+  - Extracts dominant colors from the active wallpaper and adaptively tints accent glows, borders, and surfaces across both Dark and Light themes.
+  - Implemented window hibernation: automatically pauses dominant color extraction, timer loops, and non-essential processing when the app is minimized or hidden in the background, slashing background CPU usage to 0%.
+- **Offline-First Resilient Metadata Caching:**
+  - Re-engineered `metadataCache.js` with local persistence (`local_metadata.json`) for categories, collections, and tags.
+  - Added 3.5s timeout guards and graceful offline fallback, completely eliminating `ECONNRESET` interruptions on unstable networks.
+  - Resolved `0 wallpapers` / `⚡ 0` collection count display bug so collections show true counts immediately on boot.
+- **Node.js Deprecation Clean-up:**
+  - Added `safeExists(p)` guards across file checks in `main.js`, eliminating Node.js `[DEP0187]` DeprecationWarning (`Passing invalid argument types to fs.existsSync is deprecated`).
+
+---
+
 ## 5.1.0 (v5.1.0) — 2026-11-13
 
 ### Slideshow Engine, Dual Themes, UI Polish & RAM Optimization

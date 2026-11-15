@@ -22,11 +22,29 @@ export default function DocsPage() {
           Wallpaper Sync Documentation
         </h1>
         <p style={{ color: "var(--text-muted)", marginTop: "0.5rem", fontSize: "1.05rem" }}>
-          What is new in the version 3 release cycle (v3.4.1).
+          What is new in the latest release cycle (v5.2.0).
         </p>
       </header>
 
       <main style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+        <section>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1rem" }}>
+            🛡️ Orientation Safe Switch &amp; 16:9 Widescreen Engine
+          </h2>
+          <p style={{ lineHeight: 1.6, color: "var(--foreground)", marginBottom: "1rem" }}>
+            Wallpaper Sync v5.2.0 features an automated Orientation Safe Switch located directly on the top header and in settings. It automatically inspects binary image headers across local wallpapers, detects any vertical/portrait scrapes or tilted EXIF headers, and normalizes them to 16:9 widescreen landscape with synchronized thumbnail regeneration.
+          </p>
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1rem" }}>
+            🎨 Hibernation-Aware Dynamic Ambient Hue System
+          </h2>
+          <p style={{ lineHeight: 1.6, color: "var(--foreground)", marginBottom: "1rem" }}>
+            Dominant colors are extracted from the active desktop wallpaper to dynamically theme application cards, borders, and ambient glows across both Dark and Light modes. When the application is minimized or sent to the system tray, it automatically hibernates background color routines, guaranteeing 0% idle CPU footprint.
+          </p>
+        </section>
+
         <section>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1rem" }}>
             The Discovery Dashboard
@@ -114,7 +132,7 @@ export default function DocsPage() {
       </main>
 
       <footer style={{ marginTop: "4rem", borderTop: "1px solid var(--border)", paddingTop: "1.5rem", textAlign: "center", fontSize: "0.85rem", color: "var(--text-muted)" }}>
-        Wallpaper Sync App - Core Version 3.4.1 - Designed by Debanjan Dutta
+        Wallpaper Sync App - Core Version 5.2.0 - Designed by Debanjan Dutta
       </footer>
     </div>
   );

@@ -1,4 +1,4 @@
-# Wallpaper Sync (v5.1.0) 🌄✨
+# Wallpaper Sync (v5.2.0) 🌄✨
 
 <p align="center">
   <img src="icon.png" alt="Wallpaper Sync Logo" width="140" height="140" />
@@ -33,7 +33,10 @@ Wallpaper Sync flips the script: it runs quietly in your Windows system tray, ma
 ## 🚀 Key Features
 
 - **⚡ Ultra-Low Memory Footprint**: Uses Electron's native image scaling to generate lightweight 380px grid thumbnails, slashing renderer memory from 264 MB down to ~65 MB. When minimized to the tray, it automatically sweeps caches down to **~35-45 MB**.
-- **🎨 Dynamic Adaptive Ambient Hue**: Reads the dominant color profile of whichever wallpaper is currently playing and gently tints the UI glow and borders to match the artwork.
+- **🛡️ Orientation Safe Switch**: Built-in 1-click normalization switch (in top bar & settings) that auto-scans all wallpapers on disk, rotates sideways/portrait images to 16:9 widescreen landscape, and regenerates 16:9 thumbnails with instant cache-busting.
+- **🎨 Hibernation-Aware Dynamic Ambient Hue**: Reads the dominant color profile of whichever wallpaper is currently playing and gently tints the UI glow, borders, and surfaces across both Dark and Light themes. Automatically hibernates background color extraction when the app is minimized, keeping idle CPU at 0%.
+- **🖼️ Strict 16:9 Widescreen Gallery & Card Controls**: Every gallery card is strictly locked to horizontal 16:9 ratio with `object-fit: cover`, plus individual 90° clockwise rotation buttons directly on card hover.
+- **💾 Offline-First Resilient Metadata Sync**: Caches collections, categories, and tags locally in `local_metadata.json` with 3.5s timeout guards and graceful offline fallback, eliminating ECONNRESET interruptions on offline/slow networks.
 - **🌗 Dual Handcrafted Themes**:
   - **Deep Plum Dark Mode**: Velvet midnight canvas (`#2C2C2C`), plum surfaces (`#612D53`), and rose highlights (`#853953`).
   - **Warm Terracotta Light Mode**: Cream canvas (`#FFEAD3`), soft mint accents (`#BFE7EA`), and rust buttons (`#D46743`).

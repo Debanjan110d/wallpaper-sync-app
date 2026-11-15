@@ -94,7 +94,7 @@ export default function ComparisonTable() {
           >
             <span style={{ color: "rgba(233, 238, 252, 0.6)" }}>Capability / Feature</span>
             <span style={{ color: "#818cf8", display: "flex", alignItems: "center", gap: "6px" }}>
-              ✨ Wallpaper Sync (v5.1.0)
+              ✨ Wallpaper Sync (v5.2.0)
             </span>
             <span style={{ color: "rgba(233, 238, 252, 0.5)" }}>Generic Wallpaper Apps</span>
           </div>

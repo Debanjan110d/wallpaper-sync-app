@@ -42,7 +42,7 @@ export default function HeroSection({
               }}
             >
               <Sparkles size={14} />
-              <span>v5.1.0 Released · Windows 10 & 11 (64-bit)</span>
+              <span>v5.2.0 Released · Windows 10 & 11 (64-bit)</span>
             </div>
 
             <h1 className="hTitle" style={{ lineHeight: 1.15 }}>

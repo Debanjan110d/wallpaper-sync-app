@@ -23,7 +23,7 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
   const issueTemplateMarkdown = `### Bug Report: ${title || "Issue with " + category}
 **Category:** ${category}
 **Operating System:** ${windowsVersion}
-**App Version:** v5.1.0
+**App Version:** v5.2.0
 
 #### Description:
 ${description || "No description provided."}

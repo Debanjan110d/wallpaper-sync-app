@@ -10,7 +10,7 @@ export default function Header() {
           <Link href="/" className="brand" id="tour-brand" style={{ textDecoration: "none", color: "inherit" }}>
             <Image src="/logo.png" alt="Wallpaper Sync" width={38} height={38} priority />
             <span className="brandText">Wallpaper Sync</span>
-            <span className="badge">v5.1.0 · Win 10/11</span>
+            <span className="badge">v5.2.0 · Win 10/11</span>
           </Link>
 
           <nav className="nav navDesktop" aria-label="Primary">
