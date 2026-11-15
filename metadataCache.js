@@ -121,16 +121,17 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
   const data = loadLocalMetadata();
 
   try {
-    // 1. Check server connectivity
+    // 1. Fast Connectivity Probe (short timeout so app never blocks or hangs)
     reportProgress("Checking server connection...", 10);
-    await axios.get(`${cleanUrl}/api/collections`, { headers, timeout: 5000 });
+    await axios.get(`${cleanUrl}/api/collections`, { headers, timeout: 3500 });
   } catch (err) {
-    reportProgress("Server unreachable", 0);
-    return { status: "offline", error: "Server unreachable: " + err.message };
+    reportProgress("Server offline - using cached metadata", 100);
+    console.log(`[MetadataCache] Server unreachable (${err.code || err.message}) - working offline with cached collections.`);
+    return { status: "offline", error: err.message, usingCached: true };
   }
 
   try {
-    // 2. Pull server metadata to fully synchronize local tables
+    // 2. Pull server metadata with strict timeouts to prevent hangs or unhandled ECONNRESET
     reportProgress("Fetching latest library data...", 50);
     const wpsHeaders = { ...headers };
     if (data.etag) {
@@ -138,34 +139,43 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
     }
 
     const [srvColsRes, srvTagsRes, srvWpsRes] = await Promise.all([
-      axios.get(`${cleanUrl}/api/collections`, { headers }),
-      axios.get(`${cleanUrl}/api/tags`, { headers }),
+      axios.get(`${cleanUrl}/api/collections`, { headers, timeout: 5000 }),
+      axios.get(`${cleanUrl}/api/tags`, { headers, timeout: 5000 }),
       axios.get(`${cleanUrl}/api/wallpapers`, { 
         headers: wpsHeaders,
+        timeout: 6000,
         validateStatus: (status) => status === 200 || status === 304
       }),
     ]);
 
-    // Overwrite local tables with server data
+    // Update local collections & tags if server returned valid arrays
+    if (Array.isArray(srvColsRes.data?.collections)) {
+      data.collections = srvColsRes.data.collections;
+    }
+    if (Array.isArray(srvTagsRes.data?.tags)) {
+      data.tags = srvTagsRes.data.tags;
+    }
     data.categories = [];
-    data.collections = srvColsRes.data.collections || [];
-    data.tags = srvTagsRes.data.tags || [];
 
-    if (srvWpsRes.status === 200) {
-      // Sync server wallpaper metadata down to the local cache
-      data.wallpaper_metadata = {};
+    if (srvWpsRes.status === 200 && Array.isArray(srvWpsRes.data?.wallpapers)) {
+      // Intelligently merge server wallpaper metadata without wiping local orientations
+      if (!data.wallpaper_metadata) data.wallpaper_metadata = {};
       const serverWallpapers = srvWpsRes.data.wallpapers || [];
       for (const sw of serverWallpapers) {
         if (sw.hash) {
+          const existing = data.wallpaper_metadata[sw.hash] || {};
           data.wallpaper_metadata[sw.hash] = {
-            file_name: sw.file_name || null,
-            collection_id: sw.collection_id ? Number(sw.collection_id) : null,
-            collection_ids: Array.isArray(sw.collections) ? sw.collections.map((c) => Number(c.id)) : (sw.collection_id ? [Number(sw.collection_id)] : []),
-            tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : [],
-            title: sw.title || null,
-            description: sw.description || null,
-            orientation: sw.orientation || null,
-            quality: sw.quality || null,
+            ...existing,
+            file_name: sw.file_name || existing.file_name || null,
+            collection_id: sw.collection_id ? Number(sw.collection_id) : existing.collection_id,
+            collection_ids: Array.isArray(sw.collections)
+              ? sw.collections.map((c) => Number(c.id))
+              : (sw.collection_id ? [Number(sw.collection_id)] : (existing.collection_ids || [])),
+            tags: Array.isArray(sw.tags) ? sw.tags.map((t) => Number(t.id)) : (existing.tags || []),
+            title: sw.title || existing.title || null,
+            description: sw.description || existing.description || null,
+            orientation: existing.orientation || sw.orientation || null,
+            quality: sw.quality || existing.quality || null,
           };
         }
       }
@@ -193,9 +203,14 @@ async function syncMetadataWithServer(apiUrl, syncToken, onProgress) {
       tagsCount: data.tags.length,
     };
   } catch (err) {
-    console.error("Error during sync runner:", err);
-    reportProgress("Sync failed: " + err.message, 0);
-    return { status: "offline", error: err.message };
+    const isNetworkError = err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND" || err.message?.includes("timeout");
+    if (isNetworkError) {
+      console.log(`[MetadataCache] Sync paused due to network (${err.code || err.message}) - preserving offline metadata cache.`);
+    } else {
+      console.warn("[MetadataCache] Notice during sync runner:", err.message);
+    }
+    reportProgress("Using cached metadata", 100);
+    return { status: "offline", error: err.message, usingCached: true };
   }
 }
 

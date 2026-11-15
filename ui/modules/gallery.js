@@ -477,29 +477,64 @@ export function renderRecentlyAdded() {
         const meta = localMetadata.wallpaper_metadata[hash] || {};
         const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
         const matchedCols = localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
-        const colNames = matchedCols.map(c => c.name).join(", ") || "None";
+        const colNames = matchedCols.map(c => c.name).join(", ") || "";
 
-        const friendlyName = colNames && colNames !== "None" ? colNames : img.filename.split(".")[0];
-        const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
-        const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
-        const extraCount = wtags.length - 3;
-        const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
+        let friendlyName = meta.title || "";
+        if (!friendlyName) {
+            const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
+            if (wtags.length > 0) {
+                friendlyName = wtags.slice(0, 2).map(t => `#${t.name}`).join(" ");
+            } else if (colNames) {
+                friendlyName = colNames;
+            } else {
+                const base = img.filename.replace(/\.[^/.]+$/, "");
+                friendlyName = base.length <= 16 ? base : `Wallpaper #${base.slice(0, 6)}`;
+            }
+        }
 
         const isFav = store.state.selectedSet.has(String(img.path));
+        const cacheBuster = img.mtimeMs ? `?v=${img.mtimeMs}` : "";
 
         const card = document.createElement("div");
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
-            <img src="${toFileUrl(img.thumbPath || img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
+            <img src="${toFileUrl(img.thumbPath || img.path)}${cacheBuster}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
+            <button class="card-rotate-btn" type="button" title="Rotate 90° Clockwise">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+            </button>
             <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
                 ${isFav ? '❤️' : '♡'}
             </button>
             <div class="horizontal-card-overlay">
                 <div class="horizontal-card-title">${friendlyName}</div>
-                <div class="horizontal-card-meta">${colNames}</div>
+                <div class="horizontal-card-meta">${colNames || "Original"}</div>
             </div>
         `;
+
+        const rotateBtn = card.querySelector(".card-rotate-btn");
+        if (rotateBtn) {
+            rotateBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                rotateBtn.disabled = true;
+                try {
+                    const res = await window.api.rotateWallpaper(img.path, 90);
+                    if (res && res.success) {
+                        const newUrl = toFileUrl(img.path) + `?t=${Date.now()}`;
+                        const cardImg = card.querySelector(".horizontal-card-img");
+                        if (cardImg) cardImg.src = newUrl;
+                        showToast("Wallpaper rotated 90°", "success");
+                    }
+                } catch {
+                    showToast("Failed to rotate wallpaper", "error");
+                } finally {
+                    rotateBtn.disabled = false;
+                }
+            });
+        }
 
         const favBtn = card.querySelector(".card-fav-btn");
         if (favBtn) {
@@ -554,29 +589,64 @@ export function renderRandomDiscoveries() {
         const meta = localMetadata.wallpaper_metadata[hash] || {};
         const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id ? [meta.collection_id] : []);
         const matchedCols = localMetadata.collections.filter(c => collectionIds.includes(Number(c.id)));
-        const colNames = matchedCols.map(c => c.name).join(", ") || "None";
+        const colNames = matchedCols.map(c => c.name).join(", ") || "";
 
-        const friendlyName = colNames && colNames !== "None" ? colNames : img.filename.split(".")[0];
-        const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
-        const tagString = wtags.slice(0, 3).map(t => `#${t.name}`).join(" ");
-        const extraCount = wtags.length - 3;
-        const displayName = tagString + (extraCount > 0 ? ` +${extraCount}` : "");
+        let friendlyName = meta.title || "";
+        if (!friendlyName) {
+            const wtags = meta.tags ? localMetadata.tags.filter(t => meta.tags.includes(t.id)) : [];
+            if (wtags.length > 0) {
+                friendlyName = wtags.slice(0, 2).map(t => `#${t.name}`).join(" ");
+            } else if (colNames) {
+                friendlyName = colNames;
+            } else {
+                const base = img.filename.replace(/\.[^/.]+$/, "");
+                friendlyName = base.length <= 16 ? base : `Wallpaper #${base.slice(0, 6)}`;
+            }
+        }
 
         const isFav = store.state.selectedSet.has(String(img.path));
+        const cacheBuster = img.mtimeMs ? `?v=${img.mtimeMs}` : "";
 
         const card = document.createElement("div");
         card.className = "horizontal-card";
         card.title = img.filename;
         card.innerHTML = `
-            <img src="${toFileUrl(img.thumbPath || img.path)}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
+            <img src="${toFileUrl(img.thumbPath || img.path)}${cacheBuster}" class="horizontal-card-img" alt="${img.filename}" draggable="false" loading="lazy" decoding="async" />
+            <button class="card-rotate-btn" type="button" title="Rotate 90° Clockwise">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+            </button>
             <button class="card-fav-btn ${isFav ? 'active' : ''}" type="button" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
                 ${isFav ? '❤️' : '♡'}
             </button>
             <div class="horizontal-card-overlay">
                 <div class="horizontal-card-title">${friendlyName}</div>
-                <div class="horizontal-card-meta">${colNames}</div>
+                <div class="horizontal-card-meta">${colNames || "Original"}</div>
             </div>
         `;
+
+        const rotateBtn = card.querySelector(".card-rotate-btn");
+        if (rotateBtn) {
+            rotateBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                rotateBtn.disabled = true;
+                try {
+                    const res = await window.api.rotateWallpaper(img.path, 90);
+                    if (res && res.success) {
+                        const newUrl = toFileUrl(img.path) + `?t=${Date.now()}`;
+                        const cardImg = card.querySelector(".horizontal-card-img");
+                        if (cardImg) cardImg.src = newUrl;
+                        showToast("Wallpaper rotated 90°", "success");
+                    }
+                } catch {
+                    showToast("Failed to rotate wallpaper", "error");
+                } finally {
+                    rotateBtn.disabled = false;
+                }
+            });
+        }
 
         const favBtn = card.querySelector(".card-fav-btn");
         if (favBtn) {
@@ -756,7 +826,8 @@ export function renderCatalog() {
 
             const img = document.createElement("img");
             img.className = "card-img";
-            img.src = toFileUrl(imgData.thumbPath || imgData.path);
+            const cacheBuster = imgData.mtimeMs ? `?v=${imgData.mtimeMs}` : "";
+            img.src = toFileUrl(imgData.thumbPath || imgData.path) + cacheBuster;
             img.alt = imgData.filename;
             img.loading = "lazy";
             img.decoding = "async";

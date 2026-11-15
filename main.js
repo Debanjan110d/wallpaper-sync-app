@@ -604,12 +604,16 @@ function scheduleThumbnailGeneration(filesList) {
   setTimeout(processNext, 1200);
 }
 
+function safeExists(p) {
+  return typeof p === "string" && p.trim().length > 0 && fs.existsSync(p);
+}
+
 // In-memory cache for dominant colors: filePath -> { r, g, b, hex }
 const dominantColorCache = new Map();
 
 function extractDominantColor(filePath) {
   try {
-    if (!filePath || !fs.existsSync(filePath)) return null;
+    if (!safeExists(filePath)) return null;
     if (dominantColorCache.has(filePath)) {
       return dominantColorCache.get(filePath);
     }
@@ -670,7 +674,7 @@ function extractDominantColor(filePath) {
 
 async function rotateWallpaperFile(filePath, degrees = 90) {
   try {
-    if (!filePath || !fs.existsSync(filePath)) {
+    if (!safeExists(filePath)) {
       throw new Error(`File not found: ${filePath}`);
     }
 
@@ -804,7 +808,7 @@ async function rotateWallpaperFile(filePath, degrees = 90) {
 // Fast binary header reader for instant orientation checks without full image decoding
 function getJpegDimensionsFast(filePath) {
   try {
-    if (!fs.existsSync(filePath)) return null;
+    if (!safeExists(filePath)) return null;
     const fd = fs.openSync(filePath, "r");
     const buf = Buffer.alloc(8192);
     const bytesRead = fs.readSync(fd, buf, 0, 8192, 0);
@@ -839,30 +843,36 @@ function getJpegDimensionsFast(filePath) {
 function getSidewaysWallpapersInfo() {
   try {
     const metaPath = config.METADATA_FILE;
-    if (!fs.existsSync(metaPath)) return { count: 0, items: [] };
+    if (!safeExists(metaPath)) return { count: 0, items: [] };
     const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
     const wm = meta.wallpaper_metadata || {};
     const wpDir = config.WALLPAPER_DIR;
-    if (!fs.existsSync(wpDir)) return { count: 0, items: [] };
+    if (!safeExists(wpDir)) return { count: 0, items: [] };
 
     const sideways = [];
     for (const [hash, entry] of Object.entries(wm)) {
       const fileName = entry.file_name || "";
-      if (fileName.startsWith("SnapInsta")) {
-        let fullPath = path.join(wpDir, `${hash}.jpg`);
-        let ext = ".jpg";
-        if (!fs.existsSync(fullPath)) {
-          if (fs.existsSync(path.join(wpDir, `${hash}.jpeg`))) {
-            fullPath = path.join(wpDir, `${hash}.jpeg`);
-            ext = ".jpeg";
-          } else if (fs.existsSync(path.join(wpDir, `${hash}.png`))) {
-            fullPath = path.join(wpDir, `${hash}.png`);
-            ext = ".png";
-          }
+      const cids = entry.collection_ids || [entry.collection_id];
+      const isDhoni = cids.includes(445);
+      const isNumbered = /^\d+\.jpe?g$/i.test(fileName);
+      let num = isNumbered ? parseInt(fileName.match(/^(\d+)/)[1]) : 0;
+      const isNumberedTilted = isNumbered && num >= 200 && num <= 250;
+
+      let fullPath = path.join(wpDir, `${hash}.jpg`);
+      let ext = ".jpg";
+      if (!safeExists(fullPath)) {
+        if (safeExists(path.join(wpDir, `${hash}.jpeg`))) {
+          fullPath = path.join(wpDir, `${hash}.jpeg`);
+          ext = ".jpeg";
+        } else if (safeExists(path.join(wpDir, `${hash}.png`))) {
+          fullPath = path.join(wpDir, `${hash}.png`);
+          ext = ".png";
         }
-        if (fs.existsSync(fullPath)) {
-          const dims = getJpegDimensionsFast(fullPath);
-          if (dims && dims.width > dims.height) {
+      }
+      if (safeExists(fullPath)) {
+        const dims = getJpegDimensionsFast(fullPath);
+        if (dims) {
+          if (fileName.startsWith("SnapInsta") && dims.height > dims.width) {
             sideways.push({
               hash,
               filePath: fullPath,
@@ -870,6 +880,17 @@ function getSidewaysWallpapersInfo() {
               originalName: fileName,
               width: dims.width,
               height: dims.height,
+              deg: 270,
+            });
+          } else if ((isDhoni || isNumberedTilted) && dims.height > dims.width) {
+            sideways.push({
+              hash,
+              filePath: fullPath,
+              filename: `${hash}${ext}`,
+              originalName: fileName,
+              width: dims.width,
+              height: dims.height,
+              deg: 270,
             });
           }
         }
@@ -902,7 +923,7 @@ async function batchFixSidewaysWallpapers(hashesToFix = null) {
   for (let i = 0; i < total; i++) {
     const item = targetItems[i];
     try {
-      await rotateWallpaperFile(item.filePath, 90);
+      await rotateWallpaperFile(item.filePath, item.deg || 270);
       fixedCount++;
     } catch (err) {
       console.warn(`[BatchFix] Failed to rotate ${item.filename}:`, err);
@@ -1183,7 +1204,7 @@ function showNativeNotification({ title, body, icon, onClick, type = "general", 
       const notif = new Notification({
         title: title || "Wallpaper Sync",
         body: body || "",
-        icon: fs.existsSync(notifIcon) ? notifIcon : undefined,
+        icon: safeExists(notifIcon) ? notifIcon : undefined,
         silent: silent !== false, // Unobtrusive by default
       });
 
@@ -2232,7 +2253,7 @@ ipcMain.handle("app:health-check", async () => {
   const corruptedList = [];
 
   const checkDir = (dirPath) => {
-    if (!dirPath || !fs.existsSync(dirPath)) return;
+    if (!safeExists(dirPath)) return;
     try {
       const files = fs.readdirSync(dirPath);
       for (const file of files) {
@@ -2264,7 +2285,7 @@ ipcMain.handle("app:health-check", async () => {
   checkDir(userDir);
 
   const watchdogStatus = getWatchdogStatus();
-  const hasActiveWp = !!(settings.activeWallpaper && fs.existsSync(settings.activeWallpaper));
+  const hasActiveWp = safeExists(settings.activeWallpaper);
 
   // Network Connectivity Check (ping API with timeout)
   let networkOnline = false;

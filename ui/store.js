@@ -1,6 +1,7 @@
 // Central State Store and Lifecycle Management
 import {
     populateFiltersAndDropdowns,
+    updateCollectionsDropdowns,
     renderCategorySection,
     renderRecentlyAdded,
     renderRandomDiscoveries,
@@ -62,6 +63,8 @@ export async function loadWallpapers() {
     }
 
     // Redraw lists
+    renderCategorySection();
+    updateCollectionsDropdowns();
     renderHeroSlider();
     renderRecentlyAdded();
     renderRandomDiscoveries();
